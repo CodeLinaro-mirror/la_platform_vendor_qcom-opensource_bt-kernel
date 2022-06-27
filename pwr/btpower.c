@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 /*
@@ -99,6 +99,13 @@ enum power_src_pos {
 	 */
 	BT_VDD_SMPS,
 	BT_VDD_SMPS_CURRENT,
+	// QCA BT regs for Auto
+	BT_VDD_CTRL1_LDO,
+	BT_VDD_CTRL1_LDO_CURRENT,
+	BT_VDD_CTRL2_LDO,
+	BT_VDD_CTRL2_LDO_CURRENT,
+	BT_VDD_RFA3_LDO,
+	BT_VDD_RFA3_LDO_CURRENT,
 	/* New entries need to be added before PWR_SRC_SIZE.
 	 * Its hold the max size of power sources states.
 	 */
@@ -176,6 +183,26 @@ static struct bt_power bt_vreg_info_wcn399x = {
 	.num_vregs = 5,
 };
 
+// Regulator structure for QCA BT in automotive SPs
+static struct bt_power bt_vreg_info_qca_auto = {
+	.compatible = "qcom,qca-auto-converged",
+	.vregs = (struct bt_power_vreg_data []) {
+		{NULL, "qcom,bt-vdd-ctrl1", 0, 0, 0, false, false,
+			{BT_VDD_CTRL1_LDO, BT_VDD_CTRL1_LDO_CURRENT}},
+		{NULL, "qcom,bt-vdd-ctrl2", 0, 0, 0, false, false,
+			{BT_VDD_CTRL2_LDO, BT_VDD_CTRL2_LDO_CURRENT}},
+		{NULL, "qcom,bt-vdd-aon", 1055000, 1055000, 0, false, false,
+			{BT_VDD_AON_LDO, BT_VDD_AON_LDO_CURRENT}},
+		{NULL, "qcom,bt-vdd-rfa1", 1370000, 1370000, 0, false, false,
+			{BT_VDD_RFA1_LDO, BT_VDD_RFA1_LDO_CURRENT}},
+		{NULL, "qcom,bt-vdd-rfa2", 2040000, 2040000, 0, false, false,
+			{BT_VDD_RFA2_LDO, BT_VDD_RFA2_LDO_CURRENT}},
+		{NULL, "qcom,bt-vdd-rfa3", 1900000, 1900000, 0, false, false,
+			{BT_VDD_RFA3_LDO, BT_VDD_RFA3_LDO_CURRENT}},
+	},
+	.num_vregs = 6,
+};
+
 static struct bt_power bt_vreg_info_qca6174 = {
 	.compatible = "qcom,qca6174",
 	.vregs = bt_vregs_info_qca61x4_937x,
@@ -220,6 +247,7 @@ static const struct of_device_id bt_power_match_table[] = {
 	{	.compatible = "qcom,kiwi",    .data = &bt_vreg_info_kiwi},
 	{	.compatible = "qcom,wcn6750-bt", .data = &bt_vreg_info_wcn6750},
 	{	.compatible = "qcom,bt-qca-converged", .data = &bt_vreg_info_converged},
+	{	.compatible = "qcom,qca-auto-converged", .data = &bt_vreg_info_qca_auto},
 	{},
 };
 
