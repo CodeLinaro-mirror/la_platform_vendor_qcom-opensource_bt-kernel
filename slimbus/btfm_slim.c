@@ -237,6 +237,8 @@ int btfm_slim_disable_ch(struct btfmslim *btfmslim, struct btfmslim_ch *ch,
 		btfm_num_ports_open--;
 
 	ch->dai.sruntime = NULL;
+	BTFMSLIM_INFO("calling slim suspend for LPI");
+	slim_vote_for_suspend(btfmslim->slim_pgd);
 
 	BTFMSLIM_INFO("btfm_num_ports_open: %d", btfm_num_ports_open);
 
@@ -425,8 +427,10 @@ int btfm_slim_hw_init(struct btfmslim *btfmslim)
 		chipset_ver ==  QCA_COMANCHE_SOC_ID_0130 ||
 		chipset_ver ==  QCA_COMANCHE_SOC_ID_4130 ||
 		chipset_ver ==  QCA_COMANCHE_SOC_ID_5120 ||
-		chipset_ver ==  QCA_COMANCHE_SOC_ID_5130 ) {
-		BTFMSLIM_INFO("chipset is Chk/Apache/CMC, overwriting EA");
+		chipset_ver ==  QCA_COMANCHE_SOC_ID_5130 ||
+		chipset_ver ==  QCA_SLATE_SOC_ID_0100 ||
+		chipset_ver ==  QCA_SLATE_SOC_ID_0200 ) {
+		BTFMSLIM_INFO("chipset is Chk/Apache/CMC/slate, overwriting EA");
 		slim->is_laddr_valid = false;
 		slim->e_addr.manf_id = SLIM_MANF_ID_QCOM;
 		slim->e_addr.prod_code = 0x220;
@@ -592,6 +596,19 @@ static int btfm_slim_status(struct slim_device *sdev,
 	else
 		BTFMSLIM_ERR("error, registering slimbus codec failed");
 
+	return ret;
+}
+
+static long btfm_slim_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+{
+	int ret = 0;
+
+	switch (cmd) {
+	case BT_CMD_SLIM_TEST:
+		BTFMSLIM_INFO("cmd BT_CMD_SLIM_TEST, call btfm_slim_hw_init");
+		ret = btfm_slim_hw_init(btfm_slim_drv_data);
+		break;
+	}
 	return ret;
 }
 

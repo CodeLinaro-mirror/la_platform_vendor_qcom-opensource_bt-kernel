@@ -17,7 +17,6 @@
 #include <linux/rfkill.h>
 #include <linux/gpio.h>
 #include <linux/of_gpio.h>
-#include <linux/of.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
 #include <linux/regulator/consumer.h>
@@ -49,6 +48,10 @@
 #define BTPOWER_MBOX_MSG_MAX_LEN 64
 #define BTPOWER_MBOX_TIMEOUT_MS 1000
 #define XO_CLK_RETRY_COUNT_MAX 5
+
+#ifdef BT_SS_ENABLED
+#define QCA_SLATE_SOC_ID_0200 0x40190200
+#endif
 /**
  * enum btpower_vreg_param: Voltage regulator TCS param
  * @BTPOWER_VREG_VOLTAGE: Provides voltage level to be configured in TCS
@@ -193,6 +196,12 @@ static struct bt_power bt_vreg_info_wcn399x = {
 	.num_vregs = 5,
 };
 
+// Regulator structure for QCC5100 BT SoC series
+static struct bt_power_vreg_data bt_vreg_info_qcc5xxx[] = {
+	{NULL, "qcom,bt-vdd-pa", 1700000, 1900000, 0, false, false,
+			{BT_VDD_PA_LDO, BT_VDD_PA_LDO_CURRENT}},
+};
+
 static struct bt_power bt_vreg_info_qca6174 = {
 	.compatible = "qcom,qca6174",
 	.vregs = bt_vregs_info_qca61x4_937x,
@@ -217,16 +226,17 @@ static struct bt_power bt_vreg_info_kiwi = {
 	.num_vregs = ARRAY_SIZE(bt_vregs_info_kiwi),
 };
 
-static struct bt_power bt_vreg_info_converged = {
-	.compatible = "qcom,bt-qca-converged",
-	.vregs = bt_vregs_info_kiwi,
-	.num_vregs = ARRAY_SIZE(bt_vregs_info_kiwi),
-};
 
 static struct bt_power bt_vreg_info_wcn6750 = {
 	.compatible = "qcom,wcn6750-bt",
 	.vregs = bt_vregs_info_qca6xx0,
 	.num_vregs = ARRAY_SIZE(bt_vregs_info_qca6xx0),
+};
+
+static struct bt_power bt_vreg_info_qcc5100 = {
+	.compatible = "qcom,qcc5100",
+	.vregs = bt_vreg_info_qcc5xxx,
+	.num_vregs = ARRAY_SIZE(bt_vreg_info_qcc5xxx),
 };
 
 static const struct of_device_id bt_power_match_table[] = {
@@ -236,7 +246,7 @@ static const struct of_device_id bt_power_match_table[] = {
 	{	.compatible = "qcom,qca6490", .data = &bt_vreg_info_qca6490},
 	{	.compatible = "qcom,kiwi",    .data = &bt_vreg_info_kiwi},
 	{	.compatible = "qcom,wcn6750-bt", .data = &bt_vreg_info_wcn6750},
-	{	.compatible = "qcom,bt-qca-converged", .data = &bt_vreg_info_converged},
+        {       .compatible = "qcom,qcc5100", .data = &bt_vreg_info_qcc5100},
 	{},
 };
 
@@ -1080,9 +1090,11 @@ static void bt_power_vreg_put(void)
 	}
 }
 
+
 static int bt_power_populate_dt_pinfo(struct platform_device *pdev)
 {
 	int rc;
+
 	pr_debug("%s\n", __func__);
 
 	if (!bt_power_pdata)
@@ -1158,26 +1170,6 @@ static int bt_power_populate_dt_pinfo(struct platform_device *pdev)
 	return 0;
 }
 
-static void bt_power_pdc_init_params (struct btpower_platform_data *pdata)
-{
-	int ret;
-	struct device *dev = &pdata->pdev->dev;
-	pdata->pdc_init_table_len = of_property_count_strings(dev->of_node,
-				"qcom,pdc_init_table");
-	if (pdata->pdc_init_table_len > 0) {
-		pdata->pdc_init_table = kcalloc(pdata->pdc_init_table_len,
-				sizeof(char *), GFP_KERNEL);
-		ret = of_property_read_string_array(dev->of_node, "qcom,pdc_init_table",
-			pdata->pdc_init_table, pdata->pdc_init_table_len);
-		if (ret < 0)
-			pr_err("Failed to get PDC Init Table\n");
-		else
-			pr_info("PDC Init table configured\n");
-	} else {
-		pr_debug("PDC Init Table not configured\n");
-	}
-}
-
 static int bt_power_probe(struct platform_device *pdev)
 {
 	int ret = 0;
@@ -1228,9 +1220,10 @@ static int bt_power_probe(struct platform_device *pdev)
 		pr_err("%s: Failed to get platform data\n", __func__);
 		goto free_pdata;
 	}
+
 	if (btpower_rfkill_probe(pdev) < 0)
 		goto free_pdata;
-        bt_power_pdc_init_params(bt_power_pdata);
+
 	btpower_aop_mbox_init(bt_power_pdata);
 
 	probe_finished = true;
@@ -1268,8 +1261,13 @@ EXPORT_SYMBOL(btpower_register_slimdev);
 
 int btpower_get_chipset_version(void)
 {
+#ifndef BT_SS_ENABLED
 	pr_debug("%s\n", __func__);
 	return soc_id;
+#else
+	pr_debug("%s: returning slate SOCID: %x\n", __func__, QCA_SLATE_SOC_ID_0200);
+	return QCA_SLATE_SOC_ID_0200;
+#endif
 }
 EXPORT_SYMBOL(btpower_get_chipset_version);
 
@@ -1527,51 +1525,6 @@ driver_err:
 	return ret;
 }
 
-/**
- * bt_aop_send_msg: Sends json message to AOP using QMP
- * @plat_priv: Pointer to cnss platform data
- * @msg: String in json format
- *
- * AOP accepts JSON message to configure WLAN/BT resources. Format as follows:
- * To send VReg config: {class: wlan_pdc, ss: <pdc_name>,
- *                       res: <VReg_name>.<param>, <seq_param>: <value>}
- * To send PDC Config: {class: wlan_pdc, ss: <pdc_name>, res: pdc,
- *                      enable: <Value>}
- * QMP returns timeout error if format not correct or AOP operation fails.
- *
- * Return: 0 for success
- */
- int bt_aop_send_msg(struct btpower_platform_data *plat_priv, char *mbox_msg)
- {
-	struct qmp_pkt pkt;
-	int ret = 0;
-	pkt.size = BTPOWER_MBOX_MSG_MAX_LEN;
-	pkt.data = mbox_msg;
-	ret = mbox_send_message(plat_priv->mbox_chan, &pkt);
-	if (ret < 0)
-		pr_err("Failed to send AOP mbox msg: %s\n", mbox_msg);
-	else
-		ret =0;
-	return ret;
-
- }
-int bt_aop_pdc_reconfig(struct btpower_platform_data *pdata)
-{
-
-	unsigned int i;
-	int ret;
-	if (pdata->pdc_init_table_len <= 0 || !pdata->pdc_init_table)
-		return 0;
-        pr_debug("Setting PDC defaults");
-	for (i = 0; i < pdata->pdc_init_table_len; i++) {
-		ret =bt_aop_send_msg(pdata,(char *)pdata->pdc_init_table[i]);
-		if (ret < 0)
-			break;
-	}
-	return ret;
-}
-
-
 int btpower_aop_mbox_init(struct btpower_platform_data *pdata)
 {
 	struct mbox_client *mbox = &pdata->mbox_client_data;
@@ -1598,10 +1551,6 @@ int btpower_aop_mbox_init(struct btpower_platform_data *pdata)
 		pr_info("%s: vreg for iPA not configured\n", __func__);
 	else
 		pr_info("%s: Mbox channel initialized\n", __func__);
-
-	ret = bt_aop_pdc_reconfig(pdata);
-	if (ret)
-		pr_err("Failed to reconfig BT WLAN PDC, err = %d\n", ret);
 
 	return 0;
 }

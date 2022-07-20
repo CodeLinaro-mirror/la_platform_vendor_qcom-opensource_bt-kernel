@@ -3,9 +3,13 @@
 LOCAL_PATH := $(call my-dir)
 
 # Build/Package only in case of supported target
-ifeq ($(call is-board-platform-in-list,taro kalama pineapple blair), true)
+ifeq ($(call is-board-platform-in-list,taro kalama pineapple blair monaco), true)
 
 BT_SELECT := CONFIG_MSM_BT_POWER=m
+
+ifeq ($(TARGET_USE_WEAR_QC_BT_STACK),true)
+BT_SELECT += CONFIG_QC_SS_STACK=m
+endif
 #ifdef CONFIG_SLIMBUS
 BT_SELECT += CONFIG_BTFM_SLIM=m
 #endif
@@ -28,10 +32,10 @@ LOCAL_MODULE_KO_DIRS += rtc6226/radio-i2c-rtc6226-qca.ko
 ifneq ($(findstring vendor,$(LOCAL_PATH)),)
 
 ifneq ($(findstring opensource,$(LOCAL_PATH)),)
-	BT_BLD_DIR := $(abspath .)/vendor/qcom/opensource/bt-kernel
+	BT_BLD_DIR := $(abspath .)/$(BOARD_OPENSOURCE_DIR)/bt-kernel
 endif # opensource
 
-DLKM_DIR := $(TOP)/device/qcom/common/dlkm
+DLKM_DIR := $(TOP)/$(BOARD_COMMON_DIR)/dlkm
 
 
 ###########################################################
@@ -40,6 +44,7 @@ KBUILD_OPTIONS := BT_KERNEL_ROOT=$(BT_BLD_DIR)
 KBUILD_OPTIONS += $(foreach bt_select, \
        $(BT_SELECT), \
        $(bt_select))
+
 BT_SRC_FILES := \
 	$(wildcard $(LOCAL_PATH)/*) \
 	$(wildcard $(LOCAL_PATH)/*/*) \
