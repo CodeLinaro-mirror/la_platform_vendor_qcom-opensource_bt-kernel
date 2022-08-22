@@ -227,6 +227,13 @@ int btfm_slim_disable_ch(struct btfmslim *btfmslim, struct btfmslim_ch *ch,
 		btfm_num_ports_open--;
 
 	ch->dai.sruntime = NULL;
+	chipset_ver = btpower_get_chipset_version();
+	BTFMSLIM_INFO("chipset soc version:%x", chipset_ver);
+	if (chipset_ver == QCA_SLATE_SOC_ID_0100 ||
+		chipset_ver == QCA_SLATE_SOC_ID_0200) {
+		BTFMSLIM_INFO("chipset is Slate, calling slim suspend for LPI");
+//		slim_vote_for_suspend(btfmslim->slim_pgd);
+	}
 
 	BTFMSLIM_INFO("btfm_num_ports_open: %d", btfm_num_ports_open);
 
@@ -411,8 +418,10 @@ int btfm_slim_hw_init(struct btfmslim *btfmslim)
 		chipset_ver ==  QCA_COMANCHE_SOC_ID_0130 ||
 		chipset_ver ==  QCA_COMANCHE_SOC_ID_4130 ||
 		chipset_ver ==  QCA_COMANCHE_SOC_ID_5120 ||
-		chipset_ver ==  QCA_COMANCHE_SOC_ID_5130 ) {
-		BTFMSLIM_INFO("chipset is Chk/Apache/CMC, overwriting EA");
+		chipset_ver ==  QCA_COMANCHE_SOC_ID_5130 ||
+		chipset_ver ==  QCA_SLATE_SOC_ID_0100 ||
+		chipset_ver ==  QCA_SLATE_SOC_ID_0200 ) {
+		BTFMSLIM_INFO("chipset is Chk/Apache/CMC/slate, overwriting EA");
 		slim->is_laddr_valid = false;
 		slim->e_addr.manf_id = SLIM_MANF_ID_QCOM;
 		slim->e_addr.prod_code = 0x220;

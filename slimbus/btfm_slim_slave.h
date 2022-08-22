@@ -128,6 +128,11 @@ enum {
 	QCA_HAMILTON_SOC_ID_0200 = 0x40170200,
 };
 
+enum {
+	QCA_SLATE_SOC_ID_0100 = 0x40190100,
+	QCA_SLATE_SOC_ID_0200 = 0x40190200,
+};
+
 /* Function Prototype */
 
 /*
