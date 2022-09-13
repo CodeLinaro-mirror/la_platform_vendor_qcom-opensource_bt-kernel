@@ -14,7 +14,6 @@
 #include <linux/slimbus.h>
 #include <linux/ratelimit.h>
 #include <linux/slab.h>
-#include <linux/errno.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
@@ -25,6 +24,7 @@
 static int bt_soc_enable_status;
 int btfm_feedback_ch_setting;
 
+#ifdef CONFIG_SLIMBUS
 static int btfm_slim_codec_write(struct snd_soc_component *codec,
 			unsigned int reg, unsigned int value)
 {
@@ -223,11 +223,6 @@ static int btfm_slim_dai_prepare(struct snd_pcm_substream *substream,
 	/* save the enable channel status */
 	if (ret == 0)
 		bt_soc_enable_status = 1;
-
-	if (ret == -EISCONN) {
-		BTFMSLIM_ERR("channel opened without closing, returning success");
-		ret = 0;
-	}
 	return ret;
 }
 
@@ -378,7 +373,7 @@ static struct snd_soc_dai_driver btfmslim_dai[] = {
 		},
 		.ops = &btfmslim_dai_ops,
 	},
-	{	/* Bluetooth SCO voice uplink: bt -> lpass */
+	{	/* Bluetooth SCO voice uplink: bt -> modem */
 		.name = "btfm_bt_sco_slim_tx",
 		.id = BTFM_BT_SCO_SLIM_TX,
 		.capture = {
@@ -386,17 +381,16 @@ static struct snd_soc_dai_driver btfmslim_dai[] = {
 			/* 8 KHz or 16 KHz */
 			.rates = SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000
 				| SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000
-				| SNDRV_PCM_RATE_88200 | SNDRV_PCM_RATE_96000
-				| SNDRV_PCM_RATE_192000,
+				| SNDRV_PCM_RATE_88200 | SNDRV_PCM_RATE_96000,
 			.formats = SNDRV_PCM_FMTBIT_S16_LE, /* 16 bits */
-			.rate_max = 192000,
+			.rate_max = 96000,
 			.rate_min = 8000,
 			.channels_min = 1,
 			.channels_max = 1,
 		},
 		.ops = &btfmslim_dai_ops,
 	},
-	{	/* Bluetooth SCO voice downlink: lpass -> bt or A2DP Playback */
+	{	/* Bluetooth SCO voice downlink: modem -> bt or A2DP Playback */
 		.name = "btfm_bt_sco_a2dp_slim_rx",
 		.id = BTFM_BT_SCO_A2DP_SLIM_RX,
 		.playback = {
@@ -404,10 +398,9 @@ static struct snd_soc_dai_driver btfmslim_dai[] = {
 			/* 8/16/44.1/48/88.2/96 Khz */
 			.rates = SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000
 				| SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000
-				| SNDRV_PCM_RATE_88200 | SNDRV_PCM_RATE_96000
-				| SNDRV_PCM_RATE_192000,
+				| SNDRV_PCM_RATE_88200 | SNDRV_PCM_RATE_96000,
 			.formats = SNDRV_PCM_FMTBIT_S16_LE, /* 16 bits */
-			.rate_max = 192000,
+			.rate_max = 96000,
 			.rate_min = 8000,
 			.channels_min = 1,
 			.channels_max = 1,
@@ -459,6 +452,7 @@ void btfm_slim_unregister_codec(struct device *dev)
 	/* Unregister Codec driver */
 	snd_soc_unregister_component(dev);
 }
+#endif
 
 MODULE_DESCRIPTION("BTFM Slimbus Codec driver");
 MODULE_LICENSE("GPL v2");
