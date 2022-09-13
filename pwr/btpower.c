@@ -39,6 +39,7 @@
 #define BTPOWER_MBOX_MSG_MAX_LEN 64
 #define BTPOWER_MBOX_TIMEOUT_MS 1000
 #define XO_CLK_RETRY_COUNT_MAX 5
+#define PWR_SRC_LOG_UNSUPPORTED {DEFAULT_INVALID_VALUE, DEFAULT_INVALID_VALUE}
 /**
  * enum btpower_vreg_param: Voltage regulator TCS param
  * @BTPOWER_VREG_VOLTAGE: Provides voltage level to be configured in TCS
@@ -95,60 +96,27 @@ enum power_src_pos {
 	BT_VDD_RFACMN_CURRENT
 };
 
-// Regulator structure for QCA6390 and QCA6490 BT SoC series
-static struct bt_power_vreg_data bt_vregs_info_qca6x9x[] = {
-	{NULL, "qcom,bt-vdd-io",      1800000, 1800000, 0, false, true,
-		{BT_VDD_IO_LDO, BT_VDD_IO_LDO_CURRENT}},
-	{NULL, "qcom,bt-vdd-aon",     966000,  966000,  0, false, true,
-		{BT_VDD_AON_LDO, BT_VDD_AON_LDO_CURRENT}},
-	{NULL, "qcom,bt-vdd-rfacmn",  950000,  950000,  0, false, true,
-		{BT_VDD_RFACMN, BT_VDD_RFACMN_CURRENT}},
-	/* BT_CX_MX */
-	{NULL, "qcom,bt-vdd-dig",      966000,  966000,  0, false, true,
-		{BT_VDD_DIG_LDO, BT_VDD_DIG_LDO_CURRENT}},
-	{NULL, "qcom,bt-vdd-rfa-0p8",  950000,  952000,  0, false, true,
-		{BT_VDD_RFA_0p8, BT_VDD_RFA_0p8_CURRENT}},
-	{NULL, "qcom,bt-vdd-rfa1",     1900000, 1900000, 0, false, true,
-		{BT_VDD_RFA1_LDO, BT_VDD_RFA1_LDO_CURRENT}},
-	{NULL, "qcom,bt-vdd-rfa2",     1900000, 1900000, 0, false, true,
-		{BT_VDD_RFA2_LDO, BT_VDD_RFA2_LDO_CURRENT}},
-	{NULL, "qcom,bt-vdd-asd",      2800000, 2800000, 0, false, true,
-		{BT_VDD_ASD_LDO, BT_VDD_ASD_LDO_CURRENT}},
-};
-
-// Regulator structure for WCN399x BT SoC series
-static struct bt_power bt_vreg_info_wcn399x = {
-	.compatible = "qcom,wcn3990",
+static struct bt_power bt_vreg_info_qca_auto = {
+	.compatible = "qcom,qca-auto-secondary",
 	.vregs = (struct bt_power_vreg_data []) {
-		{NULL, "qcom,bt-vdd-io",   1700000, 1900000, 0, false, false,
-			{BT_VDD_IO_LDO, BT_VDD_IO_LDO_CURRENT}},
-		{NULL, "qcom,bt-vdd-core", 1304000, 1304000, 0, false, false,
-			{BT_VDD_CORE_LDO, BT_VDD_CORE_LDO_CURRENT}},
-		{NULL, "qcom,bt-vdd-pa",   3000000, 3312000, 0, false, false,
-			{BT_VDD_PA_LDO, BT_VDD_PA_LDO_CURRENT}},
-		{NULL, "qcom,bt-vdd-xtal", 1700000, 1900000, 0, false, false,
-			{BT_VDD_XTAL_LDO, BT_VDD_XTAL_LDO_CURRENT}},
+		{NULL, "qcom,bt-vdd-ctrl1", 0, 0, 0, false, false,
+			PWR_SRC_LOG_UNSUPPORTED},
+		{NULL, "qcom,bt-vdd-ctrl2", 0, 0, 0, false, false,
+			PWR_SRC_LOG_UNSUPPORTED},
+		{NULL, "qcom,bt-vdd-aon", 1055000, 1055000, 0, false, false,
+			PWR_SRC_LOG_UNSUPPORTED},
+		{NULL, "qcom,bt-vdd-rfa1", 1370000, 1370000, 0, false, false,
+			PWR_SRC_LOG_UNSUPPORTED},
+		{NULL, "qcom,bt-vdd-rfa2", 2040000, 2040000, 0, false, false,
+			PWR_SRC_LOG_UNSUPPORTED},
+		{NULL, "qcom,bt-vdd-rfa3", 1900000, 1900000, 0, false, false,
+			PWR_SRC_LOG_UNSUPPORTED},
 	},
-	.num_vregs = 4,
-};
-
-static struct bt_power bt_vreg_info_qca6390 = {
-	.compatible = "qcom,qca6390",
-	.vregs = bt_vregs_info_qca6x9x,
-	.num_vregs = ARRAY_SIZE(bt_vregs_info_qca6x9x),
-};
-
-static struct bt_power bt_vreg_info_qca6490 = {
-	.compatible = "qcom,qca6490",
-	.vregs = bt_vregs_info_qca6x9x,
-	.num_vregs = ARRAY_SIZE(bt_vregs_info_qca6x9x),
+	.num_vregs = 6,
 };
 
 static const struct of_device_id bt_power_match_table[] = {
-	{	.compatible = "qcom,qca6174" },
-	{	.compatible = "qcom,wcn3990", .data = &bt_vreg_info_wcn399x},
-	{	.compatible = "qcom,qca6390", .data = &bt_vreg_info_qca6390},
-	{	.compatible = "qcom,qca6490", .data = &bt_vreg_info_qca6490},
+	{	.compatible = "qcom,qca-auto-secondary", .data = &bt_vreg_info_qca_auto},
 	{},
 };
 
@@ -565,20 +533,12 @@ static const struct rfkill_ops btpower_rfkill_ops = {
 	.set_block = btpower_toggle_radio,
 };
 
-static ssize_t extldo_show(struct device *dev, struct device_attribute *attr,
-			char *buf)
-{
-	return scnprintf(buf, 6, "false\n");
-}
-
-static DEVICE_ATTR_RO(extldo);
-
 static int btpower_rfkill_probe(struct platform_device *pdev)
 {
 	struct rfkill *rfkill;
 	int ret;
 
-	rfkill = rfkill_alloc("bt_power", &pdev->dev, RFKILL_TYPE_BLUETOOTH,
+	rfkill = rfkill_alloc("bt_power_new", &pdev->dev, RFKILL_TYPE_BLUETOOTH,
 						&btpower_rfkill_ops,
 						pdev->dev.platform_data);
 
@@ -586,11 +546,6 @@ static int btpower_rfkill_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "rfkill allocate failed\n");
 		return -ENOMEM;
 	}
-
-	/* add file into rfkill0 to handle LDO27 */
-	ret = device_create_file(&pdev->dev, &dev_attr_extldo);
-	if (ret < 0)
-		pr_err("%s: device create file error\n", __func__);
 
 	/* force Bluetooth off during init to allow for user control */
 	rfkill_init_sw_state(rfkill, 1);
@@ -936,14 +891,12 @@ int btpower_register_slimdev(struct device *dev)
 	bt_power_pdata->slim_dev = dev;
 	return 0;
 }
-EXPORT_SYMBOL(btpower_register_slimdev);
 
 int btpower_get_chipset_version(void)
 {
 	pr_debug("%s\n", __func__);
 	return soc_id;
 }
-EXPORT_SYMBOL(btpower_get_chipset_version);
 
 static void  set_pwr_srcs_status(struct bt_power_vreg_data *handle)
 {
@@ -1099,7 +1052,7 @@ static struct platform_driver bt_power_driver = {
 	.probe = bt_power_probe,
 	.remove = bt_power_remove,
 	.driver = {
-		.name = "bt_power",
+		.name = "bt_power_new",
 		.of_match_table = bt_power_match_table,
 	},
 };
@@ -1121,14 +1074,14 @@ static int __init btpower_init(void)
 		goto driver_err;
 	}
 
-	bt_major = register_chrdev(0, "bt", &bt_dev_fops);
+	bt_major = register_chrdev(0, "bt-new", &bt_dev_fops);
 	if (bt_major < 0) {
 		pr_err("%s: failed to allocate char dev\n", __func__);
 		ret = -1;
 		goto chrdev_err;
 	}
 
-	bt_class = class_create(THIS_MODULE, "bt-dev");
+	bt_class = class_create(THIS_MODULE, "bt-dev-new");
 	if (IS_ERR(bt_class)) {
 		pr_err("%s: coudn't create class\n", __func__);
 		ret = -1;
@@ -1137,7 +1090,7 @@ static int __init btpower_init(void)
 
 
 	if (device_create(bt_class, NULL, MKDEV(bt_major, 0),
-		NULL, "btpower") == NULL) {
+		NULL, "btpower-new") == NULL) {
 		pr_err("%s: failed to allocate char dev\n", __func__);
 		goto device_err;
 	}
@@ -1146,7 +1099,7 @@ static int __init btpower_init(void)
 device_err:
 	class_destroy(bt_class);
 class_err:
-	unregister_chrdev(bt_major, "bt");
+	unregister_chrdev(bt_major, "bt-new");
 chrdev_err:
 	platform_driver_unregister(&bt_power_driver);
 driver_err:

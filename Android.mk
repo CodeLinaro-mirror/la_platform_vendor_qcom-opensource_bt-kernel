@@ -5,6 +5,8 @@ LOCAL_PATH := $(call my-dir)
 # Build/Package only in case of supported target
 ifeq ($(call is-board-platform-in-list,msmnile), true)
 
+ifeq ($(BOARD_HAVE_DUAL_BLUETOOTH),true)
+
 BT_SELECT := CONFIG_MSM_BT_POWER=m
 
 LOCAL_PATH := $(call my-dir)
@@ -34,8 +36,8 @@ BT_SRC_FILES := \
 ################################ pwr ################################
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(BT_SRC_FILES)
-LOCAL_MODULE              := btpower.ko
-LOCAL_MODULE_KBUILD_NAME  := pwr/btpower.ko
+LOCAL_MODULE              := btpower_new.ko
+LOCAL_MODULE_KBUILD_NAME  := pwr/btpower_new.ko
 LOCAL_MODULE_TAGS         := optional
 LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(TARGET_OUT_VENDOR)/lib/modules
@@ -43,4 +45,5 @@ include $(DLKM_DIR)/AndroidKernelModule.mk
 ###########################################################
 
 endif # DLKM check
+endif # Dual BT enable check
 endif # supported target check
