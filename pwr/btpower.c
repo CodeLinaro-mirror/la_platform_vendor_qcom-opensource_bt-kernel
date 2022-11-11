@@ -1481,6 +1481,8 @@ static long bt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	return ret;
 }
 
+MODULE_DEVICE_TABLE(of, bt_power_match_table);
+
 static struct platform_driver bt_power_driver = {
 	.probe = bt_power_probe,
 	.remove = bt_power_remove,
