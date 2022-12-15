@@ -3,14 +3,15 @@
 LOCAL_PATH := $(call my-dir)
 
 # Build/Package only in case of supported target
-ifeq ($(call is-board-platform-in-list,taro kalama bengal), true)
+ifeq ($(call is-board-platform-in-list,taro kalama msmnile), true)
 
 BT_SELECT := CONFIG_MSM_BT_POWER=m
+ifneq ($(TARGET_BOARD_AUTO),true)
 #ifdef CONFIG_SLIMBUS
 BT_SELECT += CONFIG_BTFM_SLIM=m
 #endif
 BT_SELECT += CONFIG_I2C_RTC6226_QCA=m
-
+endif
 LOCAL_PATH := $(call my-dir)
 
 # This makefile is only for DLKM
