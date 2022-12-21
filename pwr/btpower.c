@@ -30,7 +30,9 @@
 #include "btfm_slim.h"
 #endif
 #include <linux/fs.h>
+#ifdef CONFIG_MSM_BT_CONVERGED
 #include "cnss_utils.h"
+#endif
 
 #define PWR_SRC_NOT_AVAILABLE -2
 #define DEFAULT_INVALID_VALUE -1
@@ -852,7 +854,7 @@ static int bt_dt_parse_vreg_info(struct device *dev,
 		snprintf(prop_name, sizeof(prop_name), "%s-config", vreg->name);
 		prop = of_get_property(dev->of_node, prop_name, &len);
 		if (!prop || len != (4 * sizeof(__be32))) {
-			pr_debug("%s: Property %s %s, use default\n",
+			pr_info("%s: Property %s %s, use default\n",
 				__func__, prop_name,
 				prop ? "invalid format" : "doesn't exist");
 		} else {
@@ -1004,12 +1006,15 @@ static void bt_power_vreg_put(void)
 static int bt_power_populate_dt_pinfo(struct platform_device *pdev)
 {
 	int rc;
+#ifdef CONFIG_MSM_BT_CONVERGED
 	struct device_node *child;
+#endif
 	pr_debug("%s\n", __func__);
 
 	if (!bt_power_pdata)
 		return -ENOMEM;
 
+#ifdef CONFIG_MSM_BT_CONVERGED
 	if (bt_power_pdata->is_converged_dt) {
 		for_each_available_child_of_node(pdev->dev.of_node, child) {
 			if (bt_power_pdata->bt_device_type == CNSS_HSP_DEVICE_TYPE ) {
@@ -1025,6 +1030,8 @@ static int bt_power_populate_dt_pinfo(struct platform_device *pdev)
 			break;
 		}
 	}
+#endif
+
 	if (pdev->dev.of_node) {
 		rc = bt_power_vreg_get(pdev);
 		if (rc)
@@ -1118,7 +1125,9 @@ static void bt_power_pdc_init_params (struct btpower_platform_data *pdata)
 static int bt_power_probe(struct platform_device *pdev)
 {
 	int ret = 0;
+#ifdef CONFIG_MSM_BT_CONVERGED
 	unsigned int gpio_value;
+#endif
 	int itr;
 
 	pr_debug("%s\n", __func__);
@@ -1137,6 +1146,8 @@ static int bt_power_probe(struct platform_device *pdev)
 
 	bt_power_pdata->pdev = pdev;
         bt_power_pdata->is_converged_dt = bt_is_converged_dt(pdev);
+
+#ifdef CONFIG_MSM_BT_CONVERGED
 	if (bt_power_pdata->is_converged_dt) {
 		if (of_find_property(pdev->dev.of_node, WLAN_SW_CTRL_GPIO, NULL)) {
 			bt_power_pdata->wlan_sw_ctrl_gpio =
@@ -1156,6 +1167,7 @@ static int bt_power_probe(struct platform_device *pdev)
 				cnss_utils_update_device_type(CNSS_HMT_DEVICE_TYPE);
 		}
 	}
+#endif
 
 	if (pdev->dev.of_node) {
 		ret = bt_power_populate_dt_pinfo(pdev);
@@ -1416,6 +1428,8 @@ static long bt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	}
 	return ret;
 }
+
+MODULE_DEVICE_TABLE(of, bt_power_match_table);
 
 static struct platform_driver bt_power_driver = {
 	.probe = bt_power_probe,
