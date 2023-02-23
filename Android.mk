@@ -3,9 +3,10 @@
 LOCAL_PATH := $(call my-dir)
 
 # Build/Package only in case of supported target
-ifeq ($(call is-board-platform-in-list,taro kalama bengal), true)
+ifeq ($(call is-board-platform-in-list,taro kalama bengal msmnile), true)
 
 BT_SELECT := CONFIG_MSM_BT_POWER=m
+ifneq ($(TARGET_BOARD_AUTO),true)
 #ifdef CONFIG_SLIMBUS
 BT_SELECT += CONFIG_BTFM_SLIM=m
 #endif
@@ -15,6 +16,7 @@ ifeq ($(ENABLE_PERIPHERAL_STATE_UTILS), true)
 BT_SELECT += CONFIG_BT_HW_SECURE_DISABLE=y
 endif
 endif
+endif # AUTO product check
 
 LOCAL_PATH := $(call my-dir)
 

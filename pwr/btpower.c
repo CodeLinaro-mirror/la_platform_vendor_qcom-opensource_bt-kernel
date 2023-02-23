@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 /*
@@ -30,7 +30,9 @@
 #include "btfm_slim.h"
 #endif
 #include <linux/fs.h>
+#ifdef CONFIG_MSM_BT_CONVERGED
 #include "cnss_utils.h"
+#endif
 
 #ifdef CONFIG_BT_HW_SECURE_DISABLE
 #include "smcinvoke.h"
@@ -111,6 +113,13 @@ enum power_src_pos {
 	 */
 	BT_VDD_SMPS,
 	BT_VDD_SMPS_CURRENT,
+	// QCA BT regs for Auto
+	BT_VDD_CTRL1_LDO,
+	BT_VDD_CTRL1_LDO_CURRENT,
+	BT_VDD_CTRL2_LDO,
+	BT_VDD_CTRL2_LDO_CURRENT,
+	BT_VDD_RFA3_LDO,
+	BT_VDD_RFA3_LDO_CURRENT,
 	/* New entries need to be added before PWR_SRC_SIZE.
 	 * Its hold the max size of power sources states.
 	 */
@@ -188,6 +197,26 @@ static struct bt_power bt_vreg_info_wcn399x = {
 	.num_vregs = 5,
 };
 
+// Regulator structure for QCA BT in automotive SPs
+static struct bt_power bt_vreg_info_qca_auto = {
+	.compatible = "qcom,qca-auto-converged",
+	.vregs = (struct bt_power_vreg_data []) {
+		{NULL, "qcom,bt-vdd-ctrl1", 0, 0, 0, false, false,
+			{BT_VDD_CTRL1_LDO, BT_VDD_CTRL1_LDO_CURRENT}},
+		{NULL, "qcom,bt-vdd-ctrl2", 0, 0, 0, false, false,
+			{BT_VDD_CTRL2_LDO, BT_VDD_CTRL2_LDO_CURRENT}},
+		{NULL, "qcom,bt-vdd-aon", 1055000, 1055000, 0, false, false,
+			{BT_VDD_AON_LDO, BT_VDD_AON_LDO_CURRENT}},
+		{NULL, "qcom,bt-vdd-rfa1", 1370000, 1370000, 0, false, false,
+			{BT_VDD_RFA1_LDO, BT_VDD_RFA1_LDO_CURRENT}},
+		{NULL, "qcom,bt-vdd-rfa2", 2040000, 2040000, 0, false, false,
+			{BT_VDD_RFA2_LDO, BT_VDD_RFA2_LDO_CURRENT}},
+		{NULL, "qcom,bt-vdd-rfa3", 1900000, 1900000, 0, false, false,
+			{BT_VDD_RFA3_LDO, BT_VDD_RFA3_LDO_CURRENT}},
+	},
+	.num_vregs = 6,
+};
+
 static struct bt_power bt_vreg_info_qca6174 = {
 	.compatible = "qcom,qca6174",
 	.vregs = bt_vregs_info_qca61x4_937x,
@@ -232,6 +261,7 @@ static const struct of_device_id bt_power_match_table[] = {
 	{	.compatible = "qcom,kiwi",    .data = &bt_vreg_info_kiwi},
 	{	.compatible = "qcom,wcn6750-bt", .data = &bt_vreg_info_wcn6750},
 	{	.compatible = "qcom,bt-qca-converged", .data = &bt_vreg_info_converged},
+	{	.compatible = "qcom,qca-auto-converged", .data = &bt_vreg_info_qca_auto},
 	{},
 };
 
@@ -918,7 +948,7 @@ static int bt_dt_parse_vreg_info(struct device *dev,
 		snprintf(prop_name, sizeof(prop_name), "%s-config", vreg->name);
 		prop = of_get_property(dev->of_node, prop_name, &len);
 		if (!prop || len != (4 * sizeof(__be32))) {
-			pr_debug("%s: Property %s %s, use default\n",
+			pr_info("%s: Property %s %s, use default\n",
 				__func__, prop_name,
 				prop ? "invalid format" : "doesn't exist");
 		} else {
@@ -1070,12 +1100,15 @@ static void bt_power_vreg_put(void)
 static int bt_power_populate_dt_pinfo(struct platform_device *pdev)
 {
 	int rc;
+#ifdef CONFIG_MSM_BT_CONVERGED
 	struct device_node *child;
+#endif
 	pr_debug("%s\n", __func__);
 
 	if (!bt_power_pdata)
 		return -ENOMEM;
 
+#ifdef CONFIG_MSM_BT_CONVERGED
 	if (bt_power_pdata->is_converged_dt) {
 		for_each_available_child_of_node(pdev->dev.of_node, child) {
 			if (bt_power_pdata->bt_device_type == CNSS_HSP_DEVICE_TYPE ) {
@@ -1091,6 +1124,8 @@ static int bt_power_populate_dt_pinfo(struct platform_device *pdev)
 			break;
 		}
 	}
+#endif
+
 	if (pdev->dev.of_node) {
 		rc = bt_power_vreg_get(pdev);
 		if (rc)
@@ -1184,7 +1219,9 @@ static void bt_power_pdc_init_params (struct btpower_platform_data *pdata)
 static int bt_power_probe(struct platform_device *pdev)
 {
 	int ret = 0;
+#ifdef CONFIG_MSM_BT_CONVERGED
 	unsigned int gpio_value;
+#endif
 	int itr;
 
 	pr_debug("%s\n", __func__);
@@ -1203,6 +1240,8 @@ static int bt_power_probe(struct platform_device *pdev)
 
 	bt_power_pdata->pdev = pdev;
         bt_power_pdata->is_converged_dt = bt_is_converged_dt(pdev);
+
+#ifdef CONFIG_MSM_BT_CONVERGED
 	if (bt_power_pdata->is_converged_dt) {
 		if (of_find_property(pdev->dev.of_node, WLAN_SW_CTRL_GPIO, NULL)) {
 			bt_power_pdata->wlan_sw_ctrl_gpio =
@@ -1222,7 +1261,9 @@ static int bt_power_probe(struct platform_device *pdev)
 				cnss_utils_update_device_type(CNSS_HMT_DEVICE_TYPE);
 		}
 	}
+#endif
 	ret = perisec_cnss_bt_hw_disable_check(bt_power_pdata);
+
 	if (pdev->dev.of_node) {
 		ret = bt_power_populate_dt_pinfo(pdev);
 		if (ret < 0) {
@@ -1486,6 +1527,8 @@ static long bt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	}
 	return ret;
 }
+
+MODULE_DEVICE_TABLE(of, bt_power_match_table);
 
 static struct platform_driver bt_power_driver = {
 	.probe = bt_power_probe,
