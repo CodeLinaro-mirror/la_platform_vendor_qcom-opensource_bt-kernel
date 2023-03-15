@@ -5,6 +5,7 @@ M=$(PWD)
 BT_ROOT=$(KERNEL_SRC)/$(M)
 
 KBUILD_OPTIONS += BT_ROOT=$(BT_ROOT)
+KBUILD_OPTIONS += MODNAME=$(MODNAME)
 
 ifeq ($(CONFIG_MSM_BT_CONVERGED), y)
 KBUILD_EXTRA_SYMBOLS=$(call intermediates-dir-for,DLKM,wlan-platform-module-symvers)/Module.symvers
@@ -12,8 +13,10 @@ KBUILD_EXTRA_SYMBOLS=$(OUT_DIR)/vendor/qcom/wlan/platform/Module.symvers
 ccflags-y += -I$(BT_ROOT)/../wlan/platform/inc
 endif
 
-all:
-	$(MAKE) -C $(KERNEL_SRC) M=$(M) modules $(KBUILD_OPTIONS)
+all: modules
+
+%:
+	$(MAKE) -C $(KERNEL_SRC) M=$(M) $@ $(KBUILD_OPTIONS)
 
 modules_install:
 	$(MAKE) INSTALL_MOD_STRIP=1 -C $(KERNEL_SRC) M=$(M) modules_install
