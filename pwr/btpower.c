@@ -36,6 +36,10 @@
 #define BTPOWER_MBOX_MSG_MAX_LEN 64
 #define BTPOWER_MBOX_TIMEOUT_MS 1000
 #define XO_CLK_RETRY_COUNT_MAX 5
+
+#ifdef BT_SS_ENABLED
+#define QCA_SLATE_SOC_ID_0200 0x40190200
+#endif
 /**
  * enum btpower_vreg_param: Voltage regulator TCS param
  * @BTPOWER_VREG_VOLTAGE: Provides voltage level to be configured in TCS
@@ -1137,8 +1141,13 @@ EXPORT_SYMBOL(btpower_register_slimdev);
 
 int btpower_get_chipset_version(void)
 {
+#ifndef BT_SS_ENABLED
 	pr_debug("%s\n", __func__);
 	return soc_id;
+#else
+	pr_debug("%s: returning slate SOCID: %x\n", __func__, QCA_SLATE_SOC_ID_0200);
+	return QCA_SLATE_SOC_ID_0200;
+#endif
 }
 EXPORT_SYMBOL(btpower_get_chipset_version);
 

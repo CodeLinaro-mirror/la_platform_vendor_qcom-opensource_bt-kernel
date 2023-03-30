@@ -6,6 +6,10 @@ LOCAL_PATH := $(call my-dir)
 ifeq ($(call is-board-platform-in-list,taro kalama monaco), true)
 
 BT_SELECT := CONFIG_MSM_BT_POWER=m
+
+ifeq ($(TARGET_USE_WEAR_QC_BT_STACK),true)
+BT_SELECT += CONFIG_QC_SS_STACK=m
+endif
 #ifdef CONFIG_SLIMBUS
 BT_SELECT += CONFIG_BTFM_SLIM=m
 #endif
