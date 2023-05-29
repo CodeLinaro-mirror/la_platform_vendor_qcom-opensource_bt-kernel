@@ -3,7 +3,7 @@
 LOCAL_PATH := $(call my-dir)
 
 # Build/Package only in case of supported target
-ifeq ($(call is-board-platform-in-list,taro kalama bengal msmnile), true)
+ifeq ($(call is-board-platform-in-list,taro kalama bengal msmnile gen4), true)
 
 BT_SELECT := CONFIG_MSM_BT_POWER=m
 ifneq ($(TARGET_BOARD_AUTO),true)
