@@ -37,6 +37,7 @@ enum {
 	BTFM_BT_SCO_SLIM_TX,
 	BTFM_BT_SCO_A2DP_SLIM_RX,
 	BTFM_BT_SPLIT_A2DP_SLIM_RX,
+	BTFM_BT_SPLIT_A2DP_SLIM_TX,
 	BTFM_SLIM_NUM_CODEC_DAIS
 };
 
@@ -68,6 +69,7 @@ struct btfmslim {
 	uint32_t sample_rate;
 	uint32_t bps;
 	uint16_t direction;
+	int dai_id;
 	struct btfmslim_ch *rx_chs;
 	struct btfmslim_ch *tx_chs;
 	int (*vendor_init)(struct btfmslim *btfmslim);
