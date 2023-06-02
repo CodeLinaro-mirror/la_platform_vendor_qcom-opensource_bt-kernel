@@ -30,7 +30,6 @@
 #include "btfm_slim.h"
 #endif
 #include <linux/fs.h>
-#include "cnss_utils.h"
 
 #define PWR_SRC_NOT_AVAILABLE -2
 #define DEFAULT_INVALID_VALUE -1
@@ -38,6 +37,12 @@
 #define BTPOWER_MBOX_MSG_MAX_LEN 64
 #define BTPOWER_MBOX_TIMEOUT_MS 1000
 #define XO_CLK_RETRY_COUNT_MAX 5
+enum cnss_utils_device_type {
+	CNSS_UNSUPPORETD_DEVICE_TYPE = -1,
+	CNSS_HMT_DEVICE_TYPE,
+	CNSS_HSP_DEVICE_TYPE
+};
+
 /**
  * enum btpower_vreg_param: Voltage regulator TCS param
  * @BTPOWER_VREG_VOLTAGE: Provides voltage level to be configured in TCS
@@ -166,6 +171,8 @@ static struct bt_power bt_vreg_info_wcn399x = {
 			{BT_VDD_SMPS, BT_VDD_SMPS_CURRENT}},
 		{NULL, "qcom,bt-vdd-io",   1700000, 1900000, 0, false, false,
 			{BT_VDD_IO_LDO, BT_VDD_IO_LDO_CURRENT}},
+                {NULL, "qcom,bt-vdd-ldo",   1300000, 1350000, 0, false, false,
+                        {BT_VDD_LDO, BT_VDD_LDO_CURRENT}},
 		{NULL, "qcom,bt-vdd-core", 1304000, 1304000, 0, false, false,
 			{BT_VDD_CORE_LDO, BT_VDD_CORE_LDO_CURRENT}},
 		{NULL, "qcom,bt-vdd-pa",   3000000, 3312000, 0, false, false,
@@ -1121,11 +1128,11 @@ static int bt_power_probe(struct platform_device *pdev)
 		gpio_value = gpio_get_value(bt_power_pdata->wlan_sw_ctrl_gpio);
 		pr_info("%s:WLAN_SW_CNTRL_GPIO value= %d\n", __func__, gpio_value);
 		if(gpio_value) {
-			bt_power_pdata->bt_device_type =
-				cnss_utils_update_device_type(CNSS_HSP_DEVICE_TYPE);
+			bt_power_pdata->bt_device_type = CNSS_HSP_DEVICE_TYPE;
+//				cnss_utils_update_device_type(CNSS_HSP_DEVICE_TYPE);
 		} else {
-			bt_power_pdata->bt_device_type =
-				cnss_utils_update_device_type(CNSS_HMT_DEVICE_TYPE);
+			bt_power_pdata->bt_device_type = CNSS_HMT_DEVICE_TYPE;
+//				cnss_utils_update_device_type(CNSS_HMT_DEVICE_TYPE);
 		}
 	}
 
