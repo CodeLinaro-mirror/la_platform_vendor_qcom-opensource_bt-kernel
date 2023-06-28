@@ -3,7 +3,7 @@
 LOCAL_PATH := $(call my-dir)
 
 # Build/Package only in case of supported target
-ifeq ($(call is-board-platform-in-list,taro kalama msmnile), true)
+ifeq ($(call is-board-platform-in-list,taro kalama bengal msmnile gen4), true)
 
 BT_SELECT := CONFIG_MSM_BT_POWER=m
 ifneq ($(TARGET_BOARD_AUTO),true)
@@ -11,7 +11,13 @@ ifneq ($(TARGET_BOARD_AUTO),true)
 BT_SELECT += CONFIG_BTFM_SLIM=m
 #endif
 BT_SELECT += CONFIG_I2C_RTC6226_QCA=m
+ifeq ($(TARGET_KERNEL_DLKM_SECURE_MSM_OVERRIDE), true)
+ifeq ($(ENABLE_PERIPHERAL_STATE_UTILS), true)
+BT_SELECT += CONFIG_BT_HW_SECURE_DISABLE=y
 endif
+endif
+endif # AUTO product check
+
 LOCAL_PATH := $(call my-dir)
 
 # This makefile is only for DLKM

@@ -13,6 +13,7 @@
 #include <linux/debugfs.h>
 #include <linux/ratelimit.h>
 #include <linux/slab.h>
+#include <linux/fs.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
@@ -21,11 +22,18 @@
 #include "btpower.h"
 #include "btfm_slim.h"
 #include "btfm_slim_slave.h"
+#include "btfm_slim_hw_interface.h"
+
 #define DELAY_FOR_PORT_OPEN_MS (200)
 #define SLIM_MANF_ID_QCOM	0x217
 #define SLIM_PROD_CODE		0x221
+#define BT_CMD_SLIM_TEST	0xbfac
 
-static bool btfm_is_port_opening_delayed = true;
+struct class *btfm_slim_class;
+static int btfm_slim_major;
+
+struct btfmslim *btfm_slim_drv_data;
+
 static int btfm_num_ports_open;
 
 int btfm_slim_write(struct btfmslim *btfmslim,
@@ -82,19 +90,6 @@ int btfm_slim_read(struct btfmslim *btfmslim, uint32_t reg, uint8_t pgd)
 	return ret;
 }
 
-static bool btfm_slim_is_sb_reset_needed(int chip_ver)
-{
-	switch (chip_ver) {
-	case QCA_APACHE_SOC_ID_0100:
-	case QCA_APACHE_SOC_ID_0110:
-	case QCA_APACHE_SOC_ID_0120:
-	case QCA_APACHE_SOC_ID_0121:
-		return true;
-	default:
-		return false;
-	}
-}
-
 int btfm_slim_enable_ch(struct btfmslim *btfmslim, struct btfmslim_ch *ch,
 	uint8_t rxport, uint32_t rates, uint8_t nchan)
 {
@@ -132,31 +127,14 @@ int btfm_slim_enable_ch(struct btfmslim *btfmslim, struct btfmslim_ch *ch,
 				goto error;
 			}
 		}
-		chan->dai.sconfig.chs[i] = chan->ch;
-		chan->dai.sconfig.port_mask |= BIT(chan->port);
+		chan->dai.sconfig.chs[i] = ch->ch;
+		chan->dai.sconfig.port_mask |= BIT(ch->port);
 	}
 
 	/* Activate the channel immediately */
 	BTFMSLIM_INFO("port: %d, ch: %d", chan->port, chan->ch);
 	chipset_ver = btpower_get_chipset_version();
 	BTFMSLIM_INFO("chipset soc version:%x", chipset_ver);
-
-	/* Delay port opening for few chipsets if:
-		1. for 8k, feedback channel
-		2. 44.1k, 88.2k rxports
-	*/
-	if (((rates == 8000 && btfm_feedback_ch_setting && rxport == 0) ||
-		(rxport == 1 && (rates == 44100 || rates == 88200))) &&
-		btfm_slim_is_sb_reset_needed(chipset_ver)) {
-
-		BTFMSLIM_INFO("btfm_is_port_opening_delayed %d",
-					btfm_is_port_opening_delayed);
-		if (!btfm_is_port_opening_delayed) {
-			BTFMSLIM_INFO("SB reset needed, sleeping");
-			btfm_is_port_opening_delayed = true;
-			msleep(DELAY_FOR_PORT_OPEN_MS);
-		}
-	}
 
 	/* for feedback channel, PCM bit should not be set */
 	if (btfm_feedback_ch_setting) {
@@ -204,8 +182,6 @@ int btfm_slim_disable_ch(struct btfmslim *btfmslim, struct btfmslim_ch *ch,
 		BTFMSLIM_ERR("Channel not enabled yet. returning");
 		return -EINVAL;
 	}
-
-	btfm_is_port_opening_delayed = false;
 
 	if (rxport && (btfmslim->sample_rate == 44100 ||
 		btfmslim->sample_rate == 88200)) {
@@ -430,8 +406,15 @@ int btfm_slim_hw_init(struct btfmslim *btfmslim)
 		chipset_ver ==  QCA_APACHE_SOC_ID_0100  ||
 		chipset_ver ==  QCA_APACHE_SOC_ID_0110  ||
 		chipset_ver ==  QCA_APACHE_SOC_ID_0120 ||
-		chipset_ver ==  QCA_APACHE_SOC_ID_0121) {
-		BTFMSLIM_INFO("chipset is Chk/Apache, overwriting EA");
+		chipset_ver ==  QCA_APACHE_SOC_ID_0121 ||
+		chipset_ver ==  QCA_COMANCHE_SOC_ID_0101 ||
+		chipset_ver ==  QCA_COMANCHE_SOC_ID_0110 ||
+		chipset_ver ==  QCA_COMANCHE_SOC_ID_0120 ||
+		chipset_ver ==  QCA_COMANCHE_SOC_ID_0130 ||
+		chipset_ver ==  QCA_COMANCHE_SOC_ID_4130 ||
+		chipset_ver ==  QCA_COMANCHE_SOC_ID_5120 ||
+		chipset_ver ==  QCA_COMANCHE_SOC_ID_5130 ) {
+		BTFMSLIM_INFO("chipset is Chk/Apache/CMC, overwriting EA");
 		slim->is_laddr_valid = false;
 		slim->e_addr.manf_id = SLIM_MANF_ID_QCOM;
 		slim->e_addr.prod_code = 0x220;
@@ -513,6 +496,67 @@ int btfm_slim_hw_deinit(struct btfmslim *btfmslim)
 	return ret;
 }
 
+#if IS_ENABLED (CONFIG_BTFM_SLIM)
+void btfm_slim_get_hwep_details(struct slim_device *dev, struct btfmslim *btfm_slim)
+{
+}
+#else
+void btfm_slim_get_hwep_details(struct slim_device *slim, struct btfmslim *btfm_slim)
+{
+	struct device_node *np = slim->dev.of_node;
+	const __be32 *prop;
+	struct btfmslim_ch *rx_chs = btfm_slim->rx_chs;
+	struct btfmslim_ch *tx_chs = btfm_slim->tx_chs;
+	int len;
+
+	prop = of_get_property(np, "qcom,btslim-address", &len);
+	if (prop) {
+		btfm_slim->device_id = be32_to_cpup(&prop[0]);
+		BTFMSLIM_DBG("hwep slim address define in dt %08x", btfm_slim->device_id);
+	} else {
+		BTFMSLIM_ERR("btslim-address is not defined in dt using default address");
+		btfm_slim->device_id = 0;
+	}
+
+	if (!rx_chs || !tx_chs) {
+		BTFMSLIM_ERR("either rx/tx channels are configured to null");
+		return;
+	}
+
+	prop = of_get_property(np, "qcom,btslimrx-channels", &len);
+	if (prop) {
+		/* Check if we need any protection for index */
+		rx_chs[0].ch = (uint8_t)be32_to_cpup(&prop[0]);
+		rx_chs[1].ch = (uint8_t)be32_to_cpup(&prop[1]);
+		BTFMSLIM_DBG("Rx: id\tname\tport\tch");
+		BTFMSLIM_DBG("    %d\t%s\t%d\t%d", rx_chs[0].id,
+				rx_chs[0].name, rx_chs[0].port,
+				rx_chs[0].ch);
+		BTFMSLIM_DBG("    %d\t%s\t%d\t%d", rx_chs[1].id,
+				rx_chs[1].name, rx_chs[1].port,
+				rx_chs[1].ch);
+	} else {
+		BTFMSLIM_ERR("btslimrx channels are missing in dt using default values");
+	}
+
+	prop = of_get_property(np, "qcom,btslimtx-channels", &len);
+	if (prop) {
+		/* Check if we need any protection for index */
+		tx_chs[0].ch = (uint8_t)be32_to_cpup(&prop[0]);
+		tx_chs[1].ch = (uint8_t)be32_to_cpup(&prop[1]);
+		BTFMSLIM_DBG("Tx: id\tname\tport\tch");
+		BTFMSLIM_DBG("    %d\t%s\t%d\t%x", tx_chs[0].id,
+				tx_chs[0].name, tx_chs[0].port,
+				tx_chs[0].ch);
+		BTFMSLIM_DBG("    %d\t%s\t%d\t%x", tx_chs[1].id,
+				tx_chs[1].name, tx_chs[1].port,
+				tx_chs[1].ch);
+	} else {
+		BTFMSLIM_ERR("btslimtx channels are missing in dt using default values");
+	}
+
+}
+#endif
 static int btfm_slim_status(struct slim_device *sdev,
 				enum slim_device_status status)
 {
@@ -520,11 +564,35 @@ static int btfm_slim_status(struct slim_device *sdev,
 	struct device *dev = &sdev->dev;
 	struct btfmslim *btfm_slim;
 	btfm_slim = dev_get_drvdata(dev);
+
+#if IS_ENABLED(CONFIG_BTFM_SLIM)
 	ret = btfm_slim_register_codec(btfm_slim);
+#else
+	btfm_slim_get_hwep_details(sdev, btfm_slim);
+	ret = btfm_slim_register_hw_ep(btfm_slim);
+#endif
 	if (ret)
 		BTFMSLIM_ERR("error, registering slimbus codec failed");
 	return ret;
 }
+
+static long btfm_slim_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+{
+	int ret = 0;
+
+	switch (cmd) {
+	case BT_CMD_SLIM_TEST:
+		BTFMSLIM_INFO("cmd BT_CMD_SLIM_TEST, call btfm_slim_hw_init");
+		ret = btfm_slim_hw_init(btfm_slim_drv_data);
+		break;
+	}
+	return ret;
+}
+
+static const struct file_operations bt_dev_fops = {
+	.unlocked_ioctl = btfm_slim_ioctl,
+	.compat_ioctl = btfm_slim_ioctl,
+};
 
 static int btfm_slim_probe(struct slim_device *slim)
 {
@@ -534,7 +602,8 @@ static int btfm_slim_probe(struct slim_device *slim)
 	pr_info("%s: name = %s\n", __func__, dev_name(&slim->dev));
 	/*this as true during the probe then slimbus won't check for logical address*/
 	slim->is_laddr_valid = true;
-	dev_set_name(&slim->dev, "%s", "btfmslim_slave");
+
+	dev_set_name(&slim->dev, "%s", BTFMSLIM_DEV_NAME);
 	pr_info("%s: name = %s\n", __func__, dev_name(&slim->dev));
 
 	BTFMSLIM_DBG("");
@@ -565,11 +634,48 @@ static int btfm_slim_probe(struct slim_device *slim)
 	btfm_slim->dev = &slim->dev;
 	ret = btpower_register_slimdev(&slim->dev);
 	if (ret < 0) {
+#if IS_ENABLED(CONFIG_BTFM_SLIM)
 		btfm_slim_unregister_codec(&slim->dev);
+#else
+		btfm_slim_unregister_hwep();
+#endif
 		ret = -EPROBE_DEFER;
 		goto dealloc;
 	}
+
+	btfm_slim_drv_data = btfm_slim;
+	btfm_slim_major = register_chrdev(0, "btfm_slim", &bt_dev_fops);
+	if (btfm_slim_major < 0) {
+		BTFMSLIM_ERR("%s: failed to allocate char dev\n", __func__);
+		ret = -1;
+		goto register_err;
+	}
+
+	btfm_slim_class = class_create(THIS_MODULE, "btfmslim-dev");
+	if (IS_ERR(btfm_slim_class)) {
+		BTFMSLIM_ERR("%s: coudn't create class\n", __func__);
+		ret = -1;
+		goto class_err;
+	}
+
+	if (device_create(btfm_slim_class, NULL, MKDEV(btfm_slim_major, 0),
+		NULL, "btfmslim") == NULL) {
+		BTFMSLIM_ERR("%s: failed to allocate char dev\n", __func__);
+		ret = -1;
+		goto device_err;
+	}
 	return ret;
+
+device_err:
+	class_destroy(btfm_slim_class);
+class_err:
+	unregister_chrdev(btfm_slim_major, "btfm_slim");
+register_err:
+#if IS_ENABLED(CONFIG_BTFM_SLIM)
+	btfm_slim_unregister_codec(&slim->dev);
+#else
+		btfm_slim_unregister_hwep();
+#endif
 dealloc:
 	mutex_destroy(&btfm_slim->io_lock);
 	mutex_destroy(&btfm_slim->xfer_lock);
