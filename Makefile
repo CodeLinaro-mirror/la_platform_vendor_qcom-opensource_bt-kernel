@@ -5,7 +5,6 @@ M=$(PWD)
 BT_ROOT=$(KERNEL_SRC)/$(M)
 
 KBUILD_OPTIONS += BT_ROOT=$(BT_ROOT)
-KBUILD_OPTIONS += MODNAME=$(MODNAME)
 
 ifeq ($(CONFIG_MSM_BT_CONVERGED), y)
 KBUILD_EXTRA_SYMBOLS=$(call intermediates-dir-for,DLKM,wlan-platform-module-symvers)/Module.symvers

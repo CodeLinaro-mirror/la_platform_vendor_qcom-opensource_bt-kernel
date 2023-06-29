@@ -52,8 +52,6 @@
 #define BTPOWER_MBOX_MSG_MAX_LEN 64
 #define BTPOWER_MBOX_TIMEOUT_MS 1000
 #define XO_CLK_RETRY_COUNT_MAX 5
-#define PWR_SRC_LOG_UNSUPPORTED {DEFAULT_INVALID_VALUE, DEFAULT_INVALID_VALUE}
-
 /**
  * enum btpower_vreg_param: Voltage regulator TCS param
  * @BTPOWER_VREG_VOLTAGE: Provides voltage level to be configured in TCS
@@ -199,7 +197,6 @@ static struct bt_power bt_vreg_info_wcn399x = {
 	.num_vregs = 5,
 };
 
-#ifndef QCA_AUTO_SECONDARY
 // Regulator structure for QCA BT in automotive SPs
 static struct bt_power bt_vreg_info_qca_auto = {
 	.compatible = "qcom,qca-auto-converged",
@@ -219,32 +216,6 @@ static struct bt_power bt_vreg_info_qca_auto = {
 	},
 	.num_vregs = 6,
 };
-#define BT_MAJOR "bt"
-#define BT_CLASS "bt-dev"
-#define DRIVER_NAME "bt_power"
-#else
-static struct bt_power bt_vreg_info_qca_auto_2nd = {
-	.compatible = "qcom,qca-auto-secondary",
-	.vregs = (struct bt_power_vreg_data []) {
-		{NULL, "qcom,bt-vdd-ctrl1", 0, 0, 0, false, false,
-			PWR_SRC_LOG_UNSUPPORTED},
-		{NULL, "qcom,bt-vdd-ctrl2", 0, 0, 0, false, false,
-			PWR_SRC_LOG_UNSUPPORTED},
-		{NULL, "qcom,bt-vdd-aon", 1055000, 1055000, 0, false, false,
-			PWR_SRC_LOG_UNSUPPORTED},
-		{NULL, "qcom,bt-vdd-rfa1", 1370000, 1370000, 0, false, false,
-			PWR_SRC_LOG_UNSUPPORTED},
-		{NULL, "qcom,bt-vdd-rfa2", 2040000, 2040000, 0, false, false,
-			PWR_SRC_LOG_UNSUPPORTED},
-		{NULL, "qcom,bt-vdd-rfa3", 1900000, 1900000, 0, false, false,
-			PWR_SRC_LOG_UNSUPPORTED},
-	},
-	.num_vregs = 6,
-};
-#define BT_MAJOR "bt2"
-#define BT_CLASS "bt-dev2"
-#define DRIVER_NAME "bt_power2"
-#endif
 
 static struct bt_power bt_vreg_info_qca6174 = {
 	.compatible = "qcom,qca6174",
@@ -290,11 +261,7 @@ static const struct of_device_id bt_power_match_table[] = {
 	{	.compatible = "qcom,kiwi",    .data = &bt_vreg_info_kiwi},
 	{	.compatible = "qcom,wcn6750-bt", .data = &bt_vreg_info_wcn6750},
 	{	.compatible = "qcom,bt-qca-converged", .data = &bt_vreg_info_converged},
-#ifndef QCA_AUTO_SECONDARY
 	{	.compatible = "qcom,qca-auto-converged", .data = &bt_vreg_info_qca_auto},
-#else
-	{	.compatible = "qcom,qca-auto-secondary", .data = &bt_vreg_info_qca_auto_2nd},
-#endif
 	{},
 };
 
@@ -911,7 +878,7 @@ static int btpower_rfkill_probe(struct platform_device *pdev)
 	struct rfkill *rfkill;
 	int ret;
 
-	rfkill = rfkill_alloc(DRIVER_NAME, &pdev->dev, RFKILL_TYPE_BLUETOOTH,
+	rfkill = rfkill_alloc("bt_power", &pdev->dev, RFKILL_TYPE_BLUETOOTH,
 						&btpower_rfkill_ops,
 						pdev->dev.platform_data);
 
@@ -1356,18 +1323,14 @@ int btpower_register_slimdev(struct device *dev)
 	bt_power_pdata->slim_dev = dev;
 	return 0;
 }
-#ifndef QCA_AUTO_SECONDARY
 EXPORT_SYMBOL(btpower_register_slimdev);
-#endif
 
 int btpower_get_chipset_version(void)
 {
 	pr_debug("%s\n", __func__);
 	return soc_id;
 }
-#ifndef QCA_AUTO_SECONDARY
 EXPORT_SYMBOL(btpower_get_chipset_version);
-#endif
 
 static void  set_pwr_srcs_status(struct bt_power_vreg_data *handle)
 {
@@ -1571,7 +1534,7 @@ static struct platform_driver bt_power_driver = {
 	.probe = bt_power_probe,
 	.remove = bt_power_remove,
 	.driver = {
-		.name = DRIVER_NAME,
+		.name = "bt_power",
 		.of_match_table = bt_power_match_table,
 	},
 };
@@ -1593,14 +1556,14 @@ static int __init btpower_init(void)
 		goto driver_err;
 	}
 
-	bt_major = register_chrdev(0, BT_MAJOR, &bt_dev_fops);
+	bt_major = register_chrdev(0, "bt", &bt_dev_fops);
 	if (bt_major < 0) {
 		pr_err("%s: failed to allocate char dev\n", __func__);
 		ret = -1;
 		goto chrdev_err;
 	}
 
-	bt_class = class_create(THIS_MODULE, BT_CLASS);
+	bt_class = class_create(THIS_MODULE, "bt-dev");
 	if (IS_ERR(bt_class)) {
 		pr_err("%s: coudn't create class\n", __func__);
 		ret = -1;

@@ -10,8 +10,3 @@ ccflags-y += -I$(BT_ROOT)/../securemsm-kernel/linux/
 endif
 
 obj-$(CONFIG_MSM_BT_POWER)  += btpower.o
-else
-obj-$(CONFIG_MSM_BT_POWER)  += $(MODNAME).o
-ccflags-y += -DQCA_AUTO_SECONDARY
-$(MODNAME)-y := btpower.o
-endif
