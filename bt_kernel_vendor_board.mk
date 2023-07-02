@@ -17,7 +17,7 @@ else
   endif
 endif
 else
-  ifeq ($(TARGET_BOARD_PLATFORM), msmnile)
+  ifeq ($(call is-board-platform-in-list, msmnile gen4), true)
     BOARD_VENDOR_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/btpower.ko
   endif
 endif
