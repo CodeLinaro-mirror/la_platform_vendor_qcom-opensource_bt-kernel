@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021,2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef __LINUX_BLUETOOTH_POWER_H
@@ -86,8 +86,6 @@ struct btpower_platform_data {
 #endif
 };
 
-int btpower_register_slimdev(struct device *dev);
-int btpower_get_chipset_version(void);
 int btpower_aop_mbox_init(struct btpower_platform_data *pdata);
 int bt_aop_pdc_reconfig(struct btpower_platform_data *pdata);
 

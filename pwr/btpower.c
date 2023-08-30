@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 /*
@@ -52,6 +52,13 @@
 #define BTPOWER_MBOX_MSG_MAX_LEN 64
 #define BTPOWER_MBOX_TIMEOUT_MS 1000
 #define XO_CLK_RETRY_COUNT_MAX 5
+
+#define RFKILL_NAME "bt_power"
+#define BT_POWER_DRIVER_NAME "bt_power"
+#define BT_MAJOR_NAME "bt"
+#define BT_CLASS_NAME "bt-dev"
+#define BT_DEVICE_NAME "btpower"
+
 /**
  * enum btpower_vreg_param: Voltage regulator TCS param
  * @BTPOWER_VREG_VOLTAGE: Provides voltage level to be configured in TCS
@@ -126,77 +133,6 @@ enum power_src_pos {
 	BT_POWER_SRC_SIZE,
 };
 
-// Regulator structure for QCA6174/QCA9377/QCA9379 BT SoC series
-static struct bt_power_vreg_data bt_vregs_info_qca61x4_937x[] = {
-	{NULL, "qcom,bt-vdd-aon", 928000, 928000, 0, false, false,
-		{BT_VDD_AON_LDO, BT_VDD_AON_LDO_CURRENT}},
-	{NULL, "qcom,bt-vdd-io", 1710000, 3460000, 0, false, false,
-		{BT_VDD_IO_LDO, BT_VDD_IO_LDO_CURRENT}},
-	{NULL, "qcom,bt-vdd-core", 3135000, 3465000, 0, false, false,
-		{BT_VDD_CORE_LDO, BT_VDD_CORE_LDO_CURRENT}},
-};
-
-// Regulator structure for QCA6390,QCA6490 and WCN6750 BT SoC series
-static struct bt_power_vreg_data bt_vregs_info_qca6xx0[] = {
-	{NULL, "qcom,bt-vdd-io",      1800000, 1800000, 0, false, true,
-		{BT_VDD_IO_LDO, BT_VDD_IO_LDO_CURRENT}},
-	{NULL, "qcom,bt-vdd-aon",     966000,  966000,  0, false, true,
-		{BT_VDD_AON_LDO, BT_VDD_AON_LDO_CURRENT}},
-	{NULL, "qcom,bt-vdd-rfacmn",  950000,  950000,  0, false, true,
-		{BT_VDD_RFACMN, BT_VDD_RFACMN_CURRENT}},
-	/* BT_CX_MX */
-	{NULL, "qcom,bt-vdd-dig",      966000,  966000,  0, false, true,
-		{BT_VDD_DIG_LDO, BT_VDD_DIG_LDO_CURRENT}},
-	{NULL, "qcom,bt-vdd-rfa-0p8",  950000,  952000,  0, false, true,
-		{BT_VDD_RFA_0p8, BT_VDD_RFA_0p8_CURRENT}},
-	{NULL, "qcom,bt-vdd-rfa1",     1900000, 1900000, 0, false, true,
-		{BT_VDD_RFA1_LDO, BT_VDD_RFA1_LDO_CURRENT}},
-	{NULL, "qcom,bt-vdd-rfa2",     1900000, 1900000, 0, false, true,
-		{BT_VDD_RFA2_LDO, BT_VDD_RFA2_LDO_CURRENT}},
-	{NULL, "qcom,bt-vdd-asd",      2800000, 2800000, 0, false, true,
-		{BT_VDD_ASD_LDO, BT_VDD_ASD_LDO_CURRENT}},
-	{NULL, "qcom,bt-vdd-ipa-2p2",  2200000, 2210000, 0, false, true,
-		{BT_VDD_IPA_2p2, BT_VDD_IPA_2p2_CURRENT}},
-};
-
-
-// Regulator structure for kiwi BT SoC series
-static struct bt_power_vreg_data bt_vregs_info_kiwi[] = {
-	{NULL, "qcom,bt-vdd18-aon",      1800000, 1800000, 0, false, true,
-		{BT_VDD_IO_LDO, BT_VDD_IO_LDO_CURRENT}},
-	{NULL, "qcom,bt-vdd-aon",     950000,  950000,  0, false, true,
-		{BT_VDD_AON_LDO, BT_VDD_AON_LDO_CURRENT}},
-	{NULL, "qcom,bt-vdd-rfaOp8",  950000,  950000,  0, false, true,
-		{BT_VDD_RFACMN, BT_VDD_RFACMN_CURRENT}},
-	/* BT_CX_MX */
-	{NULL, "qcom,bt-vdd-dig",      950000,  950000,  0, false, true,
-		{BT_VDD_DIG_LDO, BT_VDD_DIG_LDO_CURRENT}},
-	{NULL, "qcom,bt-vdd-rfaOp8",  950000,  952000,  0, false, true,
-		{BT_VDD_RFA_0p8, BT_VDD_RFA_0p8_CURRENT}},
-	{NULL, "qcom,bt-vdd-rfa1",     1350000, 1350000, 0, false, true,
-		{BT_VDD_RFA1_LDO, BT_VDD_RFA1_LDO_CURRENT}},
-	{NULL, "qcom,bt-vdd-rfa2",     1900000, 1900000, 0, false, true,
-		{BT_VDD_RFA2_LDO, BT_VDD_RFA2_LDO_CURRENT}},
-};
-
-// Regulator structure for WCN399x BT SoC series
-static struct bt_power bt_vreg_info_wcn399x = {
-	.compatible = "qcom,wcn3990",
-	.vregs = (struct bt_power_vreg_data []) {
-		{NULL, "qcom,bt-vdd-smps", 984000,  984000, 0, false, false,
-			{BT_VDD_SMPS, BT_VDD_SMPS_CURRENT}},
-		{NULL, "qcom,bt-vdd-io",   1700000, 1900000, 0, false, false,
-			{BT_VDD_IO_LDO, BT_VDD_IO_LDO_CURRENT}},
-		{NULL, "qcom,bt-vdd-core", 1304000, 1304000, 0, false, false,
-			{BT_VDD_CORE_LDO, BT_VDD_CORE_LDO_CURRENT}},
-		{NULL, "qcom,bt-vdd-pa",   3000000, 3312000, 0, false, false,
-			{BT_VDD_PA_LDO, BT_VDD_PA_LDO_CURRENT}},
-		{NULL, "qcom,bt-vdd-xtal", 1700000, 1900000, 0, false, false,
-			{BT_VDD_XTAL_LDO, BT_VDD_XTAL_LDO_CURRENT}},
-	},
-	.num_vregs = 5,
-};
-
 // Regulator structure for QCA BT in automotive SPs
 static struct bt_power bt_vreg_info_qca_auto = {
 	.compatible = "qcom,qca-auto-converged",
@@ -217,50 +153,7 @@ static struct bt_power bt_vreg_info_qca_auto = {
 	.num_vregs = 6,
 };
 
-static struct bt_power bt_vreg_info_qca6174 = {
-	.compatible = "qcom,qca6174",
-	.vregs = bt_vregs_info_qca61x4_937x,
-	.num_vregs = ARRAY_SIZE(bt_vregs_info_qca61x4_937x),
-};
-
-static struct bt_power bt_vreg_info_qca6390 = {
-	.compatible = "qcom,qca6390",
-	.vregs = bt_vregs_info_qca6xx0,
-	.num_vregs = ARRAY_SIZE(bt_vregs_info_qca6xx0),
-};
-
-static struct bt_power bt_vreg_info_qca6490 = {
-	.compatible = "qcom,qca6490",
-	.vregs = bt_vregs_info_qca6xx0,
-	.num_vregs = ARRAY_SIZE(bt_vregs_info_qca6xx0),
-};
-
-static struct bt_power bt_vreg_info_kiwi = {
-	.compatible = "qcom,kiwi",
-	.vregs = bt_vregs_info_kiwi,
-	.num_vregs = ARRAY_SIZE(bt_vregs_info_kiwi),
-};
-
-static struct bt_power bt_vreg_info_converged = {
-	.compatible = "qcom,bt-qca-converged",
-	.vregs = bt_vregs_info_kiwi,
-	.num_vregs = ARRAY_SIZE(bt_vregs_info_kiwi),
-};
-
-static struct bt_power bt_vreg_info_wcn6750 = {
-	.compatible = "qcom,wcn6750-bt",
-	.vregs = bt_vregs_info_qca6xx0,
-	.num_vregs = ARRAY_SIZE(bt_vregs_info_qca6xx0),
-};
-
 static const struct of_device_id bt_power_match_table[] = {
-	{	.compatible = "qcom,qca6174", .data = &bt_vreg_info_qca6174},
-	{	.compatible = "qcom,wcn3990", .data = &bt_vreg_info_wcn399x},
-	{	.compatible = "qcom,qca6390", .data = &bt_vreg_info_qca6390},
-	{	.compatible = "qcom,qca6490", .data = &bt_vreg_info_qca6490},
-	{	.compatible = "qcom,kiwi",    .data = &bt_vreg_info_kiwi},
-	{	.compatible = "qcom,wcn6750-bt", .data = &bt_vreg_info_wcn6750},
-	{	.compatible = "qcom,bt-qca-converged", .data = &bt_vreg_info_converged},
 	{	.compatible = "qcom,qca-auto-converged", .data = &bt_vreg_info_qca_auto},
 	{},
 };
@@ -865,20 +758,12 @@ static const struct rfkill_ops btpower_rfkill_ops = {
 	.set_block = btpower_toggle_radio,
 };
 
-static ssize_t extldo_show(struct device *dev, struct device_attribute *attr,
-			char *buf)
-{
-	return scnprintf(buf, 6, "false\n");
-}
-
-static DEVICE_ATTR_RO(extldo);
-
 static int btpower_rfkill_probe(struct platform_device *pdev)
 {
 	struct rfkill *rfkill;
 	int ret;
 
-	rfkill = rfkill_alloc("bt_power", &pdev->dev, RFKILL_TYPE_BLUETOOTH,
+	rfkill = rfkill_alloc(RFKILL_NAME, &pdev->dev, RFKILL_TYPE_BLUETOOTH,
 						&btpower_rfkill_ops,
 						pdev->dev.platform_data);
 
@@ -886,11 +771,6 @@ static int btpower_rfkill_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "rfkill allocate failed\n");
 		return -ENOMEM;
 	}
-
-	/* add file into rfkill0 to handle LDO27 */
-	ret = device_create_file(&pdev->dev, &dev_attr_extldo);
-	if (ret < 0)
-		pr_err("%s: device create file error\n", __func__);
 
 	/* force Bluetooth off during init to allow for user control */
 	rfkill_init_sw_state(rfkill, 1);
@@ -1313,25 +1193,6 @@ static int bt_power_remove(struct platform_device *pdev)
 	return 0;
 }
 
-int btpower_register_slimdev(struct device *dev)
-{
-	pr_debug("%s\n", __func__);
-	if (!bt_power_pdata || (dev == NULL)) {
-		pr_err("%s: Failed to allocate memory\n", __func__);
-		return -EINVAL;
-	}
-	bt_power_pdata->slim_dev = dev;
-	return 0;
-}
-EXPORT_SYMBOL(btpower_register_slimdev);
-
-int btpower_get_chipset_version(void)
-{
-	pr_debug("%s\n", __func__);
-	return soc_id;
-}
-EXPORT_SYMBOL(btpower_get_chipset_version);
-
 static void  set_pwr_srcs_status(struct bt_power_vreg_data *handle)
 {
 	int ldo_index;
@@ -1534,7 +1395,7 @@ static struct platform_driver bt_power_driver = {
 	.probe = bt_power_probe,
 	.remove = bt_power_remove,
 	.driver = {
-		.name = "bt_power",
+		.name = BT_POWER_DRIVER_NAME,
 		.of_match_table = bt_power_match_table,
 	},
 };
@@ -1556,14 +1417,14 @@ static int __init btpower_init(void)
 		goto driver_err;
 	}
 
-	bt_major = register_chrdev(0, "bt", &bt_dev_fops);
+	bt_major = register_chrdev(0, BT_MAJOR_NAME, &bt_dev_fops);
 	if (bt_major < 0) {
 		pr_err("%s: failed to allocate char dev\n", __func__);
 		ret = -1;
 		goto chrdev_err;
 	}
 
-	bt_class = class_create(THIS_MODULE, "bt-dev");
+	bt_class = class_create(THIS_MODULE, BT_CLASS_NAME);
 	if (IS_ERR(bt_class)) {
 		pr_err("%s: coudn't create class\n", __func__);
 		ret = -1;
@@ -1572,7 +1433,7 @@ static int __init btpower_init(void)
 
 
 	if (device_create(bt_class, NULL, MKDEV(bt_major, 0),
-		NULL, "btpower") == NULL) {
+		NULL, BT_DEVICE_NAME) == NULL) {
 		pr_err("%s: failed to allocate char dev\n", __func__);
 		goto device_err;
 	}
@@ -1581,7 +1442,7 @@ static int __init btpower_init(void)
 device_err:
 	class_destroy(bt_class);
 class_err:
-	unregister_chrdev(bt_major, "bt");
+	unregister_chrdev(bt_major, BT_MAJOR_NAME);
 chrdev_err:
 	platform_driver_unregister(&bt_power_driver);
 driver_err:
@@ -1725,6 +1586,12 @@ static int btpower_enable_ipa_vreg(struct btpower_platform_data *pdata)
 
 static void __exit btpower_exit(void)
 {
+	if (!IS_ERR(bt_class))
+		class_destroy(bt_class);
+
+	if (bt_major >= 0)
+		unregister_chrdev(bt_major, BT_MAJOR_NAME);
+
 	platform_driver_unregister(&bt_power_driver);
 }
 
