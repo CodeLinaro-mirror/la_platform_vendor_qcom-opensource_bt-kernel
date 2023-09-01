@@ -6,4 +6,11 @@ ifeq ($(CONFIG_BT_HW_SECURE_DISABLE), y)
 KBUILD_CPPFLAGS += -DCONFIG_BT_HW_SECURE_DISABLE
 endif
 
-obj-$(CONFIG_MSM_BT_POWER) += pwr/
+ccflags-y += -I$(BT_KERNEL_ROOT)/include
+
+ifneq ($(MODNAME), btpower)
+KBUILD_CPPFLAGS += -DQCA_AUTO_SECONDARY
+endif
+
+obj-$(CONFIG_MSM_BT_POWER) += $(MODNAME).o
+$(MODNAME)-y = pwr/btpower.o

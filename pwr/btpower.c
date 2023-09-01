@@ -53,11 +53,19 @@
 #define BTPOWER_MBOX_TIMEOUT_MS 1000
 #define XO_CLK_RETRY_COUNT_MAX 5
 
+#ifndef QCA_AUTO_SECONDARY
 #define RFKILL_NAME "bt_power"
 #define BT_POWER_DRIVER_NAME "bt_power"
 #define BT_MAJOR_NAME "bt"
 #define BT_CLASS_NAME "bt-dev"
 #define BT_DEVICE_NAME "btpower"
+#else
+#define RFKILL_NAME "bt_power_new"
+#define BT_POWER_DRIVER_NAME "bt_power_new"
+#define BT_MAJOR_NAME "bt-new"
+#define BT_CLASS_NAME "bt-dev-new"
+#define BT_DEVICE_NAME "btpower-new"
+#endif
 
 /**
  * enum btpower_vreg_param: Voltage regulator TCS param
@@ -134,6 +142,7 @@ enum power_src_pos {
 };
 
 // Regulator structure for QCA BT in automotive SPs
+#ifndef QCA_AUTO_SECONDARY
 static struct bt_power bt_vreg_info_qca_auto = {
 	.compatible = "qcom,qca-auto-converged",
 	.vregs = (struct bt_power_vreg_data []) {
@@ -152,11 +161,38 @@ static struct bt_power bt_vreg_info_qca_auto = {
 	},
 	.num_vregs = 6,
 };
+#else
+static struct bt_power bt_vreg_info_qca_auto_new = {
+	.compatible = "qcom,qca-auto-secondary",
+	.vregs = (struct bt_power_vreg_data []) {
+		{NULL, "qcom,bt-vdd-ctrl1", 0, 0, 0, false, false,
+			{BT_VDD_CTRL1_LDO, BT_VDD_CTRL1_LDO_CURRENT}},
+		{NULL, "qcom,bt-vdd-ctrl2", 0, 0, 0, false, false,
+			{BT_VDD_CTRL2_LDO, BT_VDD_CTRL2_LDO_CURRENT}},
+		{NULL, "qcom,bt-vdd-aon", 1055000, 1055000, 0, false, false,
+			{BT_VDD_AON_LDO, BT_VDD_AON_LDO_CURRENT}},
+		{NULL, "qcom,bt-vdd-rfa1", 1370000, 1370000, 0, false, false,
+			{BT_VDD_RFA1_LDO, BT_VDD_RFA1_LDO_CURRENT}},
+		{NULL, "qcom,bt-vdd-rfa2", 2040000, 2040000, 0, false, false,
+			{BT_VDD_RFA2_LDO, BT_VDD_RFA2_LDO_CURRENT}},
+		{NULL, "qcom,bt-vdd-rfa3", 1900000, 1900000, 0, false, false,
+			{BT_VDD_RFA3_LDO, BT_VDD_RFA3_LDO_CURRENT}},
+	},
+	.num_vregs = 6,
+};
+#endif
 
+#ifndef QCA_AUTO_SECONDARY
 static const struct of_device_id bt_power_match_table[] = {
 	{	.compatible = "qcom,qca-auto-converged", .data = &bt_vreg_info_qca_auto},
 	{},
 };
+#else
+static const struct of_device_id bt_power_match_table[] = {
+	{	.compatible = "qcom,qca-auto-secondary", .data = &bt_vreg_info_qca_auto_new},
+	{},
+};
+#endif
 
 static int bt_power_vreg_set(enum bt_power_modes mode);
 static int btpower_enable_ipa_vreg(struct btpower_platform_data *pdata);
