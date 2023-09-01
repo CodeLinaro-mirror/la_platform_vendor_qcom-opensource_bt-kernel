@@ -15,12 +15,32 @@ ifneq ($(findstring opensource,$(LOCAL_PATH)),)
 	BT_BLD_DIR := $(abspath .)/vendor/qcom/opensource/bt-kernel
 endif # opensource
 
+LOCAL_DEV_NAME := $(patsubst .%,%,\
+	$(lastword $(strip $(subst /, ,$(LOCAL_PATH)))))
+
 DLKM_DIR := $(TOP)/device/qcom/common/dlkm
 
+LOCAL_MULTI_KO := false
+
+ifeq ($(LOCAL_DEV_NAME), bt-kernel)
+LOCAL_MULTI_KO := true
+ifeq ($(BOARD_HAVE_DUAL_BLUETOOTH), true)
+TARGET_BT_CHIP := btpower btpower_new
+else
+TARGET_BT_CHIP := btpower
+endif
+endif # LOCAL_DEV_NAME check
+
+ifeq ($(LOCAL_MULTI_KO), true)
+
+include $(foreach chip, $(TARGET_BT_CHIP), $(LOCAL_PATH)/.$(chip)/Android.mk)
+
+else
 
 ###########################################################
 # This is set once per LOCAL_PATH, not per (kernel) module
 KBUILD_OPTIONS := BT_KERNEL_ROOT=$(BT_BLD_DIR)
+KBUILD_OPTIONS += MODNAME=$(LOCAL_DEV_NAME)
 KBUILD_OPTIONS += $(foreach bt_select, \
        $(BT_SELECT), \
        $(bt_select))
@@ -29,13 +49,14 @@ BT_SRC_FILES := $(LOCAL_PATH)/pwr/btpower.c
 ################################ pwr ################################
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(BT_SRC_FILES)
-LOCAL_MODULE              := btpower.ko
-LOCAL_MODULE_KBUILD_NAME  := pwr/btpower.ko
+LOCAL_MODULE              := $(LOCAL_DEV_NAME).ko
+LOCAL_MODULE_KBUILD_NAME  := $(LOCAL_DEV_NAME).ko
 LOCAL_MODULE_TAGS         := optional
 LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 ################################ slimbus ################################
 
+endif # MULTI ko check
 endif # DLKM check
 endif # supported target check
