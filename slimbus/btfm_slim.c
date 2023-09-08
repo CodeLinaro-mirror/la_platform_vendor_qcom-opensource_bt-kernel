@@ -612,19 +612,6 @@ static long btfm_slim_ioctl(struct file *file, unsigned int cmd, unsigned long a
 	return ret;
 }
 
-static long btfm_slim_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
-{
-	int ret = 0;
-
-	switch (cmd) {
-	case BT_CMD_SLIM_TEST:
-		BTFMSLIM_INFO("cmd BT_CMD_SLIM_TEST, call btfm_slim_hw_init");
-		ret = btfm_slim_hw_init(btfm_slim_drv_data);
-		break;
-	}
-	return ret;
-}
-
 static const struct file_operations bt_dev_fops = {
 	.unlocked_ioctl = btfm_slim_ioctl,
 	.compat_ioctl = btfm_slim_ioctl,

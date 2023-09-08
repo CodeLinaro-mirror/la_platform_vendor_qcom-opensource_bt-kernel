@@ -87,6 +87,9 @@ int btpower_register_slimdev(struct device *dev);
 int btpower_get_chipset_version(void);
 int btpower_aop_mbox_init(struct btpower_platform_data *pdata);
 
+#define BT_CMD_SLIM_TEST            0xbfac
+#define BT_CMD_PWR_CTRL             0xbfad
+#define BT_CMD_CHIPSET_VERS         0xbfae
 #define BT_CMD_GET_CHIPSET_ID       0xbfaf
 #define BT_CMD_CHECK_SW_CTRL        0xbfb0
 #define BT_CMD_GETVAL_POWER_SRCS    0xbfb1
