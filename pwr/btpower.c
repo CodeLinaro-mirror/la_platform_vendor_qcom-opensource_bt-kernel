@@ -1214,13 +1214,13 @@ static int bt_power_probe(struct platform_device *pdev)
 		}
 		gpio_value = gpio_get_value(bt_power_pdata->wlan_sw_ctrl_gpio);
 		pr_info("%s:WLAN_SW_CNTRL_GPIO value= %d\n", __func__, gpio_value);
-		if(gpio_value) {
+		/*if(gpio_value) {
 			bt_power_pdata->bt_device_type =
 				cnss_utils_update_device_type(CNSS_HSP_DEVICE_TYPE);
 		} else {
 			bt_power_pdata->bt_device_type =
 				cnss_utils_update_device_type(CNSS_HMT_DEVICE_TYPE);
-		}
+		}*/
 	}
 	ret = perisec_cnss_bt_hw_disable_check(bt_power_pdata);
 	if (pdev->dev.of_node) {
