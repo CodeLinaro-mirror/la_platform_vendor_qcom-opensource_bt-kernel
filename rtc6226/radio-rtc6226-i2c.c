@@ -699,8 +699,11 @@ static int rtc6226_dt_parse_vreg_info(struct device *dev,
 /*
  * rtc6226_i2c_probe - probe for the device
  */
-static int rtc6226_i2c_probe(struct i2c_client *client,
-			const struct i2c_device_id *id)
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(6, 1, 128)
+static int rtc6226_i2c_probe(struct i2c_client *client,const struct i2c_device_id *id)
+#else
+static int rtc6226_i2c_probe(struct i2c_client *client)
+#endif
 {
 	struct rtc6226_device *radio;
 	struct v4l2_device *v4l2_dev;
