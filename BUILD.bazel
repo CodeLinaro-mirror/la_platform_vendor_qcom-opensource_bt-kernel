@@ -8,6 +8,7 @@ ddk_headers(
     includes = ["btfmcodec/include"]
 )
 
-load(":target.bzl", "define_pineapple")
+load(":target.bzl", "define_pineapple", "define_monaco")
 
 define_pineapple()
+define_monaco()

@@ -49,7 +49,7 @@ def define_target_variant_modules(target, variant, modules, config_options = [])
     """
     Generates the ddk_module for each of our kernel modules
     Args:
-        target: either `pineapple` or `kalama`
+        target: either `pineapple` or `kalama or monaco`
         variant: either `gki` or `consolidate`
         modules: bt_modules dictionary defined in `bt_modules.bzl`
         config_options: decides which kernel modules to build
