@@ -431,6 +431,7 @@ int btfm_slim_hw_init(struct btfmslim *btfmslim)
 		chipset_ver ==  QCA_CHEROKEE_SOC_ID_0201  ||
 		chipset_ver ==  QCA_CHEROKEE_SOC_ID_0210  ||
 		chipset_ver ==  QCA_CHEROKEE_SOC_ID_0211  ||
+		chipset_ver ==  QCA_CHEROKEE_SOC_ID_0300  ||
 		chipset_ver ==  QCA_CHEROKEE_SOC_ID_0310  ||
 		chipset_ver ==  QCA_CHEROKEE_SOC_ID_0320  ||
 		chipset_ver ==  QCA_CHEROKEE_SOC_ID_0320_UMC  ||
