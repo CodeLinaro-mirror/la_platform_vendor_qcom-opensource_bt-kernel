@@ -16,6 +16,7 @@ ifeq ($(TARGET_USES_QMAA),true)
            else
            BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/bt_fm_slim.ko
            endif
+      BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/spi_cnss_proto.ko
            BOARD_VENDOR_KERNEL_MODULES += $(BT_KERNEL_DRIVER)
      endif
   endif
@@ -34,6 +35,7 @@ else
      else
      BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/bt_fm_slim.ko
      endif
+     BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/spi_cnss_proto.ko
      BOARD_VENDOR_KERNEL_MODULES += $(BT_KERNEL_DRIVER)
   endif
 endif

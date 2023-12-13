@@ -9,6 +9,7 @@ def define_pineapple():
             "bt_fm_slim",
             "btfmcodec",
             "bt_fm_swr",
+            "spi_cnss_proto",
          ],
          config_options = [
             "CONFIG_MSM_BT_POWER",
@@ -18,6 +19,7 @@ def define_pineapple():
             #"CONFIG_BT_HW_SECURE_DISABLE",
             "CONFIG_BTFM_SWR",
             "CONFIG_BTFM_SLIM",
+            "CONFIG_SPI_CNSS_PROTO",
         ]
     )
 
@@ -61,7 +63,6 @@ def define_volcano():
            #  "CONFIG_BT_HW_SECURE_DISABLE",
             "CONFIG_BTFM_SWR",
             "CONFIG_BTFM_SLIM",
-
 	 ]
 	)
 def define_parrot():
