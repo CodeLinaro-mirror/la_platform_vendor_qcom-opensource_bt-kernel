@@ -3,6 +3,7 @@ SLIMBUS_PATH = "slimbus"
 FMRTC_PATH = "rtc6226"
 BTFMCODEC_PATH = "btfmcodec"
 SWR_PATH = "soundwire"
+SPI_CNSS_PATH = "spi"
 
 # This dictionary holds all the BT modules included in the bt-kernel
 bt_modules = {}
@@ -138,4 +139,19 @@ register_bt_modules(
         "//vendor/qcom/opensource/audio-kernel:audio_headers",
     ],
 )
-
+register_bt_modules(
+    name = "spi_cnss_proto",
+    path = SPI_CNSS_PATH,
+    config_opt = "CONFIG_SPI_CNSS_PROTO",
+    srcs = [
+        "spi_cnss_proto.c",
+        "spi_cnss_proto.h",
+        "spi-cnss-trace.h",
+    ],
+    deps = [":spi_cnss_headers"],
+    config_deps = {
+        "CONFIG_SPI_LOOPBACK_ENABLED" : [":spi_stub_headers",
+        ":%b_spi_stub"
+        ]
+    },
+)

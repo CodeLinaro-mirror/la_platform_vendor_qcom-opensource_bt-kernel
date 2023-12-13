@@ -14,3 +14,6 @@ else
 BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/bt_fm_slim.ko
 endif
 endif
+ifeq ($(TARGET_USES_QMAA_OVERRIDE_UWB), true)
+PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/spi_cnss_proto.ko
+endif
