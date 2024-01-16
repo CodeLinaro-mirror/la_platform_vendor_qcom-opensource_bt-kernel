@@ -23,6 +23,7 @@ static dev_t dev_major;
 struct btfmcodec_data *btfmcodec;
 struct device_driver driver = {.name = "btfmcodec-driver", .owner = THIS_MODULE};
 struct btfmcodec_char_device *btfmcodec_dev;
+bool is_cp_supported = true;
 
 #define cdev_to_btfmchardev(_cdev) container_of(_cdev, struct btfmcodec_char_device, cdev)
 #define MIN_PKT_LEN  0x9
@@ -140,6 +141,7 @@ static void btfmcodec_dev_rxwork(struct work_struct *work)
 	uint32_t len;
 	uint8_t status;
 	int idx;
+	uint8_t *bearer_switch_ind;
 
 	BTFMCODEC_DBG("start");
 	while ((skb = skb_dequeue(&btfmcodec_dev->rxq))) {
@@ -162,6 +164,10 @@ static void btfmcodec_dev_rxwork(struct work_struct *work)
 				  wake_up_interruptible(&btfmcodec_dev->rsp_wait_q[BTM_PKT_TYPE_BEARER_SWITCH_IND]);
 				}
 				btfmcodec_dev->status[idx] = skb->data[0];
+				/* Reset bearer switch ind flag */
+				bearer_switch_ind =
+					&btfmcodec_dev->status[BTM_PKT_TYPE_BEARER_SWITCH_IND];
+				*bearer_switch_ind = BTM_WAITING_RSP;
 				queue_work(btfmcodec_dev->workqueue, &btfmcodec_dev->wq_prepare_bearer);
 			} else {
 				BTFMCODEC_ERR("wrong packet format with len:%d", len);
@@ -183,6 +189,22 @@ static void btfmcodec_dev_rxwork(struct work_struct *work)
 				status);
 			wake_up_interruptible(&btfmcodec_dev->rsp_wait_q[idx]);
 			break;
+		case BTM_BTFMCODEC_CODEC_CONFIG_DMA_RSP:
+			idx = BTM_PKT_TYPE_DMA_CONFIG_RSP;
+			if (len == BTM_CODEC_CONFIG_DMA_RSP_LEN) {
+				status = skb->data[1];
+				if (status == MSG_SUCCESS)
+					btfmcodec_dev->status[idx] = BTM_RSP_RECV;
+				else
+					btfmcodec_dev->status[idx] = BTM_FAIL_RESP_RECV;
+			} else {
+				BTFMCODEC_ERR("wrong packet format with len:%d", len);
+				btfmcodec_dev->status[idx] = BTM_FAIL_RESP_RECV;
+			}
+			BTFMCODEC_INFO("Rx BTM_BTFMCODEC_CODEC_CONFIG_DMA_RSP status:%d",
+				status);
+			wake_up_interruptible(&btfmcodec_dev->rsp_wait_q[idx]);
+			break;
 		case BTM_BTFMCODEC_CTRL_MASTER_SHUTDOWN_RSP:
 			idx = BTM_PKT_TYPE_MASTER_SHUTDOWN_RSP;
 			if (len == BTM_MASTER_CONFIG_RSP_LEN) {
@@ -198,6 +220,9 @@ static void btfmcodec_dev_rxwork(struct work_struct *work)
 			BTFMCODEC_INFO("Rx BTM_BTFMCODEC_CTRL_MASTER_SHUTDOWN_RSP status:%d",
 				status);
 			wake_up_interruptible(&btfmcodec_dev->rsp_wait_q[idx]);
+			BTFMCODEC_INFO("%s: waiting to cancel prepare bearer wq", __func__);
+			cancel_work_sync(&btfmcodec_dev->wq_prepare_bearer);
+			BTFMCODEC_INFO("%s: prepare bearer wq canceled", __func__);
 			break;
 		case BTM_BTFMCODEC_BEARER_SWITCH_IND:
 			idx = BTM_PKT_TYPE_BEARER_SWITCH_IND;
@@ -442,6 +467,56 @@ static ssize_t btfmcodec_dev_read(struct file *file,
 
 	return use;
 }
+
+bool isCpSupported(void)
+{
+	return is_cp_supported;
+}
+
+static long btfmcodec_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+{
+	struct btfmcodec_data *btfmcodec = file->private_data;
+	struct hwep_data *hwep_info;
+
+	BTFMCODEC_INFO("%s: command %04x", __func__, cmd);
+
+	mutex_lock(&btfmcodec->hwep_drv_lock);
+	hwep_info = btfmcodec->hwep_info;
+	if (!hwep_info) {
+		BTFMCODEC_WARN("%s: HWEP is not registered with btfmcodec", __func__);
+		BTFMCODEC_WARN("%s: caching required info", __func__);
+		is_cp_supported = ((int)arg == 1) ? true : false;
+		mutex_unlock(&btfmcodec->hwep_drv_lock);
+		return 0;
+	}
+
+	mutex_unlock(&btfmcodec->hwep_drv_lock);
+	switch (cmd) {
+	case BTM_CP_UPDATE: {
+		if ((int)arg == 1) {
+			if (!strcmp(hwep_info->driver_name, "btfmslim"))
+				set_bit(BTADV_AUDIO_MASTER_CONFIG, &hwep_info->flags);
+			else if (!strcmp(hwep_info->driver_name, "btfmswr_slave"))
+				set_bit(BTADV_CONFIGURE_DMA, &hwep_info->flags);
+			BTFMCODEC_INFO("%s: This target support CP hwep %s",
+					__func__, hwep_info->driver_name);
+		} else {
+			clear_bit(BTADV_AUDIO_MASTER_CONFIG, &hwep_info->flags);
+			clear_bit(BTADV_CONFIGURE_DMA, &hwep_info->flags);
+			BTFMCODEC_INFO("%s: This target support doesn't CP", __func__);
+		}
+
+	BTFMCODEC_INFO("%s: mastr %d dma codec %d", __func__,
+			(int)test_bit(BTADV_AUDIO_MASTER_CONFIG, &hwep_info->flags),
+			(int)test_bit(BTADV_CONFIGURE_DMA, &hwep_info->flags));
+		break;
+	} default: {
+		BTFMCODEC_ERR("%s unhandled cmd %04x", __func__, cmd);
+	}
+	}
+
+	return 0;
+}
 static const struct file_operations btfmcodec_fops = {
 	.owner = THIS_MODULE,
 	.open = btfmcodec_dev_open,
@@ -450,8 +525,8 @@ static const struct file_operations btfmcodec_fops = {
 	.poll = btfmcodec_dev_poll,
 	.read = btfmcodec_dev_read,
 	/* For Now add no hookups for below callbacks */
-	.unlocked_ioctl = NULL,
-	.compat_ioctl = NULL,
+	.unlocked_ioctl = btfmcodec_ioctl,
+	.compat_ioctl = btfmcodec_ioctl,
 };
 
 static ssize_t btfmcodec_attributes_store(struct device *dev,
@@ -503,6 +578,7 @@ static int __init btfmcodec_init(void)
 		return -ENOMEM;
 	}
 
+	mutex_init(&btfmcodec->hwep_drv_lock);
 	states = &btfmcodec->states;
 	states->current_state = IDLE;
 	states->next_state = IDLE;
