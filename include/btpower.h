@@ -64,6 +64,7 @@ struct btpower_platform_data {
 	int bt_gpio_host_wake;                 /* Bluetooth bt_host_wake */
 	int irq;                               /* Bluetooth host_wake IRQ */
 #endif
+	int sw_cntrl_gpio;
 	int xo_gpio_clk;                       /* XO clock gpio*/
 	struct device *slim_dev;
 	struct bt_power_vreg_data *vreg_info;  /* VDDIO voltage regulator */
@@ -74,6 +75,8 @@ struct btpower_platform_data {
 	struct mbox_client mbox_client_data;
 	struct mbox_chan *mbox_chan;
 	const char *vreg_ipa;
+	bool sec_peri_feature_disable;
+	int bt_sec_hw_disable;
 #ifdef CONFIG_MSM_BT_OOBS
 	struct file *reffilp_obs;
 	struct task_struct *reftask_obs;
@@ -84,14 +87,14 @@ int btpower_register_slimdev(struct device *dev);
 int btpower_get_chipset_version(void);
 int btpower_aop_mbox_init(struct btpower_platform_data *pdata);
 
-#define BT_CMD_SLIM_TEST		0xbfac
-#define BT_CMD_PWR_CTRL			0xbfad
-#define BT_CMD_CHIPSET_VERS		0xbfae
-#define BT_CMD_GET_CHIPSET_ID	        0xbfaf
-#define BT_CMD_CHECK_SW_CTRL	        0xbfb0
-#define BT_CMD_GETVAL_POWER_SRCS	0xbfb1
-#define BT_CMD_SET_IPA_TCS_INFO         0xbfc0
-#define BT_CMD_KERNEL_PANIC             0xbfc1
+#define BT_CMD_SLIM_TEST            0xbfac
+#define BT_CMD_PWR_CTRL             0xbfad
+#define BT_CMD_CHIPSET_VERS         0xbfae
+#define BT_CMD_GET_CHIPSET_ID       0xbfaf
+#define BT_CMD_CHECK_SW_CTRL        0xbfb0
+#define BT_CMD_GETVAL_POWER_SRCS    0xbfb1
+#define BT_CMD_SET_IPA_TCS_INFO     0xbfc0
+#define BT_CMD_KERNEL_PANIC         0xbfc1
 
 #ifdef CONFIG_MSM_BT_OOBS
 #define BT_CMD_OBS_SIGNAL_TASK		0xbfd0

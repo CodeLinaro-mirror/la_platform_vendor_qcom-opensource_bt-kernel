@@ -3,7 +3,7 @@
 LOCAL_PATH := $(call my-dir)
 
 # Build/Package only in case of supported target
-ifeq ($(call is-board-platform-in-list,taro kalama monaco), true)
+ifeq ($(call is-board-platform-in-list,taro kalama pineapple blair monaco), true)
 
 BT_SELECT := CONFIG_MSM_BT_POWER=m
 
@@ -15,7 +15,20 @@ BT_SELECT += CONFIG_BTFM_SLIM=m
 #endif
 BT_SELECT += CONFIG_I2C_RTC6226_QCA=m
 
+ifeq ($(TARGET_KERNEL_DLKM_SECURE_MSM_OVERRIDE), true)
+ifeq ($(ENABLE_PERIPHERAL_STATE_UTILS), true)
+ifneq ($(TARGET_BOARD_PLATFORM),monaco)
+BT_SELECT += CONFIG_BT_HW_SECURE_DISABLE=y
+endif
+endif
+endif
+
 LOCAL_PATH := $(call my-dir)
+LOCAL_MODULE_DDK_BUILD := true
+LOCAL_MODULE_KO_DIRS := pwr/btpower.ko
+LOCAL_MODULE_KO_DIRS += slimbus/bt_fm_slim.ko
+LOCAL_MODULE_KO_DIRS += rtc6226/radio-i2c-rtc6226-qca.ko
+
 
 # This makefile is only for DLKM
 ifneq ($(findstring vendor,$(LOCAL_PATH)),)
@@ -37,6 +50,13 @@ KBUILD_OPTIONS += $(foreach bt_select, \
 BT_SRC_FILES := \
 	$(wildcard $(LOCAL_PATH)/*) \
 	$(wildcard $(LOCAL_PATH)/*/*) \
+
+ifeq ($(TARGET_KERNEL_DLKM_SECURE_MSM_OVERRIDE), true)
+ifeq ($(ENABLE_PERIPHERAL_STATE_UTILS), true)
+KBUILD_REQUIRED_KOS := smcinvoke_dlkm.ko
+endif
+endif
+
 
 # Module.symvers needs to be generated as a intermediate module so that
 # other modules which depend on BT platform modules can set local

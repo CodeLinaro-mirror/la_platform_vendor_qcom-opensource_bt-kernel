@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 /*
@@ -24,11 +24,23 @@
 #include <linux/uaccess.h>
 #include <linux/of_device.h>
 #include <soc/qcom/cmd-db.h>
+#include <linux/pinctrl/qcom-pinctrl.h>
 #include "btpower.h"
 #if (defined CONFIG_BT_SLIM)
 #include "btfm_slim.h"
 #endif
 #include <linux/fs.h>
+
+#ifdef CONFIG_BT_HW_SECURE_DISABLE
+#include "linux/smcinvoke_object.h"
+#include "linux/IClientEnv.h"
+
+#define PERISEC_HW_STATE_UID 0x108
+#define PERISEC_HW_OP_GET_STATE 1
+#define PERISEC_HW_BLUETOOTH_UID 0x502
+#define PERISEC_FEATURE_NOT_SUPPORTED 12
+#define PERISEC_PERIPHERAL_NOT_FOUND 10
+#endif
 
 #define PWR_SRC_NOT_AVAILABLE -2
 #define DEFAULT_INVALID_VALUE -1
@@ -77,6 +89,7 @@ enum power_src_pos {
 	BT_VDD_LDO,
 	BT_VDD_RFA_0p8,
 	BT_VDD_RFACMN,
+	BT_VDD_ANT_LDO,
 	// these indexes GPIOs/regs value are fetched during crash.
 	BT_RESET_GPIO_CURRENT,
 	BT_SW_CTRL_GPIO_CURRENT,
@@ -94,6 +107,7 @@ enum power_src_pos {
 	BT_VDD_RFACMN_CURRENT,
 	BT_VDD_IPA_2p2,
 	BT_VDD_IPA_2p2_CURRENT,
+	BT_VDD_ANT_LDO_CURRENT,
 	/* The below bucks are voted for HW WAR on some platform which supports
 	 * WNC39xx.
 	 */
@@ -142,6 +156,8 @@ static struct bt_power_vreg_data bt_vregs_info_qca6xx0[] = {
 // Regulator structure for kiwi BT SoC series
 static struct bt_power_vreg_data bt_vregs_info_kiwi[] = {
 	{NULL, "qcom,bt-vdd18-aon",      1800000, 1800000, 0, false, true,
+		{BT_VDD_LDO, BT_VDD_LDO_CURRENT}},
+	{NULL, "qcom,bt-vdd12-io",      1200000, 1200000, 0, false, true,
 		{BT_VDD_IO_LDO, BT_VDD_IO_LDO_CURRENT}},
 	{NULL, "qcom,bt-vdd-aon",     950000,  950000,  0, false, true,
 		{BT_VDD_AON_LDO, BT_VDD_AON_LDO_CURRENT}},
@@ -156,6 +172,8 @@ static struct bt_power_vreg_data bt_vregs_info_kiwi[] = {
 		{BT_VDD_RFA1_LDO, BT_VDD_RFA1_LDO_CURRENT}},
 	{NULL, "qcom,bt-vdd-rfa2",     1900000, 1900000, 0, false, true,
 		{BT_VDD_RFA2_LDO, BT_VDD_RFA2_LDO_CURRENT}},
+	{NULL, "qcom,bt-ant-ldo",  1776000, 1776000, 0, false, true,
+		{BT_VDD_ANT_LDO, BT_VDD_ANT_LDO_CURRENT}},
 };
 
 // Regulator structure for WCN399x BT SoC series
@@ -241,6 +259,76 @@ static struct class *bt_class;
 static int bt_major;
 static int soc_id;
 static bool probe_finished;
+
+
+#ifdef CONFIG_BT_HW_SECURE_DISABLE
+int perisec_cnss_bt_hw_disable_check(struct btpower_platform_data *plat_priv)
+{
+	struct Object client_env;
+	struct Object app_object;
+	int bt_uid = PERISEC_HW_BLUETOOTH_UID;
+	union ObjectArg obj_arg[2] = {{{0, 0}}};
+	int ret;
+	u8 state = 0;
+
+	/* Once this flag is set, secure peripheral feature
+	 * will not be supported till next reboot
+	 */
+	if (plat_priv->sec_peri_feature_disable)
+		return 0;
+
+	/* get rootObj */
+	ret = get_client_env_object(&client_env);
+	if (ret) {
+		pr_err("Failed to get client_env_object, ret: %d\n", ret);
+		goto end;
+	}
+	ret = IClientEnv_open(client_env, PERISEC_HW_STATE_UID, &app_object);
+	if (ret) {
+		pr_err("Failed to get app_object, ret: %d\n",  ret);
+		if (ret == PERISEC_FEATURE_NOT_SUPPORTED) {
+			ret = 0; /* Do not Assert */
+			plat_priv->sec_peri_feature_disable = true;
+			pr_debug("Secure HW feature not supported\n");
+		}
+		goto exit_release_clientenv;
+	}
+
+	obj_arg[0].b = (struct ObjectBuf) {&bt_uid, sizeof(u32)};
+	obj_arg[1].b = (struct ObjectBuf) {&state, sizeof(u8)};
+	ret = Object_invoke(app_object, PERISEC_HW_OP_GET_STATE, obj_arg,
+			    ObjectCounts_pack(1, 1, 0, 0));
+
+	pr_info("SMC invoke ret: %d state: %d\n", ret, state);
+	if (ret) {
+		if (ret == PERISEC_PERIPHERAL_NOT_FOUND) {
+			ret = 0; /* Do not Assert */
+			plat_priv->sec_peri_feature_disable = true;
+			pr_info("Secure HW mode is not updated. Peripheral not found\n");
+		}
+	} else {
+		if (state == 1)
+			plat_priv->bt_sec_hw_disable = 1;
+		else
+			plat_priv->bt_sec_hw_disable = 0;
+	}
+	Object_release(app_object);
+
+exit_release_clientenv:
+	Object_release(client_env);
+end:
+	if (ret) {
+		pr_err("SecMode:Unable to get sec mode BT Hardware status\n");
+	}
+	return ret;
+}
+#else
+int perisec_cnss_bt_hw_disable_check(struct btpower_platform_data *plat_priv)
+{
+	return 0;
+}
+#endif
+
 
 #ifdef CONFIG_MSM_BT_OOBS
 static void btpower_uart_transport_locked(struct btpower_platform_data *drvdata,
@@ -547,6 +635,14 @@ static int bt_configure_gpios(int on)
 		if (bt_sw_ctrl_gpio >= 0) {
 			bt_power_src_status[BT_SW_CTRL_GPIO] =
 			gpio_get_value(bt_sw_ctrl_gpio);
+			rc = msm_gpio_mpm_wake_set(bt_power_pdata->sw_cntrl_gpio, 1);
+			if (rc < 0) {
+				pr_err("Failed to set msm_gpio_mpm_wake_set for sw_cntrl gpio, ret: %d\n",
+						rc);
+				return rc;
+			} else {
+				pr_info("Set msm_gpio_mpm_wake_set for sw_cntrl gpio successful\n");
+			}
 			pr_info("BTON:Turn Bt OFF bt-sw-ctrl-gpio(%d) value(%d)\n",
 				bt_sw_ctrl_gpio,
 				bt_power_src_status[BT_SW_CTRL_GPIO]);
@@ -673,9 +769,15 @@ static int bluetooth_power(int on)
 {
 	int rc = 0;
 
-	pr_debug("%s: on: %d\n", __func__, on);
+	pr_info("%s: on: %d\n", __func__, on);
 
+	rc = perisec_cnss_bt_hw_disable_check(bt_power_pdata);
 	if (on == 1) {
+		if (bt_power_pdata->bt_sec_hw_disable) {
+			pr_err("%s:secure hw mode on,BT ON not allowed",
+				 __func__);
+			return -EINVAL;
+		}
 		rc = bt_power_vreg_set(BT_POWER_ENABLE);
 		if (rc < 0) {
 			pr_err("%s: bt_power regulators config failed\n",
@@ -707,8 +809,14 @@ static int bluetooth_power(int on)
 		}
 	} else if (on == 0) {
 		// Power Off
-		if (bt_power_pdata->bt_gpio_sys_rst > 0)
-			bt_configure_gpios(on);
+		if (bt_power_pdata->bt_gpio_sys_rst > 0) {
+			if (bt_power_pdata->bt_sec_hw_disable) {
+				pr_err("%s: secure hw mode on, not allowed to access gpio",
+					__func__);
+			}else {
+				bt_configure_gpios(on);
+			}
+		}
 gpio_fail:
 		if (bt_power_pdata->bt_gpio_sys_rst > 0)
 			gpio_free(bt_power_pdata->bt_gpio_sys_rst);
@@ -1015,6 +1123,11 @@ static int bt_power_populate_dt_pinfo(struct platform_device *pdev)
 		if (bt_power_pdata->bt_gpio_sw_ctrl < 0)
 			pr_warn("bt-sw-ctrl-gpio not provided in devicetree\n");
 
+		rc = of_property_read_u32(pdev->dev.of_node,
+			 "mpm_wake_set_gpios",&bt_power_pdata->sw_cntrl_gpio);
+		if (rc)
+			pr_warn("sw_cntrl-gpio not provided in devicetree\n");
+
 		bt_power_pdata->bt_gpio_debug  =
 			of_get_named_gpio(pdev->dev.of_node,
 						"qcom,bt-debug-gpio",  0);
@@ -1075,6 +1188,8 @@ static int bt_power_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	bt_power_pdata->pdev = pdev;
+
+	ret = perisec_cnss_bt_hw_disable_check(bt_power_pdata);
 	if (pdev->dev.of_node) {
 		ret = bt_power_populate_dt_pinfo(pdev);
 		if (ret < 0) {
@@ -1082,7 +1197,12 @@ static int bt_power_probe(struct platform_device *pdev)
 				__func__);
 			goto free_pdata;
 		}
-		pdev->dev.platform_data = bt_power_pdata;
+		if (bt_power_pdata->bt_sec_hw_disable) {
+			pr_info("%s: bt is in secure mode\n", __func__);
+		} else {
+			pr_info(" %s:send platform data of btpower\n", __func__);
+			pdev->dev.platform_data = bt_power_pdata;
+		}
 	} else if (pdev->dev.platform_data) {
 		/* Optional data set to default if not provided */
 		if (!((struct btpower_platform_data *)

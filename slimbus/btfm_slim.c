@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/init.h>
@@ -22,6 +22,10 @@
 #include "btpower.h"
 #include "btfm_slim.h"
 #include "btfm_slim_slave.h"
+#if IS_ENABLED(CONFIG_SLIM_BTFM_CODEC)
+#include "btfm_slim_hw_interface.h"
+#endif
+
 #define DELAY_FOR_PORT_OPEN_MS (200)
 #define SLIM_MANF_ID_QCOM	0x217
 #define SLIM_PROD_CODE		0x221
@@ -33,6 +37,8 @@ static int btfm_slim_major;
 struct btfmslim *btfm_slim_drv_data;
 
 static int btfm_num_ports_open;
+
+static bool is_registered;
 
 int btfm_slim_write(struct btfmslim *btfmslim,
 		uint16_t reg, uint8_t reg_val, uint8_t pgd)
@@ -220,8 +226,12 @@ int btfm_slim_disable_ch(struct btfmslim *btfmslim, struct btfmslim_ch *ch,
 		}
 	}
 	ch->dai.sconfig.port_mask = 0;
-	if (ch->dai.sconfig.chs != NULL)
+	if (ch->dai.sconfig.chs != NULL) {
 		kfree(ch->dai.sconfig.chs);
+		BTFMSLIM_INFO("setting ch->dai.sconfig.chs to NULL");
+		ch->dai.sconfig.chs = NULL;
+	} else
+		BTFMSLIM_ERR("ch->dai.sconfig.chs is already NULL");
 
 	if (btfm_num_ports_open > 0)
 		btfm_num_ports_open--;
@@ -240,7 +250,10 @@ int btfm_slim_disable_ch(struct btfmslim *btfmslim, struct btfmslim_ch *ch,
 		chipset_ver == QCA_HSP_SOC_ID_1211 ||
 		chipset_ver == QCA_HAMILTON_SOC_ID_0100 ||
 		chipset_ver == QCA_HAMILTON_SOC_ID_0101 ||
-		chipset_ver == QCA_HAMILTON_SOC_ID_0200 )) {
+		chipset_ver == QCA_HAMILTON_SOC_ID_0200 ||
+		chipset_ver == QCA_APACHE_SOC_ID_0100 ||
+		chipset_ver == QCA_APACHE_SOC_ID_0110 ||
+		chipset_ver == QCA_APACHE_SOC_ID_0121)) {
 		BTFMSLIM_INFO("SB reset needed after all ports disabled, sleeping");
 		msleep(DELAY_FOR_PORT_OPEN_MS);
 	}
@@ -356,7 +369,8 @@ int btfm_slim_hw_init(struct btfmslim *btfmslim)
 		slim_ifd->e_addr.instance = 0x0;
 		slim_ifd->laddr = 0x0;
 	} else if (chipset_ver == QCA_MOSELLE_SOC_ID_0100 ||
-		chipset_ver == QCA_MOSELLE_SOC_ID_0110) {
+		chipset_ver == QCA_MOSELLE_SOC_ID_0110 ||
+		chipset_ver == QCA_MOSELLE_SOC_ID_0120) {
 		BTFMSLIM_INFO("chipset is Moselle, overwriting EA");
 		slim->is_laddr_valid = false;
 		slim->e_addr.manf_id = SLIM_MANF_ID_QCOM;
@@ -498,6 +512,67 @@ int btfm_slim_hw_deinit(struct btfmslim *btfmslim)
 	return ret;
 }
 
+#if IS_ENABLED (CONFIG_BTFM_SLIM)
+void btfm_slim_get_hwep_details(struct slim_device *dev, struct btfmslim *btfm_slim)
+{
+}
+#else
+void btfm_slim_get_hwep_details(struct slim_device *slim, struct btfmslim *btfm_slim)
+{
+	struct device_node *np = slim->dev.of_node;
+	const __be32 *prop;
+	struct btfmslim_ch *rx_chs = btfm_slim->rx_chs;
+	struct btfmslim_ch *tx_chs = btfm_slim->tx_chs;
+	int len;
+
+	prop = of_get_property(np, "qcom,btslim-address", &len);
+	if (prop) {
+		btfm_slim->device_id = be32_to_cpup(&prop[0]);
+		BTFMSLIM_DBG("hwep slim address define in dt %08x", btfm_slim->device_id);
+	} else {
+		BTFMSLIM_ERR("btslim-address is not defined in dt using default address");
+		btfm_slim->device_id = 0;
+	}
+
+	if (!rx_chs || !tx_chs) {
+		BTFMSLIM_ERR("either rx/tx channels are configured to null");
+		return;
+	}
+
+	prop = of_get_property(np, "qcom,btslimrx-channels", &len);
+	if (prop) {
+		/* Check if we need any protection for index */
+		rx_chs[0].ch = (uint8_t)be32_to_cpup(&prop[0]);
+		rx_chs[1].ch = (uint8_t)be32_to_cpup(&prop[1]);
+		BTFMSLIM_DBG("Rx: id\tname\tport\tch");
+		BTFMSLIM_DBG("    %d\t%s\t%d\t%d", rx_chs[0].id,
+				rx_chs[0].name, rx_chs[0].port,
+				rx_chs[0].ch);
+		BTFMSLIM_DBG("    %d\t%s\t%d\t%d", rx_chs[1].id,
+				rx_chs[1].name, rx_chs[1].port,
+				rx_chs[1].ch);
+	} else {
+		BTFMSLIM_ERR("btslimrx channels are missing in dt using default values");
+	}
+
+	prop = of_get_property(np, "qcom,btslimtx-channels", &len);
+	if (prop) {
+		/* Check if we need any protection for index */
+		tx_chs[0].ch = (uint8_t)be32_to_cpup(&prop[0]);
+		tx_chs[1].ch = (uint8_t)be32_to_cpup(&prop[1]);
+		BTFMSLIM_DBG("Tx: id\tname\tport\tch");
+		BTFMSLIM_DBG("    %d\t%s\t%d\t%x", tx_chs[0].id,
+				tx_chs[0].name, tx_chs[0].port,
+				tx_chs[0].ch);
+		BTFMSLIM_DBG("    %d\t%s\t%d\t%x", tx_chs[1].id,
+				tx_chs[1].name, tx_chs[1].port,
+				tx_chs[1].ch);
+	} else {
+		BTFMSLIM_ERR("btslimtx channels are missing in dt using default values");
+	}
+
+}
+#endif
 static int btfm_slim_status(struct slim_device *sdev,
 				enum slim_device_status status)
 {
@@ -505,9 +580,22 @@ static int btfm_slim_status(struct slim_device *sdev,
 	struct device *dev = &sdev->dev;
 	struct btfmslim *btfm_slim;
 	btfm_slim = dev_get_drvdata(dev);
-	ret = btfm_slim_register_codec(btfm_slim);
-	if (ret)
+
+#if IS_ENABLED(CONFIG_BTFM_SLIM)
+	if (!is_registered) {
+		ret = btfm_slim_register_codec(btfm_slim);
+	}
+#else
+	if (!is_registered) {
+		btfm_slim_get_hwep_details(sdev, btfm_slim);
+		ret = btfm_slim_register_hw_ep(btfm_slim);
+	}
+#endif
+	if (!ret)
+		is_registered = true;
+	else
 		BTFMSLIM_ERR("error, registering slimbus codec failed");
+
 	return ret;
 }
 
@@ -537,7 +625,9 @@ static int btfm_slim_probe(struct slim_device *slim)
 	pr_info("%s: name = %s\n", __func__, dev_name(&slim->dev));
 	/*this as true during the probe then slimbus won't check for logical address*/
 	slim->is_laddr_valid = true;
-	dev_set_name(&slim->dev, "%s", "btfmslim_slave");
+	is_registered = false;
+
+	dev_set_name(&slim->dev, "%s", BTFMSLIM_DEV_NAME);
 	pr_info("%s: name = %s\n", __func__, dev_name(&slim->dev));
 
 	BTFMSLIM_DBG("");
@@ -568,7 +658,11 @@ static int btfm_slim_probe(struct slim_device *slim)
 	btfm_slim->dev = &slim->dev;
 	ret = btpower_register_slimdev(&slim->dev);
 	if (ret < 0) {
+#if IS_ENABLED(CONFIG_BTFM_SLIM)
 		btfm_slim_unregister_codec(&slim->dev);
+#else
+		btfm_slim_unregister_hwep();
+#endif
 		ret = -EPROBE_DEFER;
 		goto dealloc;
 	}
@@ -601,7 +695,11 @@ device_err:
 class_err:
 	unregister_chrdev(btfm_slim_major, "btfm_slim");
 register_err:
+#if IS_ENABLED(CONFIG_BTFM_SLIM)
 	btfm_slim_unregister_codec(&slim->dev);
+#else
+	btfm_slim_unregister_hwep();
+#endif
 dealloc:
 	mutex_destroy(&btfm_slim->io_lock);
 	mutex_destroy(&btfm_slim->xfer_lock);

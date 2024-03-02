@@ -29,7 +29,11 @@
 #define PGD	1
 #define IFD	0
 
-
+#if IS_ENABLED(CONFIG_BTFM_SLIM)
+#define BTFMSLIM_DEV_NAME "btfmslim_slave"
+#else
+#define BTFMSLIM_DEV_NAME "btfmslim"
+#endif
 
 /* Codec driver defines */
 enum {
@@ -73,6 +77,9 @@ struct btfmslim {
 	int (*vendor_init)(struct btfmslim *btfmslim);
 	int (*vendor_port_en)(struct btfmslim *btfmslim, uint8_t port_num,
 		uint8_t rxport, uint8_t enable);
+#if IS_ENABLED(CONFIG_SLIM_BTFM_CODEC)
+	int device_id;
+#endif
 };
 
 extern int btfm_feedback_ch_setting;
