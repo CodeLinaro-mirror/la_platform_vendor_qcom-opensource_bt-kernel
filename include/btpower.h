@@ -10,7 +10,9 @@
 #include <linux/cdev.h>
 #include <linux/types.h>
 #include <linux/mailbox_client.h>
+#if IS_ENABLED(CONFIG_MSM_QMP)
 #include <linux/mailbox/qmp.h>
+#endif
 /*
  * voltage regulator information required for configuring the
  * bluetooth chipset
