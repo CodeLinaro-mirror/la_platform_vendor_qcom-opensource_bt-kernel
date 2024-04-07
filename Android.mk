@@ -12,7 +12,7 @@ ifeq ($(BT_DLKM_ENABLE),  true)
 LOCAL_PATH := $(call my-dir)
 
 # Build/Package only in case of supported target
-ifeq ($(call is-board-platform-in-list, taro kalama pineapple blair sun), true)
+ifeq ($(call is-board-platform-in-list, taro kalama pineapple blair sun volcano), true)
 
 BT_SELECT := CONFIG_MSM_BT_POWER=m
 BT_SELECT += CONFIG_I2C_RTC6226_QCA=m
@@ -99,7 +99,7 @@ LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 
-ifeq ($(call is-board-platform-in-list, sun), true)
+ifeq ($(TARGET_BOARD_PLATFORM), sun)
 ################################ BTFM CODEC Driver #########################
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(BT_SRC_FILES)

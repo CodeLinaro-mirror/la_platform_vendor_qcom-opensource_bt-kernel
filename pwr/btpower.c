@@ -1590,6 +1590,8 @@ static int bt_power_probe(struct platform_device *pdev)
 {
 	int ret = 0;
 	int itr;
+	int rc = 0;
+
 
 	/* Fill whole array with -2 i.e NOT_AVAILABLE state by default
 	 * for any GPIO or Reg handle.
@@ -1607,10 +1609,7 @@ static int bt_power_probe(struct platform_device *pdev)
 
 	pwr_data->pdev = pdev;
 
-	struct device *devi = &pwr_data->pdev->dev;
-	int rc = 0;
-
-	pwr_data->nvmem_cell = devm_nvmem_cell_get(devi, "fmd_set");
+	pwr_data->nvmem_cell = devm_nvmem_cell_get(&pwr_data->pdev->dev, "fmd_set");
 
 	if (IS_ERR(pwr_data->nvmem_cell)) {
 		rc = PTR_ERR(pwr_data->nvmem_cell);
@@ -2399,6 +2398,8 @@ void set_fmd_sdam_bit(void)
 {
 	int rc = 0;
 	unsigned char sdam_bit = 1;
+	u8 *buf;
+	size_t len;
 
 	rc = nvmem_cell_write(pwr_data->nvmem_cell, &sdam_bit, sizeof(sdam_bit));
 	if (rc < 0) {
@@ -2406,9 +2407,6 @@ void set_fmd_sdam_bit(void)
 		return;
 	}
 	pr_warn("%s:  SDAM BIT of FMD Write Success %d\n", __func__, rc);
-
-	u8 *buf;
-	size_t len;
 
 	dev_info(&pwr_data->pdev->dev, "Got fmd_set nvmem_cell\n");
 	buf = nvmem_cell_read(pwr_data->nvmem_cell, &len);
@@ -2697,7 +2695,7 @@ static int __init btpower_init(void)
 		goto chrdev_err;
 	}
 
-	bt_class = class_create("bt-dev");
+	bt_class = class_create(THIS_MODULE,"bt-dev");
 	if (IS_ERR(bt_class)) {
 		pr_err("%s: coudn't create class\n", __func__);
 		ret = -1;

@@ -603,7 +603,7 @@ static int __init btfmcodec_init(void)
 	}
 
 	BTFMCODEC_INFO("creating btfm codec class");
-	dev_class = class_create("btfmcodec");
+	dev_class = class_create(THIS_MODULE,"btfmcodec");
 	if (IS_ERR(dev_class)) {
 		ret = PTR_ERR(dev_class);
 		BTFMCODEC_ERR("class_create failed ret:%d\n", ret);
