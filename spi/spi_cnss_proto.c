@@ -31,9 +31,10 @@
 #define WRITE_RETRY 2
 #define DATA_BYTES_PER_LINE 64
 u32 slave_config = 0x05000000;
-//#define CONFIG_SLEEP
-//#define CONFIG_AGGRESSIVE_SLEEP
+
 #define MEM_ALLOCATOR
+#define CONFIG_SLEEP
+#define CONFIG_AGGRESSIVE_SLEEP
 
 static void spi_cnss_notify_data_avail(struct spi_cnss_user *user);
 static void spi_cnss_reinit_xfer(struct spi_transfer* xfer, int size);
