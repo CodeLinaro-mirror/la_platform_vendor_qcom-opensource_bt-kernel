@@ -679,6 +679,7 @@ struct platform_pwr_data {
 	bool is_fmd_mode_enable;
 	struct nvmem_cell *nvmem_cell;
 	u32 fmd_clk_gpio_id;
+	struct mutex pwr_release;
 };
 
 int btpower_register_slimdev(struct device *dev);
