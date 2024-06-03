@@ -323,14 +323,11 @@ static int bt_vreg_enable(struct bt_power_vreg_data *vreg)
 			}
 		}
 
-		if (vreg->load_curr >= 0) {
-			rc = regulator_set_load(vreg->reg,
-					vreg->load_curr);
-			if (rc < 0) {
-				pr_err("%s: regulator_set_load(%s) failed rc=%d\n",
-				__func__, vreg->name, rc);
-				goto out;
-			}
+		rc = regulator_set_load(vreg->reg, vreg->load_curr);
+		if (rc < 0) {
+			pr_err("%s: regulator_set_load(%s) failed rc=%d\n",
+			__func__, vreg->name, rc);
+			goto out;
 		}
 
 		rc = regulator_enable(vreg->reg);
@@ -364,12 +361,10 @@ static int bt_vreg_enable_retention(struct bt_power_vreg_data *vreg)
 				goto out;
 			}
 		}
-		if (vreg->load_curr >= 0) {
-			rc = regulator_set_load(vreg->reg, 0);
-			if (rc < 0) {
-				pr_err("%s: regulator_set_load(%s) failed rc=%d\n",
-				__func__, vreg->name, rc);
-			}
+		rc = regulator_set_load(vreg->reg, 0);
+		if (rc < 0) {
+			pr_err("%s: regulator_set_load(%s) failed rc=%d\n",
+			__func__, vreg->name, rc);
 		}
 	}
 out:
@@ -404,12 +399,10 @@ static int bt_vreg_disable(struct bt_power_vreg_data *vreg)
 				goto out;
 			}
 		}
-		if (vreg->load_curr >= 0) {
-			rc = regulator_set_load(vreg->reg, 0);
-			if (rc < 0) {
-				pr_err("%s: regulator_set_load(%s) failed rc=%d\n",
-				__func__, vreg->name, rc);
-			}
+		rc = regulator_set_load(vreg->reg, 0);
+		if (rc < 0) {
+			pr_err("%s: regulator_set_load(%s) failed rc=%d\n",
+			__func__, vreg->name, rc);
 		}
 	}
 out:
