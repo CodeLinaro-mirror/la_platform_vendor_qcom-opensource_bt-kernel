@@ -710,13 +710,15 @@ static int bt_configure_gpios(int on)
 		if (bt_sw_ctrl_gpio >= 0) {
 			power_src.platform_state[BT_SW_CTRL_GPIO] =
 			gpio_get_value(bt_sw_ctrl_gpio);
-			rc = msm_gpio_mpm_wake_set(pwr_data->sw_cntrl_gpio, 1);
-			if (rc < 0) {
-				pr_err("Failed to set msm_gpio_mpm_wake_set for sw_cntrl gpio, ret: %d\n",
+			if (pwr_data->sw_cntrl_gpio > 0) {
+				rc = msm_gpio_mpm_wake_set(pwr_data->sw_cntrl_gpio, 1);
+				if (rc < 0) {
+					pr_err("Failed to set msm_gpio_mpm_wake_set for sw_cntrl gpio, ret: %d\n",
 						rc);
-				return rc;
-			} else {
-				pr_err("Set msm_gpio_mpm_wake_set for sw_cntrl gpio successful\n");
+					return rc;
+				} else {
+					pr_err("Set msm_gpio_mpm_wake_set for sw_cntrl gpio successful\n");
+				}
 			}
 			pr_err("BTON:Turn Bt OFF bt-sw-ctrl-gpio(%d) value(%d)\n",
 				bt_sw_ctrl_gpio,
