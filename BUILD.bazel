@@ -11,7 +11,8 @@ ddk_headers(
 load(":target.bzl", "define_pineapple")
 load(":target.bzl", "define_sun")
 load(":target.bzl", "define_volcano")
-
+load(":target.bzl", "define_parrot")
 define_pineapple()
 define_sun()
 define_volcano()
+define_parrot()
