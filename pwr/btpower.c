@@ -2517,12 +2517,12 @@ static long bt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 static int bt_power_release(struct inode *inode, struct file *file)
 {
 
-	mutex_lock(&pwr_data->pwr_release);
-
 	if (!pwr_data || !probe_finished) {
 		pr_err("%s: BTPower Probing Pending.Try Again\n", __func__);
 		return -EAGAIN;
 	}
+
+	mutex_lock(&pwr_data->pwr_release);
 
 	pwr_data->reftask = get_current();
 
