@@ -2681,15 +2681,16 @@ static int __init btpower_init(void)
 		goto class_err;
 	}
 
-
 	if (device_create(bt_class, NULL, MKDEV(bt_major, 0),
 		NULL, "btpower") == NULL) {
 		pr_err("%s: failed to allocate char dev\n", __func__);
 		goto device_err;
 	}
-	return 0;
 
 	mutex_init(&pwr_release);
+	return 0;
+
+
 
 device_err:
 	class_destroy(bt_class);
