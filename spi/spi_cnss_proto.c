@@ -36,6 +36,8 @@ u32 slave_config = 0x05000000;
 #define CONFIG_SLEEP
 #define CONFIG_AGGRESSIVE_SLEEP
 
+#define NUM_OF_TRIALS_DURING_OPEN 10
+#define NUM_OF_TRIALS_DURING_TRANS 2
 static void spi_cnss_notify_data_avail(struct spi_cnss_user *user);
 static void spi_cnss_reinit_xfer(struct spi_transfer* xfer, int size);
 static int spi_cnss_register_xfer(struct spi_cnss_priv *spi_drv, u8 reg, u8 opcode);
@@ -888,12 +890,12 @@ static int spi_cnss_clear_irq(struct spi_cnss_priv *spi_drv)
  * @spi_drv: pointer to main spi_cnss struct
  * return: zero on success, non-zero otherwise
  */
-int spi_cnss_wakeup_client(struct spi_cnss_priv *spi_drv)
+int spi_cnss_wakeup_client(struct spi_cnss_priv *spi_drv, int retry)
 {
 	int i,ret = 0;
 	SPI_CNSS_INFO(spi_drv, "%s\n",__func__);
 	spi_drv->client_state = AWAKE_PENDING;
-	for (i = 0; i < MAX_INIT_RETRY; i++) {
+	for (i = 0; i < retry; i++) {
 	//Write NOP and wait for interrupt
 		pr_info("%s: writing NOP cmd: try = %d",__func__, i);
 		reinit_completion(&spi_drv->wake_wait);
@@ -1621,7 +1623,7 @@ static int spi_cnss_controller_init(struct spi_cnss_priv *spi_drv)
 	spi_stub_driver_reg_cb(notification_to_schedule_wq);
 #else
 	enable_irq(spi_drv->irq);
-	ret = spi_cnss_wakeup_client(spi_drv);
+	ret = spi_cnss_wakeup_client(spi_drv, NUM_OF_TRIALS_DURING_OPEN);
 	/*if (spi_drv->client_state != AWAKE) {
 		ret = spi_cnss_register_xfer(spi_drv, SPI_SLAVE_SANITY_REG, SPI_REGISTER_READ);
 		if (ret < 0) {
@@ -2245,7 +2247,7 @@ static int spi_cnss_runtime_resume(struct device *dev)
 	if (spi_drv->client_state == AWAKE) {
 		return 0;
 	}
-	ret = spi_cnss_wakeup_client(spi_drv);
+	ret = spi_cnss_wakeup_client(spi_drv, NUM_OF_TRIALS_DURING_TRANS);
 	if (ret != -1) {
 		spi_cnss_read_context_info(spi_drv, true);
 	}
