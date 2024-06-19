@@ -1111,6 +1111,8 @@ static int __spi_cnss_send_msg(struct spi_cnss_priv *spi_drv, struct spi_cnss_us
 			return -1;
 		}
 	}
+	len = spi_drv->client.HBUF_LEN;
+	SPI_CNSS_DBG(spi_drv,"%s: Read len again %d\n",__func__, len);
 	if (len == 0 && !spi_drv->write_pending) {
 		list_for_each_entry_safe(user_pkt, user_pkt_temp, &spi_drv->tx_list, list) {
 			SPI_CNSS_DBG(spi_drv,"%s\n",__func__);
