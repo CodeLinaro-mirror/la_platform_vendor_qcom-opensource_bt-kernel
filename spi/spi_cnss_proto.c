@@ -294,6 +294,7 @@ void spi_cnss_kfree(struct spi_cnss_priv *spi_drv, void *ptr)
 	if (ptr) {
 		atomic_dec(&spi_drv->spi_alloc_cnt);
 		kfree(ptr);
+		ptr = NULL;
 		SPI_CNSS_DBG(spi_drv,"%s: Allocated %d\n", __func__, atomic_read(&spi_drv->spi_alloc_cnt));
 		//SPI_CNSS_DBG(spi_drv,"%s: Freeing %d 0x%p\n", __func__, spi_alloc_cnt, ptr);
 	}
@@ -932,6 +933,9 @@ static int __spi_cnss_read_msg(struct spi_cnss_priv *spi_drv)
 #ifdef CONFIG_SPI_LOOPBACK_ENABLED
 	u8 length = 0;
 #endif
+	if (spi_drv == NULL) {
+		pr_info();
+	}
 	read = spi_drv->usr_cnt;
 	SPI_CNSS_DBG(spi_drv, "%s: active clients = %d\n",__func__, read);
 	for (i = 0; i < MAX_DEV; i++) {
@@ -1085,7 +1089,7 @@ static void spi_cnss_read_msg(struct kthread_work *work)
 static int __spi_cnss_send_msg(struct spi_cnss_priv *spi_drv, struct spi_cnss_user **usr)
 {
 	int ret = 0;
-	int i = 0, len;
+	int len = 0;
 	struct spi_cnss_packet *user_pkt,*user_pkt_temp;
 	//struct client_info client = spi_drv->client;
 
@@ -1119,10 +1123,7 @@ static int __spi_cnss_send_msg(struct spi_cnss_priv *spi_drv, struct spi_cnss_us
 			SPI_CNSS_DBG(spi_drv,"%s\n",__func__);
 			//mutex_lock(&spi_drv->xfer_lock);
 			spi_drv->write_pending = true;
-			for (i = 0; i < WRITE_RETRY; i++) {
-				ret = spi_cnss_prepare_xfer(spi_drv, user_pkt, USER_WRITE);
-				if (ret >= 0) break;
-			}
+			ret = spi_cnss_prepare_xfer(spi_drv, user_pkt, USER_WRITE);
 			spi_drv->write_pending = false;
 			*usr = &spi_drv->user[user_pkt->id];
 			//mutex_unlock(&spi_drv->xfer_lock);
@@ -1150,6 +1151,10 @@ static void spi_cnss_send_msg(struct kthread_work *work)
 	ret = __spi_cnss_send_msg(spi_drv, &usr);
 	if (ret == 0) {
 		complete(&usr->sync_wait);
+	}
+	else if (ret < 0)
+	{
+		pr_err("%s: failed \n",__func__);
 	}
 	pr_debug("%s: Exit\n",__func__);
 }
