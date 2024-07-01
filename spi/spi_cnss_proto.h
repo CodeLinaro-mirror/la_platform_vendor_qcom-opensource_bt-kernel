@@ -13,6 +13,7 @@
 #include <linux/poll.h>
 #include <linux/kfifo.h>
 #include <linux/timer.h>
+#include <linux/ipc_logging.h>
 #include "spi_cnss.h"
 
 #define MAX_DEV 2
@@ -102,6 +103,8 @@ if (print) { \
 
 #define SPI_CNSS_INFO(spi_ptr, x...) do { \
 if (spi_ptr) { \
+	if (spi_ptr->ipc) \
+		ipc_log_string(spi_ptr->ipc, x);\
 	if (spi_ptr->dev) \
 		spi_cnss_trace_log(spi_ptr->dev, x); \
 	pr_info(x); \
@@ -111,6 +114,8 @@ if (spi_ptr) { \
 #define SPI_CNSS_DBG(spi_ptr, x...) do { \
 if (spi_ptr) { \
 	SPI_LOG_DBG_MSG (true, spi_ptr->dev, x); \
+	if (spi_ptr->ipc) \
+		ipc_log_string(spi_ptr->ipc, x); \
 	if (spi_ptr->dev) \
 		spi_cnss_trace_log(spi_ptr->dev, x); \
 	pr_info(x); \
@@ -119,6 +124,8 @@ if (spi_ptr) { \
 
 #define SPI_CNSS_ERR(spi_ptr, x...) do { \
 if (spi_ptr) { \
+	if (spi_ptr->ipc) \
+		ipc_log_string(spi_ptr->ipc, x); \
 	SPI_LOG_ERR_MSG(true, spi_ptr->dev, x); \
 	if (spi_ptr->dev) \
 		spi_cnss_trace_log(spi_ptr->dev, x); \
@@ -284,5 +291,6 @@ struct spi_cnss_priv {
 	atomic_t spi_alloc_cnt;
 	struct timer_list client_sleep_timer;
 	struct memory_manager mem_mngr;
+	void *ipc;
 };
 #endif //__LINUX_SPI_CNSS_PROTO_H
