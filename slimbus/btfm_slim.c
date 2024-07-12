@@ -6,6 +6,7 @@
 
 #include <linux/init.h>
 #include <linux/kernel.h>
+#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/of_gpio.h>
 #include <linux/delay.h>
@@ -14,6 +15,7 @@
 #include <linux/ratelimit.h>
 #include <linux/slab.h>
 #include <linux/fs.h>
+#include <linux/pm_runtime.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
@@ -238,7 +240,10 @@ int btfm_slim_disable_ch(struct btfmslim *btfmslim, struct btfmslim_ch *ch,
 
 	ch->dai.sruntime = NULL;
 	BTFMSLIM_INFO("calling slim suspend for LPI");
-	slim_vote_for_suspend(btfmslim->slim_pgd);
+	//slim_vote_for_suspend(btfmslim->slim_pgd);
+	pm_runtime_disable(&btfmslim->slim_pgd->dev);
+	pm_runtime_set_suspended(&btfmslim->slim_pgd->dev);
+	pm_runtime_enable(&btfmslim->slim_pgd->dev);
 
 	BTFMSLIM_INFO("btfm_num_ports_open: %d", btfm_num_ports_open);
 
@@ -675,7 +680,12 @@ static int btfm_slim_probe(struct slim_device *slim)
 		goto register_err;
 	}
 
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(6, 1, 0))
+	btfm_slim_class = class_create("btfmslim-dev");
+#else
 	btfm_slim_class = class_create(THIS_MODULE, "btfmslim-dev");
+#endif
+
 	if (IS_ERR(btfm_slim_class)) {
 		BTFMSLIM_ERR("%s: coudn't create class\n", __func__);
 		ret = -1;

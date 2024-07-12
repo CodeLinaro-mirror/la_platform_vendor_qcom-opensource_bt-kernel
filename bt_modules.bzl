@@ -94,7 +94,7 @@ register_bt_modules(
 register_bt_modules(
     name = "radio-i2c-rtc6226-qca",
     path = FMRTC_PATH,
-    config_opt = "CONFIG_I2C_RTC6226_QCA",
+    #config_opt = "CONFIG_I2C_RTC6226_QCA",
     srcs = [
         "radio-rtc6226-common.c",
         "radio-rtc6226-i2c.c",
