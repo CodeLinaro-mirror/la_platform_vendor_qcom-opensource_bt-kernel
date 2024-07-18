@@ -712,12 +712,13 @@ static int bt_configure_gpios(int on)
 		if (bt_sw_ctrl_gpio >= 0) {
 			power_src.platform_state[BT_SW_CTRL_GPIO] =
 			gpio_get_value(bt_sw_ctrl_gpio);
-			rc = msm_gpio_mpm_wake_set(pwr_data->sw_cntrl_gpio, 1);
-			if (rc < 0) {
-				pr_err("Failed to set msm_gpio_mpm_wake_set for sw_cntrl gpio, ret: %d\n",
+			if (pwr_data->sw_cntrl_gpio > 0) {
+				rc = msm_gpio_mpm_wake_set(pwr_data->sw_cntrl_gpio, 1);
+				if (rc < 0) {
+					pr_err("Failed to set msm_gpio_mpm_wake_set for sw_cntrl gpio, ret: %d\n",
 						rc);
-				return rc;
-			} else {
+					return rc;
+				}
 				pr_err("Set msm_gpio_mpm_wake_set for sw_cntrl gpio successful\n");
 			}
 			pr_err("BTON:Turn Bt OFF bt-sw-ctrl-gpio(%d) value(%d)\n",
@@ -1578,7 +1579,6 @@ static int bt_power_probe(struct platform_device *pdev)
 	skb_queue_head_init(&pwr_data->rxq);
 	mutex_init(&pwr_data->pwr_mtx);
 	mutex_init(&pwr_data->btpower_state.state_machine_lock);
-	mutex_init(&pwr_release);
 	pwr_data->btpower_state.power_state = IDLE;
 	pwr_data->btpower_state.retention_mode = RETENTION_IDLE;
 	pwr_data->btpower_state.grant_state = NO_GRANT_FOR_ANY_SS;
@@ -2613,12 +2613,13 @@ static int __init btpower_init(void)
 		goto class_err;
 	}
 
-
 	if (device_create(bt_class, NULL, MKDEV(bt_major, 0),
 		NULL, "btpower") == NULL) {
 		pr_err("%s: failed to allocate char dev\n", __func__);
 		goto device_err;
 	}
+
+	mutex_init(&pwr_release);
 	return 0;
 
 device_err:
