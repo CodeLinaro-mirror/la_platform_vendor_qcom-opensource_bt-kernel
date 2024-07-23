@@ -9,6 +9,9 @@
 #include <linux/types.h>
 #include "asm-generic/errno-base.h"
 
+
+#define SPI_SOFT_RESET_BIT  BIT(0)
+#define SPI_SLEEP_CMD_BIT  BIT(1)
 /*
 * Protocol Indicator
 */
