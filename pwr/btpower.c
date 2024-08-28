@@ -39,6 +39,9 @@
 #include <linux/pinctrl/pinctrl.h>
 
 #include "btpower.h"
+#ifdef CONFIG_FMD_ENABLE
+#include "cnss_utils.h"
+#endif
 #if (defined CONFIG_BT_SLIM)
 #include "btfm_slim.h"
 #endif
@@ -121,6 +124,8 @@ enum power_src_pos {
 	BT_VDD_RFA_0p8,
 	BT_VDD_RFACMN,
 	BT_VDD_ANT_LDO,
+	BT_VDD_WLAN_AON_LDO,
+
 	// these indexes GPIOs/regs value are fetched during crash.
 	BT_RESET_GPIO_CURRENT,
 	BT_SW_CTRL_GPIO_CURRENT,
@@ -139,6 +144,8 @@ enum power_src_pos {
 	BT_VDD_IPA_2p2,
 	BT_VDD_IPA_2p2_CURRENT,
 	BT_VDD_ANT_LDO_CURRENT,
+	BT_VDD_WLAN_AON_LDO_CURRENT,
+
 	/* The below bucks are voted for HW WAR on some platform which supports
 	 * WNC39xx.
 	 */
@@ -231,6 +238,8 @@ static struct vreg_data platform_vregs_info_peach[] = {
 	/* RFA_1P25 */
 	{NULL, "qcom,bt-vdd-rfa1p25",     1300000, 2100000, 0, false, true,
 		{BT_VDD_RFA1_LDO, BT_VDD_RFA1_LDO_CURRENT}},
+	{NULL, "qcom,bt-vdd-wlan-aon", 950000, 950000, 0, false, false,
+		{BT_VDD_WLAN_AON_LDO, BT_VDD_WLAN_AON_LDO_CURRENT}},
 };
 
 // Regulator structure for WCN399x BT SoC series
@@ -302,8 +311,8 @@ static struct pwr_data vreg_info_peach = {
 	.platform_num_vregs = ARRAY_SIZE(platform_vregs_info_peach),
 };
 
-static struct pwr_data vreg_info_wcn788x = {
-	.compatible = "qcom,wcn788x",
+static struct pwr_data vreg_info_wcn786x = {
+	.compatible = "qcom,wcn786x",
 	.platform_vregs = platform_vregs_info_peach,
 	.platform_num_vregs = ARRAY_SIZE(platform_vregs_info_peach),
 };
@@ -319,7 +328,7 @@ static const struct of_device_id bt_power_match_table[] = {
 	{	.compatible = "qcom,wcn6750-bt", .data = &vreg_info_wcn6750},
 	{	.compatible = "qcom,bt-qca-converged", .data = &vreg_info_converged},
 	{	.compatible = "qcom,peach-bt", .data = &vreg_info_peach},
-	{	.compatible = "qcom,wcn788x", .data = &vreg_info_wcn788x},
+	{	.compatible = "qcom,wcn786x", .data = &vreg_info_wcn786x},
 	{},
 };
 
@@ -736,12 +745,13 @@ static int bt_configure_gpios(int on)
 		if (bt_sw_ctrl_gpio >= 0) {
 			power_src.platform_state[BT_SW_CTRL_GPIO] =
 			gpio_get_value(bt_sw_ctrl_gpio);
-			rc = msm_gpio_mpm_wake_set(pwr_data->sw_cntrl_gpio, 1);
-			if (rc < 0) {
-				pr_err("Failed to set msm_gpio_mpm_wake_set for sw_cntrl gpio, ret: %d\n",
+			if (pwr_data->sw_cntrl_gpio >= 0) {
+				rc = msm_gpio_mpm_wake_set(pwr_data->sw_cntrl_gpio, 1);
+				if (rc < 0) {
+					pr_err("Failed to set msm_gpio_mpm_wake_set for sw_cntrl gpio, ret: %d\n",
 						rc);
-				return rc;
-			} else {
+					return rc;
+				}
 				pr_info("Set msm_gpio_mpm_wake_set for sw_cntrl gpio successful\n");
 			}
 			pr_info("BTON:Turn Bt OFF bt-sw-ctrl-gpio(%d) value(%d)\n",
@@ -909,17 +919,6 @@ static int bt_regulators_pwr(int pwr_state)
 			}
 		}
 
-		/* Parse dt_info and check if a target requires clock voting.
-		 * Enable BT clock when BT is on and disable it when BT is off
-		 */
-		if (pwr_data->bt_chip_clk) {
-			rc = bt_clk_enable(pwr_data->bt_chip_clk);
-			if (rc < 0) {
-				pr_err("%s: bt_power gpio config failed\n",
-					__func__);
-				goto clk_fail;
-			}
-		}
 		if (pwr_data->bt_gpio_sys_rst > 0) {
 			power_src.bt_state[BT_RESET_GPIO] = DEFAULT_INVALID_VALUE;
 			power_src.bt_state[BT_SW_CTRL_GPIO] = DEFAULT_INVALID_VALUE;
@@ -947,7 +946,6 @@ gpio_fail:
 			gpio_free(pwr_data->bt_gpio_debug);
 		if (pwr_data->bt_chip_clk)
 			bt_clk_disable(pwr_data->bt_chip_clk);
-clk_fail:
 regulator_fail:
 		for (i = 0; i < bt_num_vregs; i++) {
 			bt_vregs = &pwr_data->bt_vregs[i];
@@ -1025,6 +1023,46 @@ regulator_failed:
 	return rc;
 }
 
+static bool is_wlan_mx_buck(struct vreg_data *reg)
+{
+
+	if (strcmp(reg->name, "qcom,bt-vdd-wlan-aon"))
+		return false;
+	else
+		return true;
+}
+
+static int vote_wlan_reg_for_fmd(void)
+{
+	int log_indx;
+	struct vreg_data *vregs = pwr_data->wlan_vregs;
+
+	if ((vregs == NULL) || (!is_wlan_mx_buck(vregs))) {
+		pr_err("%s: Regulator qcom,bt-vdd-wlan-aon is not avilable\n", __func__);
+		return -1;
+	}
+
+	if (vregs->reg == NULL)
+		return -1;
+
+	log_indx = vregs->indx.init;
+	power_src.platform_state[log_indx] = DEFAULT_INVALID_VALUE;
+
+	if (vreg_enable(vregs) < 0) {
+		pr_err("%s: Platform regulators config failed\n", __func__);
+		return -1;
+	}
+
+	if (vregs->is_enabled) {
+		power_src.platform_state[log_indx] = regulator_get_voltage(vregs->reg);
+		pr_err("%s: Regulator %s voted-on Successfully\n", __func__, vregs->name);
+	} else {
+		pr_err("%s: Regulator qcom,bt-vdd-wlan-aon is not enabled\n", __func__);
+		return -1;
+	}
+	return 0;
+}
+
 static int platform_regulators_pwr(int pwr_state)
 {
 	int i, log_indx, platform_num_vregs, rc = 0;
@@ -1076,10 +1114,12 @@ static int platform_regulators_pwr(int pwr_state)
 			}
 		}
 gpio_failed:
-		if (pwr_data->bt_gpio_sys_rst > 0)
-			gpio_free(pwr_data->bt_gpio_sys_rst);
-		if (pwr_data->bt_gpio_debug  >  0)
-			gpio_free(pwr_data->bt_gpio_debug);
+		if (!get_fmd_mode()) {
+			if (pwr_data->bt_gpio_sys_rst > 0)
+				gpio_free(pwr_data->bt_gpio_sys_rst);
+			if (pwr_data->bt_gpio_debug  >  0)
+				gpio_free(pwr_data->bt_gpio_debug);
+		}
 regulator_failed:
 		for (i = 0; i < platform_num_vregs; i++) {
 			platform_vregs = &pwr_data->platform_vregs[i];
@@ -1346,10 +1386,10 @@ static int get_gpio_dt_pinfo(struct platform_device *pdev)
 	int ret;
 	struct device_node *child;
 	struct pinctrl *pinctrl1;
+#ifdef CONFIG_FMD_ENABLE
 	struct pinctrl_state *sw_ctrl;
-	u32 gpio_id, i;
-	int gpio_id_n;
 
+#endif
 	child = pdev->dev.of_node;
 
 	pinctrl1 =  devm_pinctrl_get(&pdev->dev);
@@ -1378,27 +1418,12 @@ static int get_gpio_dt_pinfo(struct platform_device *pdev)
 	if (pwr_data->bt_gpio_fmd_clk_ctrl < 0)
 		pr_warn("bt-fmd-clk-gpio not provided in devicetree\n");
 
-		/* Find out and configure all those GPIOs which need to be setup
-		 * for interrupt wakeup capable
-		 *
-		 */
-	gpio_id_n = of_property_count_u32_elems(child, "mpm_wake_set_gpios");
-	if (gpio_id_n > 0) {
-		pr_err("Num of GPIOs to be setup for interrupt wakeup capable: %d\n",
-						gpio_id_n);
-		for (i = 0; i < gpio_id_n; i++) {
-			ret = of_property_read_u32_index(child,
-							"mpm_wake_set_gpios",
-							i, &gpio_id);
-			if (ret) {
-				pr_err("Failed to read gpio_id at index: %d\n", i);
-				continue;
-			}
-		}
-	} else {
-		pr_err("No GPIOs to be setup for interrupt wakeup capable\n");
-	}
+	ret = of_property_read_u32(child, "mpm_wake_set_gpios", &pwr_data->sw_cntrl_gpio);
 
+	if (ret) {
+		pr_warn("sw_cntrl-gpio not provided in devicetree\n");
+	}
+#ifdef CONFIG_FMD_ENABLE
 	if (pinctrl1) {
 		sw_ctrl = pinctrl_lookup_state(pinctrl1, "sw_ctrl");
 		if (IS_ERR_OR_NULL(sw_ctrl)) {
@@ -1412,7 +1437,7 @@ static int get_gpio_dt_pinfo(struct platform_device *pdev)
 	} else {
 		pr_err("%s: pinctrl is null\n", __func__);
 	}
-
+#endif
 	pwr_data->bt_gpio_debug  = of_get_named_gpio(child,
 							"qcom,bt-debug-gpio", 0);
 	if (pwr_data->bt_gpio_debug < 0)
@@ -1462,12 +1487,6 @@ static int get_power_dt_pinfo(struct platform_device *pdev)
 		pwr_data->platform_vregs = data->platform_vregs;
 		pwr_data->uwb_num_vregs = data->uwb_num_vregs;
 		pwr_data->platform_num_vregs = data->platform_num_vregs;
-
-		pr_info("%s: bt_num_vregs =%d uwb_num_vregs =%d platform_num_vregs=%d\n",
-			__func__, pwr_data->bt_num_vregs, pwr_data->uwb_num_vregs,
-			pwr_data->platform_num_vregs);
-	} else {
-		pr_info("%s: bt_num_vregs =%d\n", __func__, pwr_data->bt_num_vregs);
 	}
 
 	for (i = 0; i < pwr_data->bt_num_vregs; i++) {
@@ -1480,6 +1499,12 @@ static int get_power_dt_pinfo(struct platform_device *pdev)
 
 	if (pwr_data->is_ganges_dt) {
 		for (i = 0; i < pwr_data->platform_num_vregs; i++) {
+			if (is_wlan_mx_buck(&pwr_data->platform_vregs[i])) {
+				pwr_data->wlan_vregs = &pwr_data->platform_vregs[i];
+				pwr_data->platform_num_vregs--;
+				pr_err("%s: Found wlan regulator for FMD Operations '%s'\n",
+					__func__, (pwr_data->wlan_vregs)->name);
+			}
 			rc = dt_parse_vreg_info(&(pdev->dev), NULL,
 				&pwr_data->platform_vregs[i]);
 			/* No point to go further if failed to get regulator handler */
@@ -1494,6 +1519,16 @@ static int get_power_dt_pinfo(struct platform_device *pdev)
 			if (rc)
 				return rc;
 		}
+
+		pr_info("%s: platform_name = %s: bt_num_vregs =%d uwb_num_vregs =%d platform_num_vregs=%d\n",
+			__func__, pwr_data->compatible, pwr_data->bt_num_vregs,
+			pwr_data->uwb_num_vregs, pwr_data->platform_num_vregs);
+
+	} else {
+
+		pr_info("%s: platform_name = %s: bt_num_vregs =%d\n", __func__,
+			pwr_data->compatible, pwr_data->bt_num_vregs);
+
 	}
 	return rc;
 }
@@ -1616,7 +1651,9 @@ static int bt_power_probe(struct platform_device *pdev)
 		rc = PTR_ERR(pwr_data->nvmem_cell);
 		pr_err("%s:Failed to get FMD nvmem-cells %d\n", __func__, rc);
 	}
+
 	pr_info("%s: --- Got FMD nvmem-cells %d\n", __func__, rc);
+
 	if (rc >= 0) {
 		u8 *buf;
 		size_t len;
@@ -1635,7 +1672,7 @@ static int bt_power_probe(struct platform_device *pdev)
 	pwr_data->is_ganges_dt = of_property_read_bool(pdev->dev.of_node,
 							"qcom,peach-bt") ||
 							of_property_read_bool(pdev->dev.of_node,
-							"qcom,wcn788x");
+							"qcom,wcn786x");
 	pr_info("%s: is_ganges_dt = %d\n", __func__, pwr_data->is_ganges_dt);
 
 	pwr_data->workq = alloc_workqueue("workq", WQ_HIGHPRI, WQ_DFL_ACTIVE);
@@ -2265,8 +2302,9 @@ static void bt_power_vote(struct work_struct *work)
 			ConvertRetentionModeToString(btpower_get_retenion_mode_state()),
 			ConvertGrantToString(btpower_get_grant_state()),
 			ConvertGrantToString(btpower_get_grant_pending_state()));
-	
+
 		pwr_data->wait_status[request] = ret;
+		kfree_skb(skb);
 		wake_up_interruptible(&pwr_data->rsp_wait_q[request]);
 	}
 }
@@ -2400,10 +2438,9 @@ const char *GetSourceSubsystemString(uint32_t source_subsystem)
 	}
 }
 
-void set_fmd_sdam_bit(void)
+void set_fmd_sdam_bit(unsigned char sdam_bit)
 {
 	int rc = 0;
-	unsigned char sdam_bit = 1;
 	u8 *buf;
 	size_t len;
 
@@ -2423,6 +2460,66 @@ void set_fmd_sdam_bit(void)
 		pr_warn("%s: Read SDAM BIT of FMD  %d\n", __func__, buf[0]);
 		kfree(buf);
 	}
+}
+
+int set_fmd_mode(enum FmdOperation operation)
+{
+	int ret = 0;
+
+	switch (operation) {
+		case ENABLE_SDAM_BIT_FMD: {
+			pr_warn("%s: SET_FMD_MODE_CTRL :: ENABLE_SDAM_BIT_FMD\n",
+				__func__);
+			set_fmd_sdam_bit((unsigned char)POWER_ENABLE);
+			break;
+		}
+		case DISABLE_SDAM_BIT_FMD: {
+			pr_warn("%s: SET_FMD_MODE_CTRL :: DISABLE_SDAM_BIT_FMD\n",
+				__func__);
+			set_fmd_sdam_bit((unsigned char)POWER_DISABLE);
+			break;
+		}
+		case UPDATE_SOC_VERSION_1_0_FOR_FMD: {
+			pr_warn("%s: SET_FMD_MODE_CTRL :: UPDATE_SOC_VERSION_1_0_FOR_FMD\n",
+				__func__);
+			pwr_data->is_fmd_mode_enable = true;
+			if (pwr_data->bt_chip_clk) {
+				ret = bt_clk_enable(pwr_data->bt_chip_clk);
+				if (ret < 0) {
+					pr_err("%s: failed to bt_chip_clk\n", __func__);
+					return -EINVAL;
+				}
+			}
+			break;
+		}
+		case UPDATE_SOC_VERSION_2_0_FOR_FMD: {
+			pr_warn("%s: SET_FMD_MODE_CTRL :: UPDATE_SOC_VERSION_2_0_FOR_FMD\n",
+				__func__);
+			pwr_data->is_fmd_mode_enable = true;
+#ifdef CONFIG_FMD_ENABLE
+			cnss_utils_fmd_status(true);
+#endif
+			if (vote_wlan_reg_for_fmd() < 0) {
+				pr_err("%s: failed to vote_wlan_reg_for_fmd\n", __func__);
+				return -EINVAL;
+			}
+			if (pwr_data->bt_chip_clk) {
+				ret = bt_clk_enable(pwr_data->bt_chip_clk);
+				if (ret < 0) {
+					pr_err("%s: failed to bt_chip_clk\n", __func__);
+					return -EINVAL;
+				}
+			}
+			break;
+		}
+		default: {
+			pr_warn("%s: invalid fmd operation = %d received\n",
+				__func__, operation);
+			ret = -EINVAL;
+			break;
+		}
+	}
+	return ret;
 }
 
 static long bt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
@@ -2495,17 +2592,7 @@ static long bt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		break;
 	}
 	case SET_FMD_MODE_CTRL: {
-		pr_warn("%s: SET_FMD_MODE_CTRL\n", __func__);
-		pwr_data->is_fmd_mode_enable = true;
-		ret = btpower_handle_client_request(BT_CMD_PWR_CTRL, (int)POWER_ENABLE);
-		if (pwr_data->bt_chip_clk) {
-			ret = bt_clk_enable(pwr_data->bt_chip_clk);
-			if (ret < 0) {
-				pr_err("%s: bt_power gpio config failed\n", __func__);
-				return -EINVAL;
-			}
-		}
-		set_fmd_sdam_bit();
+		ret = set_fmd_mode((enum FmdOperation)arg);
 		break;
 	}
 	case BT_CMD_REGISTRATION:
@@ -2708,15 +2795,16 @@ static int __init btpower_init(void)
 		goto class_err;
 	}
 
-
 	if (device_create(bt_class, NULL, MKDEV(bt_major, 0),
 		NULL, "btpower") == NULL) {
 		pr_err("%s: failed to allocate char dev\n", __func__);
 		goto device_err;
 	}
-	return 0;
 
 	mutex_init(&pwr_release);
+	return 0;
+
+
 
 device_err:
 	class_destroy(bt_class);

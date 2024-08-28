@@ -12,11 +12,14 @@ ifeq ($(BT_DLKM_ENABLE),  true)
 LOCAL_PATH := $(call my-dir)
 
 # Build/Package only in case of supported target
-ifeq ($(call is-board-platform-in-list, taro kalama pineapple blair sun volcano), true)
+ifeq ($(call is-board-platform-in-list, taro kalama pineapple blair sun volcano parrot), true)
 
 BT_SELECT := CONFIG_MSM_BT_POWER=m
 BT_SELECT += CONFIG_I2C_RTC6226_QCA=m
 
+ifneq ($(call is-board-platform-in-list, parrot), true)
+BT_SELECT += CONFIG_FMD_ENABLE=y
+endif
 
 ifeq ($(TARGET_KERNEL_DLKM_SECUREMSM_QTEE_OVERRIDE), true)
 ifeq ($(ENABLE_PERIPHERAL_STATE_UTILS), true)
@@ -68,7 +71,9 @@ endif
 endif
 
 
+ifeq ($(TARGET_BOARD_PLATFORM), sun)
 KBUILD_REQUIRED_KOS += swr_dlkm.ko
+endif
 
 # Module.symvers needs to be generated as a intermediate module so that
 # other modules which depend on BT platform modules can set local
