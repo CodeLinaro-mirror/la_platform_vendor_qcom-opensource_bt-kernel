@@ -704,39 +704,57 @@ static int bluetooth_power(int on)
 	pr_debug("%s: on: %d\n", __func__, on);
 
 	if (on == 1) {
-		rc = bt_power_vreg_set(BT_POWER_ENABLE);
-		if (rc < 0) {
-			pr_err("%s: bt_power regulators config failed\n",
-				__func__);
-			goto regulator_fail;
+#if IS_ENABLED(CONFIG_ARCH_QTI_VM)
+		if (bt_power_pdata->is_fw_managed_pwr) {
+			/* Handled by gunyah */
+			rc = btpower_fw_managed_power_gpio(bt_power_pdata, true);
 		}
-		/* Parse dt_info and check if a target requires clock voting.
-		 * Enable BT clock when BT is on and disable it when BT is off
-		 */
-		if (bt_power_pdata->bt_chip_clk) {
-			rc = bt_clk_enable(bt_power_pdata->bt_chip_clk);
+		else
+#endif
+		{
+			rc = bt_power_vreg_set(BT_POWER_ENABLE);
 			if (rc < 0) {
-				pr_err("%s: bt_power gpio config failed\n",
+				pr_err("%s: bt_power regulators config failed\n",
 					__func__);
-				goto clk_fail;
+				goto regulator_fail;
 			}
-		}
-		if (bt_power_pdata->bt_gpio_sys_rst > 0) {
-			bt_power_src_status[BT_RESET_GPIO] =
-				DEFAULT_INVALID_VALUE;
-			bt_power_src_status[BT_SW_CTRL_GPIO] =
-				DEFAULT_INVALID_VALUE;
-			rc = bt_configure_gpios(on);
-			if (rc < 0) {
-				pr_err("%s: bt_power gpio config failed\n",
-					__func__);
-				goto gpio_fail;
+			/* Parse dt_info and check if a target requires clock voting.
+			* Enable BT clock when BT is on and disable it when BT is off
+			*/
+			if (bt_power_pdata->bt_chip_clk) {
+				rc = bt_clk_enable(bt_power_pdata->bt_chip_clk);
+				if (rc < 0) {
+					pr_err("%s: bt_power gpio config failed\n",
+						__func__);
+					goto clk_fail;
+				}
+			}
+			if (bt_power_pdata->bt_gpio_sys_rst > 0) {
+				bt_power_src_status[BT_RESET_GPIO] =
+					DEFAULT_INVALID_VALUE;
+				bt_power_src_status[BT_SW_CTRL_GPIO] =
+					DEFAULT_INVALID_VALUE;
+				rc = bt_configure_gpios(on);
+				if (rc < 0) {
+					pr_err("%s: bt_power gpio config failed\n",
+						__func__);
+					goto gpio_fail;
+				}
 			}
 		}
 	} else if (on == 0) {
-		// Power Off
-		if (bt_power_pdata->bt_gpio_sys_rst > 0)
-			bt_configure_gpios(on);
+#if IS_ENABLED(CONFIG_ARCH_QTI_VM)
+		if (bt_power_pdata->is_fw_managed_pwr) {
+			/* Handled by gunyah */
+			rc = btpower_fw_managed_power_gpio(bt_power_pdata, false);
+		}
+		else
+#endif
+		{
+			// Power Off
+			if (bt_power_pdata->bt_gpio_sys_rst > 0)
+				bt_configure_gpios(on);
+		}
 gpio_fail:
 		if (bt_power_pdata->bt_gpio_sys_rst > 0)
 			gpio_free(bt_power_pdata->bt_gpio_sys_rst);
@@ -1106,6 +1124,47 @@ static void bt_power_pdc_init_params (struct btpower_platform_data *pdata)
 	}
 }
 
+#if IS_ENABLED(CONFIG_ARCH_QTI_VM)
+static inline bool
+btpower_is_fw_managed(struct btpower_platform_data *pdata)
+{
+	return of_property_read_bool(pdata->pdev->dev.of_node,
+		"qcom,firmware-managed-resources");
+}
+
+void btpower_pm_runtime_disable(struct btpower_platform_data *pdata)
+{
+	pm_runtime_dont_use_autosuspend(&pdata->pdev->dev);
+	pm_runtime_disable(&pdata->pdev->dev);
+}
+
+int btpower_fw_managed_power_gpio(struct btpower_platform_data *pdata, bool enabled)
+{
+	struct device *dev = &pdata->pdev->dev;
+
+	int ret = -1;
+
+	if (!dev) {
+		pr_err("%s: dev is null, return \n", __func__);
+		return 0;
+	}
+
+	if (enabled) {
+		pr_info("%s: power on \n", __func__);
+		ret = pm_runtime_resume_and_get(dev);
+		msleep(50);
+	} else {
+		pr_info("%s: power off \n", __func__);
+		ret = pm_runtime_put_sync(dev);
+	}
+
+	if (ret < 0)
+		pr_err("gpio operation failed with err=%d\n", ret);
+
+	return ret;
+}
+#endif
+
 static int bt_power_probe(struct platform_device *pdev)
 {
 	int ret = 0;
@@ -1155,6 +1214,14 @@ static int bt_power_probe(struct platform_device *pdev)
         bt_power_pdc_init_params(bt_power_pdata);
 	btpower_aop_mbox_init(bt_power_pdata);
 
+#if IS_ENABLED(CONFIG_ARCH_QTI_VM)
+	bt_power_pdata->is_fw_managed_pwr = btpower_is_fw_managed(bt_power_pdata);
+	if (bt_power_pdata->is_fw_managed_pwr) {
+		ret = devm_pm_runtime_enable(&pdev->dev);
+		if (ret) goto free_pdata;
+	}
+#endif
+
 	probe_finished = true;
 	return 0;
 
@@ -1170,6 +1237,14 @@ static int bt_power_remove(struct platform_device *pdev)
 	probe_finished = false;
 	btpower_rfkill_remove(pdev);
 	bt_power_vreg_put();
+
+#if IS_ENABLED(CONFIG_ARCH_QTI_VM)
+	if (bt_power_pdata->is_fw_managed_pwr) {
+		btpower_pm_runtime_disable(bt_power_pdata);
+		btpower_fw_managed_power_gpio(bt_power_pdata, false);
+		return 0;
+	}
+#endif
 
 	kfree(bt_power_pdata);
 
