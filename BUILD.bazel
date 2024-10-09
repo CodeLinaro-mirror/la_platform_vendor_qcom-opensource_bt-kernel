@@ -11,6 +11,7 @@ ddk_headers(
 load(":target.bzl", "define_pineapple")
 load(":target.bzl", "define_sun")
 load(":target.bzl", "define_parrot")
+load(":target.bzl", "define_canoe")
 
 define_pineapple()
 define_sun()

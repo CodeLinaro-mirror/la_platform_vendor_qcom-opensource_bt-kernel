@@ -12,12 +12,12 @@ ifeq ($(BT_DLKM_ENABLE),  true)
 LOCAL_PATH := $(call my-dir)
 
 # Build/Package only in case of supported target
-ifeq ($(call is-board-platform-in-list, taro kalama pineapple blair sun parrot), true)
+ifeq ($(call is-board-platform-in-list, taro kalama pineapple blair sun parrot canoe), true)
 
 BT_SELECT := CONFIG_MSM_BT_POWER=m
 BT_SELECT += CONFIG_I2C_RTC6226_QCA=m
 
-ifneq ($(call is-board-platform-in-list, parrot), true)
+ifneq ($(call is-board-platform-in-list, parrot canoe), true)
 BT_SELECT += CONFIG_FMD_ENABLE=y
 endif
 
@@ -32,7 +32,8 @@ LOCAL_MODULE_DDK_BUILD := true
 LOCAL_MODULE_KO_DIRS := pwr/btpower.ko
 LOCAL_MODULE_KO_DIRS += rtc6226/radio-i2c-rtc6226-qca.ko
 
-ifeq ($(TARGET_BOARD_PLATFORM), sun)
+ifeq ($(TARGET_USES_QMAA_OVERRIDE_BLUETOOTH_AUDIO), true)
+ifeq ($(TARGET_BOARD_PLATFORM), sun canoe)
 BT_SELECT += CONFIG_BTFM_CODEC=m
 BT_SELECT += CONFIG_BTFM_SWR=m
 BT_SELECT += CONFIG_SLIM_BTFM_CODEC=m
@@ -42,6 +43,7 @@ LOCAL_MODULE_KO_DIRS += soundwire/bt_fm_swr.ko
 else
 BT_SELECT += CONFIG_BTFM_SLIM=m
 LOCAL_MODULE_KO_DIRS += slimbus/bt_fm_slim.ko
+endif
 endif
 
 # This makefile is only for DLKM
@@ -68,11 +70,6 @@ ifeq ($(TARGET_KERNEL_DLKM_SECUREMSM_QTEE_OVERRIDE), true)
 ifeq ($(ENABLE_PERIPHERAL_STATE_UTILS), true)
 KBUILD_REQUIRED_KOS := smcinvoke_dlkm.ko
 endif
-endif
-
-
-ifeq ($(TARGET_BOARD_PLATFORM), sun)
-KBUILD_REQUIRED_KOS += swr_dlkm.ko
 endif
 
 # Module.symvers needs to be generated as a intermediate module so that
@@ -104,7 +101,8 @@ LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 
-ifeq ($(call is-board-platform-in-list, sun), true)
+ifeq ($(TARGET_USES_QMAA_OVERRIDE_BLUETOOTH_AUDIO), true)
+ifeq ($(call is-board-platform-in-list, sun canoe), true)
 ################################ BTFM CODEC Driver #########################
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(BT_SRC_FILES)
@@ -130,6 +128,7 @@ LOCAL_MODULE              := bt_fm_swr.ko
 LOCAL_MODULE_KBUILD_NAME  := soundwire/bt_fm_swr.ko
 LOCAL_MODULE_TAGS         := optional
 LOCAL_MODULE_DEBUG_ENABLE := true
+KBUILD_REQUIRED_KOS += swr_dlkm.ko
 #KBUILD_OPTIONS += KBUILD_EXTRA_SYMBOLS+=$(call intermediates-dir-for,DLKM,swr_dlkm)/Module.symvers
 #LOCAL_REQUIRED_MODULES    := swr_dlkm
 #LOCAL_ADDITIONAL_DEPENDENCIES += $(call intermediates-dir-for,DLKM,swr_dlkm)/Module.symvers
@@ -146,6 +145,8 @@ LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 endif
+endif
+
 ################################ rtc6226 ################################
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(BT_SRC_FILES)
