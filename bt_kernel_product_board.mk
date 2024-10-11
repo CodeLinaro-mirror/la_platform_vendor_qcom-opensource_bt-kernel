@@ -1,6 +1,6 @@
 # Build BT kernel drivers
 
-ifeq ($(TARGET_USES_QMAA_OVERRIDE_BLUETOOTH_AUDIO), true)
+ifeq ($(TARGET_USES_QMAA_OVERRIDE_BLUETOOTH), true)
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/btpower.ko
 endif
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/radio-i2c-rtc6226-qca.ko

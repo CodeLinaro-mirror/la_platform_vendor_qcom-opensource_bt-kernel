@@ -33,7 +33,7 @@ LOCAL_MODULE_KO_DIRS := pwr/btpower.ko
 LOCAL_MODULE_KO_DIRS += rtc6226/radio-i2c-rtc6226-qca.ko
 
 ifeq ($(TARGET_USES_QMAA_OVERRIDE_BLUETOOTH_AUDIO), true)
-ifeq ($(TARGET_BOARD_PLATFORM), sun canoe)
+ifeq ($(call is-board-platform-in-list, sun canoe), true)
 BT_SELECT += CONFIG_BTFM_CODEC=m
 BT_SELECT += CONFIG_BTFM_SWR=m
 BT_SELECT += CONFIG_SLIM_BTFM_CODEC=m

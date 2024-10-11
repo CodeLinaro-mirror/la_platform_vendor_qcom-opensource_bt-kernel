@@ -56,7 +56,7 @@ def define_parrot():
 
 def define_canoe():
     define_bt_modules(
-        target = "sun",
+        target = "canoe",
         modules = [
             "btpower",
             "radio-i2c-rtc6226-qca",
