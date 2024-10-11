@@ -9,6 +9,9 @@ ifeq ($(TARGET_USES_QMAA),true)
            BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/btfmcodec.ko
            BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/btfm_slim_codec.ko
            BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/bt_fm_swr.ko
+           else ifeq ($(TARGET_BOARD_PLATFORM), volcano)
+           BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/btfmcodec.ko
+           BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/bt_fm_swr.ko
            else
            BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/bt_fm_slim.ko
            endif
@@ -22,6 +25,9 @@ else
      ifeq ($(TARGET_BOARD_PLATFORM), sun)
      BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/btfmcodec.ko
      BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/btfm_slim_codec.ko
+     BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/bt_fm_swr.ko
+     else ifeq ($(TARGET_BOARD_PLATFORM), volcano)
+     BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/btfmcodec.ko
      BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/bt_fm_swr.ko
      else
      BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/bt_fm_slim.ko

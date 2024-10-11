@@ -5,6 +5,9 @@ ifeq ($(TARGET_BOARD_PLATFORM), sun)
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/btfmcodec.ko
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/btfm_slim_codec.ko
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/bt_fm_swr.ko
+else ifeq ($(TARGET_BOARD_PLATFORM), volcano)
+PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/btfmcodec.ko
+PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/bt_fm_swr.ko
 else
 BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/bt_fm_slim.ko
 endif

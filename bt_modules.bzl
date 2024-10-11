@@ -134,7 +134,7 @@ register_bt_modules(
     ],
     deps = [
         ":%b_btpower", ":%b_btfmcodec", ":btfmcodec_headers",
-        "//vendor/qcom/opensource/audio-kernel:%b_modules",
+        "//vendor/qcom/opensource/audio-kernel:%b_audio",
         "//vendor/qcom/opensource/audio-kernel:audio_headers",
     ],
 )
