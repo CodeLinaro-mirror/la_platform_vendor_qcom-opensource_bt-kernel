@@ -1915,6 +1915,7 @@ static int spi_cnss_open(struct inode *inode, struct file *filp)
 		}
 	}
 	if (!spi_drv->client_init) {
+		spi_drv->client_state = ASLEEP;
 		ret = spi_cnss_controller_init(spi_drv);
 		if (ret < 0) {
 			SPI_CNSS_ERR(spi_drv, "%s: spi_cnss_controller_init failed\n", __func__);
@@ -2427,10 +2428,6 @@ static int spi_cnss_runtime_suspend(struct device *dev)
 	struct spi_cnss_priv *spi_drv = spi_get_drvdata(spi);
 	if (spi_drv == NULL) {
 		pr_err("%s: spi_drv is null\n",__func__);
-		return 0;
-	}
-	if (spi_drv->usr_cnt == 0) {
-		pr_err("%s: no active clients\n",__func__);
 		return 0;
 	}
 	if (!spi_drv->read_pending && !spi_drv->write_pending
