@@ -934,7 +934,7 @@ err_vreg:
 /*
  * rtc6226_i2c_remove - remove the device
  */
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 128))
 static void rtc6226_i2c_remove(struct i2c_client *client)
 #else
 static int rtc6226_i2c_remove(struct i2c_client *client)
@@ -951,7 +951,7 @@ static int rtc6226_i2c_remove(struct i2c_client *client)
 	v4l2_device_unregister(&radio->v4l2_dev);
 	kfree(radio);
 	FMDBG("%s exit\n", __func__);
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 1, 0))
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 1, 128))
 	return 0;
 #endif
 }

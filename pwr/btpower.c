@@ -37,6 +37,7 @@
 #include <linux/pinctrl/devinfo.h>
 #include <linux/pinctrl/machine.h>
 #include <linux/pinctrl/pinctrl.h>
+#include <linux/version.h>
 
 #include "btpower.h"
 #ifdef CONFIG_FMD_ENABLE
@@ -1783,7 +1784,11 @@ free_pdata:
 	return ret;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static void bt_power_remove(struct platform_device *pdev)
+#else
 static int bt_power_remove(struct platform_device *pdev)
+#endif
 {
 	dev_dbg(&pdev->dev, "%s\n", __func__);
 	probe_finished = false;
@@ -1792,7 +1797,9 @@ static int bt_power_remove(struct platform_device *pdev)
 	if (pwr_data->is_ganges_dt)
 		destroy_workqueue(pwr_data->workq);
 	kfree(pwr_data);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
 	return 0;
+#endif
 }
 
 int btpower_register_slimdev(struct device *dev)
