@@ -270,9 +270,15 @@ static int btfm_slim_dai_prepare(void *dai, uint32_t sampling_rate, uint32_t dir
 }
 
 /* This function will be called once during boot up */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static int btfm_slim_dai_set_channel_map(void *dai,
+				unsigned int tx_num, const unsigned int *tx_slot,
+				unsigned int rx_num, const unsigned int *rx_slot)
+#else
 static int btfm_slim_dai_set_channel_map(void *dai,
 				unsigned int tx_num, unsigned int *tx_slot,
 				unsigned int rx_num, unsigned int *rx_slot)
+#endif
 {
 
 	struct hwep_data *hwep_info = (struct hwep_data *)dai;
@@ -317,9 +323,15 @@ static int btfm_slim_dai_set_channel_map(void *dai,
 	return ret;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static int btfm_slim_dai_get_channel_map(const void *dai,
+				 unsigned int *tx_num, unsigned int *tx_slot,
+				 unsigned int *rx_num, unsigned int *rx_slot, int id)
+#else
 static int btfm_slim_dai_get_channel_map(void *dai,
 				 unsigned int *tx_num, unsigned int *tx_slot,
 				 unsigned int *rx_num, unsigned int *rx_slot, int id)
+#endif
 {
 
 	struct hwep_data *hwep_info = (struct hwep_data *)dai;
