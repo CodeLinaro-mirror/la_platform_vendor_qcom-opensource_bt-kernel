@@ -1577,8 +1577,8 @@ void spi_cnss_wakeup_sequence(struct spi_cnss_priv *spi_drv)
 {
 	int ret = 0;
 	ret = spi_cnss_wakeup_client(spi_drv, NUM_OF_TRIALS_DURING_TRANS);
-	if (ret < 0) {
-		SPI_CNSS_ERR(spi_drv, "%s: Failed to wakeup client or already awake\n",__func__);
+	if (ret < 0 && (spi_drv->client_state == ASLEEP)) {
+		SPI_CNSS_ERR(spi_drv, "%s: Failed to wakeup client\n",__func__);
 		return;
 	}
 	if (ret != -1) {
@@ -2467,7 +2467,7 @@ static int spi_cnss_runtime_resume(struct device *dev)
 	}
 	spi_cnss_wakeup_sequence(spi_drv);
 
-	if (spi_drv->client_state == AWAKE) {
+	if (spi_drv->client_state != ASLEEP) {
 		SPI_CNSS_DBG(spi_drv, "%s: wakeup client success\n",__func__);
 		return 0;
 	} else {
