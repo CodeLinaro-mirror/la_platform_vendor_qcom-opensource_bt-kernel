@@ -77,6 +77,7 @@ enum power_src_pos {
 	BT_VDD_LDO,
 	BT_VDD_RFA_0p8,
 	BT_VDD_RFACMN,
+	BT_VDD_ANT_LDO,
 	// these indexes GPIOs/regs value are fetched during crash.
 	BT_RESET_GPIO_CURRENT,
 	BT_SW_CTRL_GPIO_CURRENT,
@@ -94,6 +95,7 @@ enum power_src_pos {
 	BT_VDD_RFACMN_CURRENT,
 	BT_VDD_IPA_2p2,
 	BT_VDD_IPA_2p2_CURRENT,
+	BT_VDD_ANT_LDO_CURRENT,
 	/* The below bucks are voted for HW WAR on some platform which supports
 	 * WNC39xx.
 	 */
@@ -143,6 +145,10 @@ static struct bt_power_vreg_data bt_vregs_info_qca6xx0[] = {
 static struct bt_power_vreg_data bt_vregs_info_kiwi[] = {
 	{NULL, "qcom,bt-vdd18-aon",      1800000, 1800000, 0, false, true,
 		{BT_VDD_IO_LDO, BT_VDD_IO_LDO_CURRENT}},
+	{NULL, "qcom,bt-vdd12-io",      1200000, 1200000, 0, false, true,
+		{BT_VDD_IO_LDO, BT_VDD_IO_LDO_CURRENT}},
+	{NULL, "qcom,bt-ant-ldo",  1776000, 1776000, 0, false, true,
+		{BT_VDD_ANT_LDO, BT_VDD_ANT_LDO_CURRENT}},
 	{NULL, "qcom,bt-vdd-aon",     950000,  950000,  0, false, true,
 		{BT_VDD_AON_LDO, BT_VDD_AON_LDO_CURRENT}},
 	{NULL, "qcom,bt-vdd-rfaOp8",  950000,  950000,  0, false, true,
@@ -200,6 +206,12 @@ static struct bt_power bt_vreg_info_kiwi = {
 	.num_vregs = ARRAY_SIZE(bt_vregs_info_kiwi),
 };
 
+static struct bt_power bt_vreg_info_kiwi_no_share_ant_power = {
+	.compatible = "qcom,kiwi-no-share-ant-power",
+	.vregs = bt_vregs_info_kiwi,
+	.num_vregs = ARRAY_SIZE(bt_vregs_info_kiwi),
+};
+
 static struct bt_power bt_vreg_info_converged = {
 	.compatible = "qcom,bt-qca-converged",
 	.vregs = bt_vregs_info_kiwi,
@@ -218,6 +230,8 @@ static const struct of_device_id bt_power_match_table[] = {
 	{	.compatible = "qcom,qca6390", .data = &bt_vreg_info_qca6390},
 	{	.compatible = "qcom,qca6490", .data = &bt_vreg_info_qca6490},
 	{	.compatible = "qcom,kiwi",    .data = &bt_vreg_info_kiwi},
+	{	.compatible = "qcom,kiwi-no-share-ant-power",
+			.data = &bt_vreg_info_kiwi_no_share_ant_power},
 	{	.compatible = "qcom,wcn6750-bt", .data = &bt_vreg_info_wcn6750},
 	{	.compatible = "qcom,bt-qca-converged", .data = &bt_vreg_info_converged},
 	{},
