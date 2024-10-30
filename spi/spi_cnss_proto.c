@@ -1236,7 +1236,7 @@ static int __spi_cnss_send_msg(struct spi_cnss_priv *spi_drv, struct spi_cnss_us
 		spi_drv->wait_to_notify = true;
 		timeout = wait_for_completion_interruptible_timeout(&spi_drv->buff_wait, xfer_timeout);
 		spi_drv->wait_to_notify = false;
-		if (timeout <= 0) {
+		if (timeout <= 0 && spi_drv->client.HBUF_LEN != 0) {
 			SPI_CNSS_DBG(spi_drv,"%s: couldnt get buffer free in time\n",__func__);
 			return -1;
 		}
