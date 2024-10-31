@@ -266,7 +266,7 @@ static int btfm_swr_dai_get_channel_map(const void *dai,
 				 unsigned int *tx_num, unsigned int *tx_slot,
 				 unsigned int *rx_num, unsigned int *rx_slot, int id)
 #else
-static int btfm_swr_dai_get_channel_map(const void *dai,
+static int btfm_swr_dai_get_channel_map(void *dai,
 				 unsigned int *tx_num, unsigned int *tx_slot,
 				 unsigned int *rx_num, unsigned int *rx_slot, int id)
 #endif
