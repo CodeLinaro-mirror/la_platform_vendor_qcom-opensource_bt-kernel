@@ -1236,7 +1236,7 @@ static int __spi_cnss_send_msg(struct spi_cnss_priv *spi_drv, struct spi_cnss_us
 		spi_drv->wait_to_notify = true;
 		timeout = wait_for_completion_interruptible_timeout(&spi_drv->buff_wait, xfer_timeout);
 		spi_drv->wait_to_notify = false;
-		if (timeout <= 0) {
+		if (timeout <= 0 && spi_drv->client.HBUF_LEN != 0) {
 			SPI_CNSS_DBG(spi_drv,"%s: couldnt get buffer free in time\n",__func__);
 			return -1;
 		}
@@ -1577,8 +1577,8 @@ void spi_cnss_wakeup_sequence(struct spi_cnss_priv *spi_drv)
 {
 	int ret = 0;
 	ret = spi_cnss_wakeup_client(spi_drv, NUM_OF_TRIALS_DURING_TRANS);
-	if (ret < 0) {
-		SPI_CNSS_ERR(spi_drv, "%s: Failed to wakeup client or already awake\n",__func__);
+	if (ret < 0 && (spi_drv->client_state == ASLEEP)) {
+		SPI_CNSS_ERR(spi_drv, "%s: Failed to wakeup client\n",__func__);
 		return;
 	}
 	if (ret != -1) {
@@ -2041,18 +2041,6 @@ static ssize_t spi_cnss_read(struct file *filp, char __user *buf, size_t count, 
 	}
 	usr = filp->private_data;
 	spi_drv = container_of(usr, struct spi_cnss_priv, user[usr->id]);
-//#if 0
-#ifdef CONFIG_SLEEP
-	//SPI_CNSS_DBG(spi_drv, "%s: spi_cnss_runtime_mark_last_busy",__func__);
-	ret = pm_runtime_get_sync(spi_drv->dev);
-	if (ret < 0) {
-		SPI_CNSS_ERR(spi_drv, "%s: Err pm get sync, with err = %d\n",__func__,ret);
-		pm_runtime_put_noidle(spi_drv->dev);
-		pm_runtime_set_suspended(spi_drv->dev);
-		return ret;
-	}
-#endif
-//#endif
 	if (copy_from_user(&cp, buf, sizeof(struct spi_client_request)) != 0) {
 		SPI_CNSS_ERR(spi_drv,"%s: copy from user failed\n",__func__);
 		return -EFAULT;
@@ -2097,23 +2085,29 @@ static ssize_t spi_cnss_read(struct file *filp, char __user *buf, size_t count, 
 		spi_cnss_kfree(spi_drv, tmp_pkt.data_buf);
 		SPI_CNSS_DBG(spi_drv, "%s: fifo size = %d\n",__func__, kfifo_len(&usr->user_fifo));
 		if (usr->fifo_full == true) {
+#ifdef CONFIG_SLEEP
+			ret = pm_runtime_get_sync(spi_drv->dev);
+			if (ret < 0) {
+				SPI_CNSS_ERR(spi_drv, "%s: Err pm get sync, with err = %d\n",__func__,ret);
+				pm_runtime_put_noidle(spi_drv->dev);
+				pm_runtime_set_suspended(spi_drv->dev);
+				return ret;
+			}
+#endif
 			SPI_CNSS_DBG(spi_drv, "%s: read pending\n",__func__);
 			usr->read_pending = false;
 			//usr->fifo_full = false;
 			kthread_queue_work(spi_drv->kreader, &spi_drv->read_msg);
+#ifdef CONFIG_SLEEP
+			pm_runtime_mark_last_busy(spi_drv->dev);
+			pm_runtime_put_autosuspend(spi_drv->dev);
+#endif
 		}
 		ret = (sizeof(struct spi_client_request) - ret);
 	} else {
 		pr_info("%s: No client packet avaiable, spurious read request",__func__);
 		return -EINVAL;
 	}
-//#if 0
-#ifdef CONFIG_SLEEP
-	//SPI_CNSS_DBG(spi_drv, "%s: spi_cnss_runtime_mark_last_busy",__func__);
-	pm_runtime_mark_last_busy(spi_drv->dev);
-	pm_runtime_put_autosuspend(spi_drv->dev);
-#endif
-//#endif
 	return ret;
 }
 
@@ -2180,6 +2174,7 @@ static int spi_cnss_release(struct inode *inode, struct file *filp)
 		disable_irq(spi_drv->irq);
 #ifdef CONFIG_SLEEP
 		spi_cnss_clear_clen(spi_drv);
+		spi_drv->sleep_enabled = true;
 		ret = pm_runtime_suspend(spi_drv->dev);
 		SPI_CNSS_DBG(spi_drv, "%s: pm_runtime_suspend status = %d\n",__func__,ret);
 #endif
@@ -2430,16 +2425,17 @@ static int spi_cnss_runtime_suspend(struct device *dev)
 		pr_err("%s: spi_drv is null\n",__func__);
 		return 0;
 	}
-	if (!spi_drv->read_pending && !spi_drv->write_pending
-		&& spi_drv->client_state == AWAKE) {
+	if (!spi_drv->read_pending && spi_drv->client.CBUF_LEN == 0 && !spi_drv->write_pending
+		&& spi_drv->client_state == AWAKE && !gpio_get_value(spi_drv->gpio) && !spi_drv->context_read_pending) {
 		SPI_CNSS_ERR(spi_drv,"%s: putting client to sleep\n",__func__);
 		ret = spi_cnss_send_sleep_cmd(spi_drv);
 		if (ret < 0) {
 			SPI_CNSS_ERR(spi_drv,"%s: failed to send sleep cmd\n",__func__);
 			spi_drv->client_state = AWAKE;
-		}/* else {
-			spi_drv->client_state = ASLEEP;
-		}*/
+		}
+	} else {
+		SPI_CNSS_INFO(spi_drv,"%s: read/write pending or client asleep, return failure\n",__func__);
+		return -EBUSY;
 	}
 #endif
 	pr_err("%s PID=%d\n", __func__, current->pid);
@@ -2467,7 +2463,7 @@ static int spi_cnss_runtime_resume(struct device *dev)
 	}
 	spi_cnss_wakeup_sequence(spi_drv);
 
-	if (spi_drv->client_state == AWAKE) {
+	if (spi_drv->client_state != ASLEEP) {
 		SPI_CNSS_DBG(spi_drv, "%s: wakeup client success\n",__func__);
 		return 0;
 	} else {
