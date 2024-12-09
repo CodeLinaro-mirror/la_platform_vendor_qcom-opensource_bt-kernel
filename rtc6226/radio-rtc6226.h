@@ -43,13 +43,16 @@
 #include <media/v4l2-event.h>
 #include <media/v4l2-device.h>
 #include <media/v4l2-dev.h>
-#include <asm/unaligned.h>
 #include <linux/interrupt.h>
 #include <linux/of_gpio.h>
 #include <linux/of_irq.h>
 #include <linux/kfifo.h>
+#include <linux/version.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)
+#include <linux/unaligned.h>
+#else
 #include <asm/unaligned.h>
-
+#endif
 #define RW_Kernel_ENG
 
 #define DEBUG
