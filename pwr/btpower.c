@@ -24,6 +24,7 @@
 #include <linux/clk.h>
 #include <linux/uaccess.h>
 #include <linux/of_device.h>
+#include <linux/version.h>
 #include <soc/qcom/cmd-db.h>
 #include <linux/pinctrl/qcom-pinctrl.h>
 #include "btpower.h"
@@ -1514,7 +1515,12 @@ static int __init btpower_init(void)
 		goto chrdev_err;
 	}
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0) || \
+	LINUX_VERSION_CODE == KERNEL_VERSION(5, 14, 0))
 	bt_class = class_create(BT_CLASS_NAME);
+#else
+	bt_class = class_create(THIS_MODULE, BT_CLASS_NAME);
+#endif
 	if (IS_ERR(bt_class)) {
 		pr_err("%s: coudn't create class\n", __func__);
 		ret = -1;
