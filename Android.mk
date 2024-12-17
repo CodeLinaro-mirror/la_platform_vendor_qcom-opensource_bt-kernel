@@ -53,6 +53,10 @@ BT_SELECT += CONFIG_BTFM_SLIM=m
 LOCAL_MODULE_KO_DIRS += slimbus/bt_fm_slim.ko
 endif
 
+ifeq ($(TARGET_USES_QTI_UWB), true)
+BT_SELECT += CONFIG_SPI_CNSS_PROTO=m
+LOCAL_MODULE_KO_DIRS += spi/spi_cnss_proto.ko
+endif
 # This makefile is only for DLKM
 ifneq ($(findstring vendor,$(LOCAL_PATH)),)
 
@@ -204,7 +208,16 @@ LOCAL_MODULE_TAGS         := optional
 LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
-
+################################ spi cnss proto driver################################
+include $(CLEAR_VARS)
+LOCAL_SRC_FILES           := $(BT_SRC_FILES)
+LOCAL_MODULE              := spi_cnss_proto.ko
+LOCAL_MODULE_KBUILD_NAME  := spi/spi_cnss_proto.ko
+LOCAL_MODULE_TAGS         := optional
+LOCAL_MODULE_DEBUG_ENABLE := true
+LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
+include $(DLKM_DIR)/Build_external_kernelmodule.mk
+###########################################################
 
 endif # DLKM check
 endif # supported target check
