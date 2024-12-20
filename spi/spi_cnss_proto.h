@@ -21,10 +21,11 @@
 #define DEVICE_NAME_MAX_LEN 64
 #define DATA_WORD_LEN 4
 #define XFER_TIMEOUT 500
-#define MAX_CLIENT_PKTS 16
-#define SPI_IRQ_TIMEOUT 500
-#define NOP_XFER_TIMEOUT 250
-#define SPI_AUTOSUSPEND_DELAY (XFER_TIMEOUT + 100)
+#define MAX_CLIENT_PKTS 32 
+#define SPI_IRQ_TIMEOUT 350
+#define NOP_XFER_TIMEOUT 150
+#define SPI_AUTOSUSPEND_DELAY 300 //XFER_TIMEOUT + 50
+#define CLIENT_WAKE_TIME_OUT 350 //NOP_XFER_TIMEOUT*2 + 50
 #define SPI_CLIENT_SLEEP_TIME_MS 100
 
 #define SPI_WRITE_OPCODE    (0x02)
@@ -69,6 +70,8 @@
 #define SOFT_RESET_IRQ            0x00008000
 #define SLEEP_BYTE                0xFE
 #define SLEEP_BYTE_OFFSET         5
+#define REG_TX_SIZE               8
+#define REG_RX_SIZE               16
 //static u8 *client_irq_buf;
 
 /*static u8 *host_irq_buf;
@@ -136,6 +139,7 @@ if (spi_ptr) { \
 enum sleep_state {
 	ASLEEP,
 	AWAKE_PENDING,
+	CLIENT_WAKEUP,
 	AWAKE,
 };
 
@@ -270,6 +274,7 @@ struct spi_cnss_priv {
 	struct mutex xfer_lock;
 	struct mutex read_lock;
 	struct mutex irq_lock;
+	struct mutex sleep_lock;
 	struct spi_usr_request usr_req;
 	struct completion sync_wait;
 	struct work_struct bh_work;
@@ -280,17 +285,21 @@ struct spi_cnss_priv {
 	struct client_info client;
 	bool write_pending;
 	bool read_pending;
+	bool context_read_pending;
 	bool client_init;
 	u8 usr_cnt;
 	enum sleep_state client_state;
+	bool state_transition;
 	struct completion wake_wait;
 	struct completion buff_wait;
 	bool wait_to_notify;
 	struct mutex state_lock;
+	struct mutex mem_lock;
 	u8 *client_irq_buf;
 	atomic_t spi_alloc_cnt;
 	struct timer_list client_sleep_timer;
 	struct memory_manager mem_mngr;
 	void *ipc;
+	bool sleep_enabled;
 };
 #endif //__LINUX_SPI_CNSS_PROTO_H
