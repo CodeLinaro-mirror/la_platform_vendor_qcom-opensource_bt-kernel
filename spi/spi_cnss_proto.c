@@ -31,9 +31,10 @@
 #define WRITE_RETRY 2
 #define DATA_BYTES_PER_LINE 64
 u32 slave_config = 0x05000000;
-//#define CONFIG_SLEEP
-//#define CONFIG_AGGRESSIVE_SLEEP
+
 #define MEM_ALLOCATOR
+#define CONFIG_SLEEP
+#define CONFIG_AGGRESSIVE_SLEEP
 
 static void spi_cnss_notify_data_avail(struct spi_cnss_user *user);
 static void spi_cnss_reinit_xfer(struct spi_transfer* xfer, int size);
@@ -1404,7 +1405,7 @@ void spi_cnss_sleep_timeout_handler(struct timer_list *t)
 {
 	struct spi_cnss_priv *spi_drv = from_timer(spi_drv, t, client_sleep_timer);
 	SPI_CNSS_DBG(spi_drv, "%s\n",__func__);
-	queue_work(spi_drv->sleep_wq, spi_drv->sleep_work);
+	queue_work(spi_drv->sleep_wq, &spi_drv->sleep_work);
 }
 
 static void spi_cnss_handle_sleep(struct work_struct *work)
