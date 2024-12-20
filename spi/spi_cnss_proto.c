@@ -2135,6 +2135,10 @@ static int spi_cnss_probe(struct spi_device *spi)
 			return -ENOMEM;
 	}
 	INIT_WORK(&spi_drv->bh_work,spi_cnss_handle_work);
+	spi_drv->ipc = ipc_log_context_create(15, dev_name(dev), 0);
+	if (!spi_drv->ipc && IS_ENABLED(CONFIG_IPC_LOGGING)) {
+		dev_err(dev, "Error creating IPC logs\n");
+	}
 #ifdef CONFIG_AGGRESSIVE_SLEEP
 	spi_drv->sleep_wq = alloc_workqueue("spi_sleep_wq",WQ_UNBOUND|WQ_HIGHPRI, 0);
 	if (!spi_drv->sleep_wq) {
