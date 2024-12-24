@@ -1,4 +1,4 @@
-load("//msm-kernel:target_variants.bzl", "get_all_variants")
+load("//soc-repo:target_variants.bzl", "all_target_variants")
 load("//build/kernel/kleaf:kernel.bzl", "ddk_module")
 load("//build/bazel_common_rules/dist:dist.bzl", "copy_to_dist_dir")
 load(":bt_modules.bzl", "bt_modules")
@@ -55,7 +55,7 @@ def define_target_variant_modules(target, variant, modules, config_options = [])
         config_options: decides which kernel modules to build
     """
     kernel_build = "{}_{}".format(target, variant)
-    kernel_build_label = "//msm-kernel:{}".format(kernel_build)
+    kernel_build_label = "//soc-repo:{}_base_kernel".format(kernel_build)
     modules = [bt_modules.get(module_name) for module_name in modules]
     options = _get_build_options(modules, config_options)
     formatter = lambda s : s.replace("%b", kernel_build)
@@ -70,7 +70,12 @@ def define_target_variant_modules(target, variant, modules, config_options = [])
             kernel_build = kernel_build_label,
             srcs = module_srcs,
             out = "{}.ko".format(module.name),
-            deps = ["//msm-kernel:all_headers"] + _get_module_deps(module, options, formatter),
+            deps = ["//soc-repo:all_headers",
+                    "//soc-repo:{}/drivers/remoteproc/rproc_qcom_common".format(kernel_build),
+                    "//soc-repo:{}/kernel/trace/qcom_ipc_logging".format(kernel_build),
+                    "//soc-repo:{}/drivers/soc/qcom/qcom_aoss".format(kernel_build),
+                    "//soc-repo:{}/drivers/slimbus/slimbus".format(kernel_build),
+                    "//soc-repo:{}/drivers/pinctrl/qcom/pinctrl-msm".format(kernel_build), ] + _get_module_deps(module, options, formatter),
             includes = ["include"],
             local_defines = options.keys(),
             visibility = ["//visibility:public"],
@@ -90,6 +95,6 @@ def define_target_variant_modules(target, variant, modules, config_options = [])
     )
 
 def define_bt_modules(target, modules, config_options = []):
-    for (t, v) in get_all_variants():
+    for (t, v) in all_target_variants():
         if t == target:
             define_target_variant_modules(t, v, modules, config_options)
