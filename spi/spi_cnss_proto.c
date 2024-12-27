@@ -2421,6 +2421,7 @@ static int spi_cnss_runtime_suspend(struct device *dev)
 	int ret = 0;
 	struct spi_device *spi = to_spi_device(dev);
 	struct spi_cnss_priv *spi_drv = spi_get_drvdata(spi);
+	SPI_CNSS_DBG(spi_drv,"%s\n",__func__);
 	if (spi_drv == NULL) {
 		pr_err("%s: spi_drv is null\n",__func__);
 		return 0;
@@ -2433,8 +2434,11 @@ static int spi_cnss_runtime_suspend(struct device *dev)
 			SPI_CNSS_ERR(spi_drv,"%s: failed to send sleep cmd\n",__func__);
 			spi_drv->client_state = AWAKE;
 		}
+	} else if (spi_drv->client_state == ASLEEP) {
+		SPI_CNSS_DBG(spi_drv,"%s:client asleep\n",__func__);
+		return 0;
 	} else {
-		SPI_CNSS_INFO(spi_drv,"%s: read/write pending or client asleep, return failure\n",__func__);
+		SPI_CNSS_INFO(spi_drv,"%s: read/write pending or client asleep, returning busy\n",__func__);
 		return -EBUSY;
 	}
 #endif
@@ -2483,14 +2487,10 @@ static int spi_cnss_suspend(struct device *dev)
 
 	if (spi_drv == NULL) {
 		pr_err("%s: spi_drv is null\n",__func__);
-		return -1;
-	}
-	if (spi_drv->usr_cnt == 0) {
-		pr_err("%s: no active clients\n",__func__);
-		return -1;
+		return 0;
 	}
 
-	pr_err("%s: sleep enabled\n", __func__);
+	pr_err("%s\n", __func__);
 	if (pm_runtime_status_suspended(spi_drv->dev)) {
 		return 0;
 	}
