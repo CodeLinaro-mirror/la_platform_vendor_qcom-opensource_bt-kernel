@@ -13,6 +13,10 @@
 #if IS_ENABLED(CONFIG_MSM_QMP)
 #include <linux/mailbox/qmp.h>
 #endif
+
+#include <linux/pm_domain.h>
+#include <linux/pm_runtime.h>
+
 /*
  * voltage regulator information required for configuring the
  * bluetooth chipset
@@ -21,6 +25,12 @@ enum bt_power_modes {
 	BT_POWER_DISABLE = 0,
 	BT_POWER_ENABLE,
 	BT_POWER_RETENTION
+};
+
+enum bt_power_domains {
+	POWER_REGULATOR = 0,
+	POWER_GPIO,
+	NUM_POWER_DOMAIN
 };
 
 struct log_index {
@@ -84,12 +94,18 @@ struct btpower_platform_data {
 	struct file *reffilp_obs;
 	struct task_struct *reftask_obs;
 #endif
+	bool is_fw_managed_pwr;
+	struct device **pd_devs;
+	int num_pds;
 };
 
 int btpower_register_slimdev(struct device *dev);
 int btpower_get_chipset_version(void);
 int btpower_aop_mbox_init(struct btpower_platform_data *pdata);
 int bt_aop_pdc_reconfig(struct btpower_platform_data *pdata);
+
+int btpower_pm_enable(struct btpower_platform_data *pdata);
+int btpower_pm_disable(struct btpower_platform_data *pdata);
 
 #define WLAN_SW_CTRL_GPIO       "qcom,wlan-sw-ctrl-gpio"
 #define BT_CMD_SLIM_TEST	0xbfac
