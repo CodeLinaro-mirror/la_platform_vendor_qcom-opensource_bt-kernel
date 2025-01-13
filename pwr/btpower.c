@@ -24,6 +24,7 @@
 #include <linux/clk.h>
 #include <linux/uaccess.h>
 #include <linux/of_device.h>
+#include <linux/version.h>
 #include <soc/qcom/cmd-db.h>
 #include "btpower.h"
 #if (defined CONFIG_BT_SLIM)
@@ -732,39 +733,53 @@ static int bluetooth_power(int on)
 	pr_debug("%s: on: %d\n", __func__, on);
 
 	if (on == 1) {
-		rc = bt_power_vreg_set(BT_POWER_ENABLE);
-		if (rc < 0) {
-			pr_err("%s: bt_power regulators config failed\n",
-				__func__);
-			goto regulator_fail;
+		if (bt_power_pdata->is_fw_managed_pwr) {
+			/* Handled by gunyah */
+			rc = btpower_pm_enable(bt_power_pdata);
 		}
-		/* Parse dt_info and check if a target requires clock voting.
-		 * Enable BT clock when BT is on and disable it when BT is off
-		 */
-		if (bt_power_pdata->bt_chip_clk) {
-			rc = bt_clk_enable(bt_power_pdata->bt_chip_clk);
+		else
+		{
+			rc = bt_power_vreg_set(BT_POWER_ENABLE);
 			if (rc < 0) {
-				pr_err("%s: bt_power gpio config failed\n",
+				pr_err("%s: bt_power regulators config failed\n",
 					__func__);
-				goto clk_fail;
+				goto regulator_fail;
 			}
-		}
-		if (bt_power_pdata->bt_gpio_sys_rst > 0) {
-			bt_power_src_status[BT_RESET_GPIO] =
-				DEFAULT_INVALID_VALUE;
-			bt_power_src_status[BT_SW_CTRL_GPIO] =
-				DEFAULT_INVALID_VALUE;
-			rc = bt_configure_gpios(on);
-			if (rc < 0) {
-				pr_err("%s: bt_power gpio config failed\n",
-					__func__);
-				goto gpio_fail;
+			/* Parse dt_info and check if a target requires clock voting.
+			* Enable BT clock when BT is on and disable it when BT is off
+			*/
+			if (bt_power_pdata->bt_chip_clk) {
+				rc = bt_clk_enable(bt_power_pdata->bt_chip_clk);
+				if (rc < 0) {
+					pr_err("%s: bt_power gpio config failed\n",
+						__func__);
+					goto clk_fail;
+				}
+			}
+			if (bt_power_pdata->bt_gpio_sys_rst > 0) {
+				bt_power_src_status[BT_RESET_GPIO] =
+					DEFAULT_INVALID_VALUE;
+				bt_power_src_status[BT_SW_CTRL_GPIO] =
+					DEFAULT_INVALID_VALUE;
+				rc = bt_configure_gpios(on);
+				if (rc < 0) {
+					pr_err("%s: bt_power gpio config failed\n",
+						__func__);
+					goto gpio_fail;
+				}
 			}
 		}
 	} else if (on == 0) {
-		// Power Off
-		if (bt_power_pdata->bt_gpio_sys_rst > 0)
-			bt_configure_gpios(on);
+		if (bt_power_pdata->is_fw_managed_pwr) {
+			/* Handled by gunyah */
+			rc = btpower_pm_disable(bt_power_pdata);
+		}
+		else
+		{
+			// Power Off
+			if (bt_power_pdata->bt_gpio_sys_rst > 0)
+				bt_configure_gpios(on);
+		}
 gpio_fail:
 		if (bt_power_pdata->bt_gpio_sys_rst > 0)
 			gpio_free(bt_power_pdata->bt_gpio_sys_rst);
@@ -1155,6 +1170,138 @@ static void bt_power_pdc_init_params (struct btpower_platform_data *pdata)
 	}
 }
 
+static inline bool
+btpower_is_fw_managed(struct btpower_platform_data *pdata)
+{
+	return of_property_read_bool(pdata->pdev->dev.of_node,
+		"qcom,firmware-managed-resources");
+}
+
+static void btpower_pm_domain_detach(struct btpower_platform_data *pdata)
+{
+	int i;
+
+	if (pdata->num_pds != NUM_POWER_DOMAIN)
+		return;
+
+	for (i = pdata->num_pds - 1; i >= 0; i--) {
+		pr_info("%s: detaching power domain %d\n", __func__, i);
+		if (!IS_ERR_OR_NULL(pdata->pd_devs[i]))
+			dev_pm_domain_detach(pdata->pd_devs[i], true);
+	}
+
+	if (pdata->pd_devs)
+		devm_kfree(&pdata->pdev->dev, pdata->pd_devs);
+}
+
+static int btpower_pm_domain_attach(struct btpower_platform_data *pdata)
+{
+	struct device *dev = &pdata->pdev->dev;
+	int i, ret = 0;
+
+	pdata->num_pds = of_count_phandle_with_args(
+		dev->of_node, "power-domains", "#power-domain-cells");
+	if (pdata->num_pds != NUM_POWER_DOMAIN) {
+		pr_err("Failed to get bt power domains\n");
+		return -EINVAL;
+	}
+
+	pr_err("bt power domains %d\n", pdata->num_pds);
+	pdata->pd_devs = devm_kcalloc(dev, pdata->num_pds,
+					  sizeof(*pdata->pd_devs),
+					  GFP_KERNEL);
+	if (!pdata->pd_devs) {
+		pr_err("Failed to alloc devs for bt power domains\n");
+		return -ENOMEM;
+	}
+
+	for (i = 0; i < pdata->num_pds; i++) {
+		pr_info("%s: Attaching power domain %d\n", __func__, i);
+		pdata->pd_devs[i] = dev_pm_domain_attach_by_id(dev, i);
+		if (IS_ERR(pdata->pd_devs[i])) {
+			pr_err("%s: Failed to attach power domain %d, err 0x%x\n", __func__, i, pdata->pd_devs[i]);
+			ret = PTR_ERR(pdata->pd_devs[i]);
+			btpower_pm_domain_detach(pdata);
+			break;
+		}
+	}
+
+	return ret;
+}
+
+static int btpower_fw_managed_power_domain(
+	struct btpower_platform_data *pdata,
+	enum bt_power_domains pwr_domain,
+	bool enabled
+)
+{
+	struct device *dev;
+	int ret = -1;
+
+	if (!pdata->pd_devs) {
+		pr_err("%s: pd dev is null, return \n", __func__);
+		return ret;
+	}
+
+	dev = pdata->pd_devs[pwr_domain];
+	if (!dev) {
+		pr_err("%s: domain[%d] is not attached, return \n", __func__, pwr_domain);
+		return ret;
+	}
+
+	if (enabled) {
+		pr_info("%s: domain[%d] power on \n", __func__, pwr_domain);
+		ret = pm_runtime_resume_and_get(dev);
+	} else {
+		pr_info("%s: domain[%d] power off \n", __func__, pwr_domain);
+		ret = pm_runtime_put_sync(dev);
+	}
+
+	if (ret < 0)
+		pr_err("bt runtime pm operation failed with err=%d\n", ret);
+
+	return ret;
+}
+
+int btpower_pm_enable(struct btpower_platform_data *pdata)
+{
+	int ret = 0;
+
+	ret = btpower_fw_managed_power_domain(pdata, POWER_REGULATOR, true);
+	if (ret)
+		goto out;
+
+	msleep(50);
+
+	ret = btpower_fw_managed_power_domain(pdata, POWER_GPIO, true);
+	if (ret)
+		goto power_off;
+
+	msleep(50);
+
+	return 0;
+
+power_off:
+	btpower_fw_managed_power_domain(pdata, POWER_REGULATOR, false);
+out:
+	return ret;
+}
+
+int btpower_pm_disable(struct btpower_platform_data *pdata)
+{
+	int ret;
+	ret = btpower_fw_managed_power_domain(pdata, POWER_GPIO, false);
+	if (ret)
+		goto out;
+
+	msleep(100);
+
+	ret = btpower_fw_managed_power_domain(pdata, POWER_REGULATOR, false);
+
+out:
+	return ret;
+}
+
 static int bt_power_probe(struct platform_device *pdev)
 {
 	int ret = 0;
@@ -1230,10 +1377,19 @@ static int bt_power_probe(struct platform_device *pdev)
         bt_power_pdc_init_params(bt_power_pdata);
 	btpower_aop_mbox_init(bt_power_pdata);
 
+	bt_power_pdata->is_fw_managed_pwr = btpower_is_fw_managed(bt_power_pdata);
+	if (bt_power_pdata->is_fw_managed_pwr) {
+		pr_info("%s: is_fw_managed_pwr=%d\n", __func__, bt_power_pdata->is_fw_managed_pwr);
+		ret = btpower_pm_domain_attach(bt_power_pdata);
+		if (ret) goto free_pdata;
+	}
+
 	probe_finished = true;
 	return 0;
 
 free_pdata:
+	if (bt_power_pdata->pd_devs)
+		devm_kfree(&pdev->dev, bt_power_pdata->pd_devs);
 	kfree(bt_power_pdata);
 	return ret;
 }
@@ -1245,6 +1401,11 @@ static int bt_power_remove(struct platform_device *pdev)
 	probe_finished = false;
 	btpower_rfkill_remove(pdev);
 	bt_power_vreg_put();
+
+	if (bt_power_pdata->is_fw_managed_pwr) {
+		btpower_pm_disable(bt_power_pdata);
+		btpower_pm_domain_detach(bt_power_pdata);
+	}
 
 	kfree(bt_power_pdata);
 
@@ -1501,7 +1662,12 @@ static int __init btpower_init(void)
 		goto chrdev_err;
 	}
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0) || \
+	LINUX_VERSION_CODE == KERNEL_VERSION(5, 14, 0))
+	bt_class = class_create(BT_CLASS);
+#else
 	bt_class = class_create(THIS_MODULE, BT_CLASS);
+#endif
 	if (IS_ERR(bt_class)) {
 		pr_err("%s: coudn't create class\n", __func__);
 		ret = -1;
@@ -1526,6 +1692,7 @@ driver_err:
 	return ret;
 }
 
+#if IS_ENABLED(CONFIG_MSM_QMP)
 /**
  * bt_aop_send_msg: Sends json message to AOP using QMP
  * @plat_priv: Pointer to cnss platform data
@@ -1554,6 +1721,50 @@ driver_err:
 	return ret;
 
  }
+static int btpower_aop_set_vreg_param(struct btpower_platform_data *pdata,
+				   const char *vreg_name,
+				   enum btpower_vreg_param param,
+				   enum btpower_tcs_seq seq, int val)
+{
+	struct qmp_pkt pkt;
+	char mbox_msg[BTPOWER_MBOX_MSG_MAX_LEN];
+	static const char * const vreg_param_str[] = {"v", "m", "e"};
+	static const char *const tcs_seq_str[] = {"upval", "dwnval", "enable"};
+	int ret = 0;
+
+	if (param > BTPOWER_VREG_ENABLE || seq > BTPOWER_TCS_ALL_SEQ || !vreg_name)
+		return -EINVAL;
+
+	snprintf(mbox_msg, BTPOWER_MBOX_MSG_MAX_LEN,
+		 "{class: wlan_pdc, res: %s.%s, %s: %d}", vreg_name,
+		 vreg_param_str[param], tcs_seq_str[seq], val);
+
+	pr_info("%s: sending AOP Mbox msg: %s\n", __func__, mbox_msg);
+	pkt.size = BTPOWER_MBOX_MSG_MAX_LEN;
+	pkt.data = mbox_msg;
+
+	ret = mbox_send_message(pdata->mbox_chan, &pkt);
+	if (ret < 0)
+		pr_err("%s:Failed to send AOP mbox msg(%s), err(%d)\n",
+					__func__, mbox_msg, ret);
+
+	return ret;
+}
+
+#else
+int bt_aop_send_msg(struct btpower_platform_data *plat_priv, char *mbox_msg)
+{
+	return -EOPNOTSUPP;
+}
+static int btpower_aop_set_vreg_param(struct btpower_platform_data *pdata,
+                                   const char *vreg_name,
+                                   enum btpower_vreg_param param,
+                                   enum btpower_tcs_seq seq, int val)
+{
+	return -EOPNOTSUPP;
+}
+#endif
+
 int bt_aop_pdc_reconfig(struct btpower_platform_data *pdata)
 {
 
@@ -1569,7 +1780,6 @@ int bt_aop_pdc_reconfig(struct btpower_platform_data *pdata)
 	}
 	return ret;
 }
-
 
 int btpower_aop_mbox_init(struct btpower_platform_data *pdata)
 {
@@ -1603,36 +1813,6 @@ int btpower_aop_mbox_init(struct btpower_platform_data *pdata)
 		pr_err("Failed to reconfig BT WLAN PDC, err = %d\n", ret);
 
 	return 0;
-}
-
-static int btpower_aop_set_vreg_param(struct btpower_platform_data *pdata,
-				   const char *vreg_name,
-				   enum btpower_vreg_param param,
-				   enum btpower_tcs_seq seq, int val)
-{
-	struct qmp_pkt pkt;
-	char mbox_msg[BTPOWER_MBOX_MSG_MAX_LEN];
-	static const char * const vreg_param_str[] = {"v", "m", "e"};
-	static const char *const tcs_seq_str[] = {"upval", "dwnval", "enable"};
-	int ret = 0;
-
-	if (param > BTPOWER_VREG_ENABLE || seq > BTPOWER_TCS_ALL_SEQ || !vreg_name)
-		return -EINVAL;
-
-	snprintf(mbox_msg, BTPOWER_MBOX_MSG_MAX_LEN,
-		 "{class: wlan_pdc, res: %s.%s, %s: %d}", vreg_name,
-		 vreg_param_str[param], tcs_seq_str[seq], val);
-
-	pr_info("%s: sending AOP Mbox msg: %s\n", __func__, mbox_msg);
-	pkt.size = BTPOWER_MBOX_MSG_MAX_LEN;
-	pkt.data = mbox_msg;
-
-	ret = mbox_send_message(pdata->mbox_chan, &pkt);
-	if (ret < 0)
-		pr_err("%s:Failed to send AOP mbox msg(%s), err(%d)\n",
-					__func__, mbox_msg, ret);
-
-	return ret;
 }
 
 static int btpower_enable_ipa_vreg(struct btpower_platform_data *pdata)
