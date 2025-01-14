@@ -14,7 +14,9 @@ ifeq ($(TARGET_USES_QMAA),true)
                BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/bt_fm_slim.ko
              endif
            endif
-           BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/spi_cnss_proto.ko
+           ifeq ($(TARGET_USES_QTI_UWB), true)
+             BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/spi_cnss_proto.ko
+           endif
            BOARD_VENDOR_KERNEL_MODULES += $(BT_KERNEL_DRIVER)
      endif
   endif
@@ -31,7 +33,9 @@ else
          BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/bt_fm_slim.ko
        endif
      endif
-     BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/spi_cnss_proto.ko
+     ifeq ($(TARGET_USES_QTI_UWB), true)
+       BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/spi_cnss_proto.ko
+     endif
      BOARD_VENDOR_KERNEL_MODULES += $(BT_KERNEL_DRIVER)
   endif
 endif
