@@ -90,6 +90,8 @@ struct btpower_platform_data {
 
 #if IS_ENABLED(CONFIG_ARCH_QTI_VM)
 	bool is_fw_managed_pwr;
+	int num_pds;
+	struct device **pd_devs;
 #endif
 };
 
@@ -99,8 +101,10 @@ int btpower_aop_mbox_init(struct btpower_platform_data *pdata);
 int bt_aop_pdc_reconfig(struct btpower_platform_data *pdata);
 
 #if IS_ENABLED(CONFIG_ARCH_QTI_VM)
-int btpower_fw_managed_power_gpio(struct btpower_platform_data *pdata, bool enabled);
+int btpower_fw_managed_domain_attach(struct btpower_platform_data *pdata);
+int btpower_fw_managed_power_enable(struct btpower_platform_data *pdata, bool enabled);
 void btpower_pm_runtime_disable(struct btpower_platform_data *pdata);
+void btpower_fw_managed_domain_detach(struct btpower_platform_data *pdata);
 #endif
 
 #define WLAN_SW_CTRL_GPIO       "qcom,wlan-sw-ctrl-gpio"
