@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef __LINUX_BLUETOOTH_POWER_H
@@ -11,6 +11,11 @@
 #include <linux/types.h>
 #include <linux/mailbox_client.h>
 #include <linux/mailbox/qmp.h>
+
+#if IS_ENABLED(CONFIG_ARCH_QTI_VM)
+#include <linux/pm_domain.h>
+#include <linux/pm_runtime.h>
+#endif
 /*
  * voltage regulator information required for configuring the
  * bluetooth chipset
@@ -82,12 +87,25 @@ struct btpower_platform_data {
 	struct file *reffilp_obs;
 	struct task_struct *reftask_obs;
 #endif
+
+#if IS_ENABLED(CONFIG_ARCH_QTI_VM)
+	bool is_fw_managed_pwr;
+	int num_pds;
+	struct device **pd_devs;
+#endif
 };
 
 int btpower_register_slimdev(struct device *dev);
 int btpower_get_chipset_version(void);
 int btpower_aop_mbox_init(struct btpower_platform_data *pdata);
 int bt_aop_pdc_reconfig(struct btpower_platform_data *pdata);
+
+#if IS_ENABLED(CONFIG_ARCH_QTI_VM)
+int btpower_fw_managed_domain_attach(struct btpower_platform_data *pdata);
+int btpower_fw_managed_power_enable(struct btpower_platform_data *pdata, bool enabled);
+void btpower_pm_runtime_disable(struct btpower_platform_data *pdata);
+void btpower_fw_managed_domain_detach(struct btpower_platform_data *pdata);
+#endif
 
 #define WLAN_SW_CTRL_GPIO       "qcom,wlan-sw-ctrl-gpio"
 #define BT_CMD_SLIM_TEST            0xbfac

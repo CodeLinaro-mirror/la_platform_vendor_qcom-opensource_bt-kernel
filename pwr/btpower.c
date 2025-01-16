@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 /*
@@ -711,39 +711,57 @@ static int bluetooth_power(int on)
 	pr_debug("%s: on: %d\n", __func__, on);
 
 	if (on == 1) {
-		rc = bt_power_vreg_set(BT_POWER_ENABLE);
-		if (rc < 0) {
-			pr_err("%s: bt_power regulators config failed\n",
-				__func__);
-			goto regulator_fail;
+#if IS_ENABLED(CONFIG_ARCH_QTI_VM)
+		if (bt_power_pdata->is_fw_managed_pwr) {
+			/* Handled by gunyah */
+			rc = btpower_fw_managed_power_enable(bt_power_pdata, true);
 		}
-		/* Parse dt_info and check if a target requires clock voting.
-		 * Enable BT clock when BT is on and disable it when BT is off
-		 */
-		if (bt_power_pdata->bt_chip_clk) {
-			rc = bt_clk_enable(bt_power_pdata->bt_chip_clk);
+		else
+#endif
+		{
+			rc = bt_power_vreg_set(BT_POWER_ENABLE);
 			if (rc < 0) {
-				pr_err("%s: bt_power gpio config failed\n",
+				pr_err("%s: bt_power regulators config failed\n",
 					__func__);
-				goto clk_fail;
+				goto regulator_fail;
 			}
-		}
-		if (bt_power_pdata->bt_gpio_sys_rst > 0) {
-			bt_power_src_status[BT_RESET_GPIO] =
-				DEFAULT_INVALID_VALUE;
-			bt_power_src_status[BT_SW_CTRL_GPIO] =
-				DEFAULT_INVALID_VALUE;
-			rc = bt_configure_gpios(on);
-			if (rc < 0) {
-				pr_err("%s: bt_power gpio config failed\n",
-					__func__);
-				goto gpio_fail;
+			/* Parse dt_info and check if a target requires clock voting.
+			* Enable BT clock when BT is on and disable it when BT is off
+			*/
+			if (bt_power_pdata->bt_chip_clk) {
+				rc = bt_clk_enable(bt_power_pdata->bt_chip_clk);
+				if (rc < 0) {
+					pr_err("%s: bt_power gpio config failed\n",
+						__func__);
+					goto clk_fail;
+				}
+			}
+			if (bt_power_pdata->bt_gpio_sys_rst > 0) {
+				bt_power_src_status[BT_RESET_GPIO] =
+					DEFAULT_INVALID_VALUE;
+				bt_power_src_status[BT_SW_CTRL_GPIO] =
+					DEFAULT_INVALID_VALUE;
+				rc = bt_configure_gpios(on);
+				if (rc < 0) {
+					pr_err("%s: bt_power gpio config failed\n",
+						__func__);
+					goto gpio_fail;
+				}
 			}
 		}
 	} else if (on == 0) {
-		// Power Off
-		if (bt_power_pdata->bt_gpio_sys_rst > 0)
-			bt_configure_gpios(on);
+#if IS_ENABLED(CONFIG_ARCH_QTI_VM)
+		if (bt_power_pdata->is_fw_managed_pwr) {
+			/* Handled by gunyah */
+			rc = btpower_fw_managed_power_enable(bt_power_pdata, false);
+		}
+		else
+#endif
+		{
+			// Power Off
+			if (bt_power_pdata->bt_gpio_sys_rst > 0)
+				bt_configure_gpios(on);
+		}
 gpio_fail:
 		if (bt_power_pdata->bt_gpio_sys_rst > 0)
 			gpio_free(bt_power_pdata->bt_gpio_sys_rst);
@@ -1113,12 +1131,143 @@ static void bt_power_pdc_init_params (struct btpower_platform_data *pdata)
 	}
 }
 
+#if IS_ENABLED(CONFIG_ARCH_QTI_VM)
+
+enum domains_t {
+	POWER_REGULATOR = 0,
+	POWER_GPIO = 1,
+};
+
+static inline bool
+btpower_is_fw_managed(struct btpower_platform_data *pdata)
+{
+	return of_property_read_bool(pdata->pdev->dev.of_node,
+		"qcom,firmware-managed-resources");
+}
+
+void btpower_fw_managed_domain_detach(struct btpower_platform_data *pdata)
+{
+	int i;
+
+	if (pdata->num_pds <= 1)
+		return;
+
+	for (i = pdata->num_pds - 1; i >= 0; i--) {
+		if (!IS_ERR_OR_NULL(pdata->pd_devs[i]))
+			dev_pm_domain_detach(pdata->pd_devs[i], true);
+	}
+	if (pdata->pd_devs)
+		devm_kfree(&pdata->pdev->dev, pdata->pd_devs);
+}
+
+int btpower_fw_managed_domain_attach(struct btpower_platform_data *pdata)
+{
+	struct device *dev = &pdata->pdev->dev;
+	int ret = -1;
+
+	if (!dev) {
+		pr_err("%s: dev is null, return \n", __func__);
+		return ENOMEM;
+	}
+
+	pdata->num_pds = of_count_phandle_with_args(
+		dev->of_node, "power-domains", "#power-domain-cells");
+
+	pr_info("%s: num_pds=%d \n", __func__, pdata->num_pds);
+
+	if (pdata->num_pds < 1) {
+		pr_err("%s: no power-domains defined, return \n", __func__);
+		return ret;
+	} else if (pdata->num_pds == 1) {
+		/* Assigned 1 power domain in 8225 */
+		ret = devm_pm_runtime_enable(dev);
+	} else if (pdata->num_pds == 2) {
+		/* Assigned 2 power domains in 8797 or 7255 */
+		int i;
+		ret = devm_pm_runtime_enable(dev);
+		pdata->pd_devs = devm_kcalloc(dev, pdata->num_pds,
+				sizeof(*pdata->pd_devs),
+				GFP_KERNEL);
+		if (!pdata->pd_devs)
+			return -ENOMEM;
+
+		for (i = 0; i < pdata->num_pds; i++) {
+			pdata->pd_devs[i] = dev_pm_domain_attach_by_id(dev, i);
+			if (IS_ERR(bt_power_pdata->pd_devs[i])) {
+				btpower_fw_managed_domain_detach(bt_power_pdata);
+				return PTR_ERR(pdata->pd_devs[i]);
+			}
+		}
+	}
+	pr_info("%s: attached. ret=%d \n", __func__, ret);
+	return ret;
+}
+void btpower_pm_runtime_disable(struct btpower_platform_data *pdata)
+{
+	pm_runtime_dont_use_autosuspend(&pdata->pdev->dev);
+	pm_runtime_disable(&pdata->pdev->dev);
+}
+
+int btpower_fw_managed_power_enable(struct btpower_platform_data *pdata, bool enabled)
+{
+	struct device *dev = &pdata->pdev->dev;
+	int ret = -1;
+	if (enabled) {
+		if (pdata->num_pds == 1) {
+			/* Assigned 1 power domain in 8225 */
+			if (dev) {
+				pr_info("%s: power on in one domain\n", __func__);
+				ret = pm_runtime_resume_and_get(dev);
+			} else {
+				pr_err("power on operation failed");
+			}
+		} else if (pdata->num_pds == 2) {
+			/* pd_dev[0] for regulator
+			 * pd_dev[1] for GPIO
+			 */
+			pr_info("%s: power on Regulator\n", __func__);
+			if (pdata->pd_devs[POWER_REGULATOR])
+				ret = pm_runtime_resume_and_get(pdata->pd_devs[POWER_REGULATOR]);
+
+			pr_info("%s: power on GPIO\n", __func__);
+			if (pdata->pd_devs[POWER_GPIO]) {
+				ret = pm_runtime_put_sync(pdata->pd_devs[POWER_GPIO]);
+				msleep(5);
+				ret = pm_runtime_resume_and_get(pdata->pd_devs[POWER_GPIO]);
+			}
+		}
+		msleep(50);
+	} else {
+		if (pdata->num_pds == 1) {
+			/* Assigned 1 power domain in 8225 */
+			if (dev) {
+				pr_err("%s: power off in one domain\n", __func__);
+				ret = pm_runtime_put_sync(dev);
+			} else {
+				pr_err("power off operation failed");
+			}
+		} else if (pdata->num_pds == 2) {
+			/* pd_dev[0] for regulator
+			 * pd_dev[1] for GPIO
+			 */
+			pr_info("%s: power off GPIO\n", __func__);
+			if (pdata->pd_devs[POWER_GPIO])
+				ret = pm_runtime_put_sync(pdata->pd_devs[POWER_GPIO]);
+
+			pr_info("%s: power off Regulator\n", __func__);
+			if (pdata->pd_devs[POWER_REGULATOR]) {
+				ret = pm_runtime_put_sync(pdata->pd_devs[POWER_REGULATOR]);
+			}
+		}
+	}
+	return ret;
+}
+#endif
+
 static int bt_power_probe(struct platform_device *pdev)
 {
 	int ret = 0;
 	int itr;
-
-	pr_debug("%s\n", __func__);
 
 	/* Fill whole array with -2 i.e NOT_AVAILABLE state by default
 	 * for any GPIO or Reg handle.
@@ -1162,6 +1311,14 @@ static int bt_power_probe(struct platform_device *pdev)
         bt_power_pdc_init_params(bt_power_pdata);
 	btpower_aop_mbox_init(bt_power_pdata);
 
+#if IS_ENABLED(CONFIG_ARCH_QTI_VM)
+	bt_power_pdata->is_fw_managed_pwr = btpower_is_fw_managed(bt_power_pdata);
+	if (bt_power_pdata->is_fw_managed_pwr) {
+		ret = btpower_fw_managed_domain_attach(bt_power_pdata);
+		if (ret) goto free_pdata;
+	}
+#endif
+
 	probe_finished = true;
 	return 0;
 
@@ -1177,6 +1334,14 @@ static void bt_power_remove(struct platform_device *pdev)
 	probe_finished = false;
 	btpower_rfkill_remove(pdev);
 	bt_power_vreg_put();
+
+#if IS_ENABLED(CONFIG_ARCH_QTI_VM)
+	if (bt_power_pdata->is_fw_managed_pwr) {
+		btpower_pm_runtime_disable(bt_power_pdata);
+		btpower_fw_managed_power_enable(bt_power_pdata, false);
+		btpower_fw_managed_domain_detach(bt_power_pdata);
+	}
+#endif
 
 	kfree(bt_power_pdata);
 }
