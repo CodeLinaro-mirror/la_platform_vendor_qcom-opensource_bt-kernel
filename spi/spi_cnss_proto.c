@@ -31,6 +31,7 @@
 #define WRITE_RETRY 2
 #define DATA_BYTES_PER_LINE 64
 u32 slave_config = 0x05000000;
+int user_id = 0xFFFF;
 
 #define MEM_ALLOCATOR
 #define CONFIG_SLEEP
@@ -495,6 +496,7 @@ static int spi_cnss_build_transfer(struct spi_cnss_priv *spi_drv,
 //	struct spi_transfer *xfer =  spi_cnss_kzalloc(spi_drv, (sizeof(struct spi_transfer)*3));
 	struct spi_transfer xfer[3] = {};
 	//struct spi_device *spi;
+	struct spi_cnss_user *user = NULL;
 	int ret = 0, offset = 0, num_xfer = 0;
 	mutex_lock(&spi_drv->sleep_lock);
 	//xfer = *(&spi_drv->spi_xfer[0]);
@@ -509,6 +511,14 @@ static int spi_cnss_build_transfer(struct spi_cnss_priv *spi_drv,
 	}
 	xfer[offset].len = len;
 	offset++;
+	if (spi_drv->write_pending == true) {
+		user = &spi_drv->user[user_id];
+		SPI_CNSS_DBG(spi_drv,"%s: check sync_wait completion user_id = %d\n",__func__, user_id);
+		if (completion_done(&user->sync_wait)) {
+			pr_err("%s: sync_wait completed abrubtly!",__func__);
+			BUG();
+		}
+	}
 	ret = prepare_notifiers(spi_drv, xfer, offset, payload_len);
 	if (ret < 0) {
 		pr_err("%s: failed prepare write notifier",__func__);
@@ -1035,7 +1045,8 @@ static int __spi_cnss_read_msg(struct spi_cnss_priv *spi_drv)
 	u8 length = 0;
 #endif
 	if (spi_drv == NULL) {
-		pr_info();
+		SPI_CNSS_ERR(spi_drv,"%s: spi_drv is null or released\n",__func__);
+		return -EINVAL;
 	}
 	read = spi_drv->usr_cnt;
 	SPI_CNSS_DBG(spi_drv, "%s: active clients = %d\n",__func__, read);
@@ -1245,9 +1256,10 @@ static int __spi_cnss_send_msg(struct spi_cnss_priv *spi_drv, struct spi_cnss_us
 	SPI_CNSS_DBG(spi_drv,"%s: Read len again %d\n",__func__, len);
 	if (len == 0 && !spi_drv->write_pending) {
 		list_for_each_entry_safe(user_pkt, user_pkt_temp, &spi_drv->tx_list, list) {
-			SPI_CNSS_DBG(spi_drv,"%s\n",__func__);
+			SPI_CNSS_DBG(spi_drv,"%s user id = %d\n",__func__, user_pkt->id);
 			//mutex_lock(&spi_drv->xfer_lock);
 			spi_drv->write_pending = true;
+			user_id = user_pkt->id;
 			ret = spi_cnss_prepare_xfer(spi_drv, user_pkt, USER_WRITE);
 			spi_drv->write_pending = false;
 			*usr = &spi_drv->user[user_pkt->id];
@@ -1277,10 +1289,11 @@ static void spi_cnss_send_msg(struct kthread_work *work)
 	ret = __spi_cnss_send_msg(spi_drv, &usr);
 	if (ret == 0) {
 		complete(&usr->sync_wait);
+		pr_info("%s: Sync wait completed\n",__func__);
 	} else if (ret < 0) {
 		pr_err("%s: failed \n",__func__);
 	}
-	pr_debug("%s: Exit\n",__func__);
+	pr_info("%s: Exit\n",__func__);
 }
 /*
 static void spi_cnss_clear_context_cmds(struct spi_cnss_priv *spi_drv)
@@ -1884,10 +1897,15 @@ static int spi_cnss_open(struct inode *inode, struct file *filp)
 	struct spi_cnss_user *usr;
 	struct cdev *cdev;
 	struct spi_cnss_chrdev *spi_cnss_cdev;
-	int rc, ret=0;
+	int rc = 0, ret=0;
 	pr_info("%s PID =%d\n", __func__, current->pid);
 
 	rc = iminor(inode);
+	if (rc >= MAX_DEV) {
+		pr_err("%s Err spi dev minor:%d\n", __func__, rc);
+		return -ENODEV;
+	}
+
 	cdev = inode->i_cdev;
 	pr_info("%s rc =%d\n", __func__, rc);
 	spi_cnss_cdev = container_of(cdev, struct spi_cnss_chrdev, c_dev[rc]);
@@ -2403,8 +2421,10 @@ static void spi_cnss_remove(struct spi_device *spi)
 	kthread_destroy_worker(spi_drv->kreader);
 	for (i = 0; i < MAX_DEV; i++) {
 		device_destroy(spi_drv->chrdev.spi_cnss_class, MKDEV(spi_cnss_cdev_major, i));
+		cdev_del(&spi_drv->chrdev.c_dev[i]);
 	}
 	class_unregister(spi_drv->chrdev.spi_cnss_class);
+	unregister_chrdev_region(MKDEV(spi_cnss_cdev_major, 0), MINORMASK);
 	class_destroy(spi_drv->chrdev.spi_cnss_class);
 	devm_kfree(&spi->dev, spi_drv);
 	spi_set_drvdata(spi, NULL);
