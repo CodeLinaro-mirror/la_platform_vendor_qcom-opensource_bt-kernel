@@ -33,6 +33,7 @@
 u32 slave_config = 0x05000000;
 int user_id = 0xFFFF;
 
+
 #define MEM_ALLOCATOR
 #define CONFIG_SLEEP
 #define CONFIG_AGGRESSIVE_SLEEP
@@ -342,6 +343,7 @@ static int spi_cnss_nop_cmd(struct spi_cnss_priv *spi_drv)
 	if (ret < 0) {
 		SPI_CNSS_ERR(spi_drv, "%s: spi write failed = %d\n",__func__, ret);
 	}
+
 //#ifndef MEM_ALLOCATOR
 	if (nop_cmd_buf) {
 		spi_cnss_kfree(spi_drv, nop_cmd_buf);
@@ -990,7 +992,7 @@ int spi_cnss_wakeup_client(struct spi_cnss_priv *spi_drv, int retry)
 {
 	int i,ret = 0;
 	SPI_CNSS_INFO(spi_drv, "%s\n",__func__);
-	if (spi_drv->client_state != ASLEEP) {
+	if (spi_drv->client_init && spi_drv->client_state != ASLEEP) {
 		SPI_CNSS_DBG(spi_drv,"%s: client is not asleep, bailing\n",__func__);
 		return -1;
 	}
@@ -1664,6 +1666,7 @@ static irqreturn_t spi_cnss_irq(int irq, void *data)
 	struct spi_cnss_priv *spi_drv = data;
 	//Read HLEN/CLEN and then schedule work
 	SPI_CNSS_INFO(spi_drv, "%s\n",__func__);
+
 	if (!spi_drv->client_init ||
 		spi_drv->client_state == AWAKE_PENDING) {
 		SPI_CNSS_INFO(spi_drv, "%s: power on ack\n",__func__);
@@ -2049,7 +2052,7 @@ static ssize_t spi_cnss_read(struct file *filp, char __user *buf, size_t count, 
 	struct spi_cnss_user *usr;
 	struct spi_cnss_priv *spi_drv;
 	struct spi_client_request cp;
-	int ret;
+	int ret,status;
 	//unsigned long xfer_timeout = msecs_to_jiffies(XFER_TIMEOUT);
 	//pr_err("%s PID =%d\n", __func__, current->pid);
 	//pr_info("%s PID =%d\n", __func__, current->pid);
@@ -2104,12 +2107,12 @@ static ssize_t spi_cnss_read(struct file *filp, char __user *buf, size_t count, 
 		SPI_CNSS_DBG(spi_drv, "%s: fifo size = %d\n",__func__, kfifo_len(&usr->user_fifo));
 		if (usr->fifo_full == true) {
 #ifdef CONFIG_SLEEP
-			ret = pm_runtime_get_sync(spi_drv->dev);
-			if (ret < 0) {
-				SPI_CNSS_ERR(spi_drv, "%s: Err pm get sync, with err = %d\n",__func__,ret);
+			status = pm_runtime_get_sync(spi_drv->dev);
+			if (status < 0) {
+				SPI_CNSS_ERR(spi_drv, "%s: Err pm get sync, with err = %d\n",__func__,status);
 				pm_runtime_put_noidle(spi_drv->dev);
 				pm_runtime_set_suspended(spi_drv->dev);
-				return ret;
+				return status;
 			}
 #endif
 			SPI_CNSS_DBG(spi_drv, "%s: read pending\n",__func__);
@@ -2213,7 +2216,6 @@ static int spi_cnss_release(struct inode *inode, struct file *filp)
 #ifdef CONFIG_SPI_LOOPBACK_ENABLED
 	spi_stub_driver_unreg_cb();
 #endif
-
 	return 0;
 }
 
