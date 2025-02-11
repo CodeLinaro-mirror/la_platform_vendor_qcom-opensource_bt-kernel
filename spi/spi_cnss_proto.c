@@ -1830,14 +1830,7 @@ static int spi_cnss_controller_init(struct spi_cnss_priv *spi_drv)
 #else
 	enable_irq(spi_drv->irq);
 	ret = spi_cnss_wakeup_client(spi_drv, NUM_OF_TRIALS_DURING_OPEN);
-	/*if (spi_drv->client_state != AWAKE) {
-		ret = spi_cnss_register_xfer(spi_drv, SPI_SLAVE_SANITY_REG, SPI_REGISTER_READ);
-		if (ret < 0) {
-			pr_err("%s: Controller is in bad state or not powered on: %d\n",__func__, ret);
-			spi_drv->client_state = ASLEEP;
-			return -1;
-		}
-	}*/
+
 	if (ret < 0 && gpio_get_value(spi_drv->gpio)) {
 		ret = spi_cnss_register_xfer(spi_drv, SPI_SLAVE_SANITY_REG, SPI_REGISTER_READ);
 		if (ret < 0) {
@@ -1887,6 +1880,8 @@ static int spi_cnss_controller_init(struct spi_cnss_priv *spi_drv)
 			return ret;
 		}
 	}
+	SPI_CNSS_DBG(spi_drv,"%s:read slave sanity reg\n",__func__);
+	ret = spi_cnss_register_xfer(spi_drv, SPI_SLAVE_SANITY_REG, SPI_REGISTER_READ);
 	return ret;
 }
 static int spi_cnss_open(struct inode *inode, struct file *filp)
