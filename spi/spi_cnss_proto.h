@@ -110,7 +110,7 @@ if (spi_ptr) { \
 		ipc_log_string(spi_ptr->ipc, x);\
 	if (spi_ptr->dev) \
 		spi_cnss_trace_log(spi_ptr->dev, x); \
-	pr_info(x); \
+	/*pr_info(x);*/ \
 } \
 } while (0)
 
@@ -121,7 +121,7 @@ if (spi_ptr) { \
 		ipc_log_string(spi_ptr->ipc, x); \
 	if (spi_ptr->dev) \
 		spi_cnss_trace_log(spi_ptr->dev, x); \
-	pr_info(x); \
+	/*pr_info(x);*/ \
 } \
 } while (0)
 
