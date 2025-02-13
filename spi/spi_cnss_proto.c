@@ -2357,7 +2357,7 @@ static int spi_cnss_probe(struct spi_device *spi)
 	init_completion(&spi_drv->buff_wait);
 	spi_drv->client_state = ASLEEP;
 
-	spi_drv->bh_work_wq = alloc_workqueue("%s", WQ_HIGHPRI, 1, dev_name(dev));
+	spi_drv->bh_work_wq = alloc_workqueue("%s", WQ_UNBOUND|WQ_HIGHPRI, 1, dev_name(dev));
 	if (!spi_drv->bh_work_wq) {
 			SPI_CNSS_ERR(spi_drv, "%s: falied to alloc workqueue", __func__);
 			destroy_workqueue(spi_drv->bh_work_wq);
