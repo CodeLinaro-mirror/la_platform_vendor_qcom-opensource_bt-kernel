@@ -12,3 +12,6 @@ PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/bt_fm_slim.ko
 else
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/bt_fm_slim.ko
 endif
+ifeq ($(TARGET_USES_QTI_UWB), true)
+PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/spi_cnss_proto.ko
+endif

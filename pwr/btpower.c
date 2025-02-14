@@ -84,8 +84,10 @@
 #define UWB_SS	(0x02)
 #define TME_SS	(0x03)
 
-#define SOC_VERSION_1_0 0x01
-#define SOC_VERSION_2_0 0x02
+#define INVALID_SOC                 0x00
+#define PEACH_SOC_VERSION_1_0       0x01
+#define PEACH_SOC_VERSION_2_0       0x02
+#define OTHER_FMD_SUPPORTED_BT_SOC  0x03
 
 /**
  * enum btpower_vreg_param: Voltage regulator TCS param
@@ -335,7 +337,6 @@ static const struct of_device_id bt_power_match_table[] = {
 	{},
 };
 
-static int btpower_enable_ipa_vreg(struct platform_pwr_data *pdata);
 static struct platform_pwr_data *pwr_data;
 static bool previous;
 static struct class *bt_class;
@@ -345,6 +346,8 @@ static bool probe_finished;
 static struct fmdOperationStruct fmdStruct;
 char *default_crash_reason = "Crash reason not found";
 
+static int btpower_enable_ipa_vreg(struct platform_pwr_data *pdata);
+static inline int btpower_get_retenion_mode_state(void);
 static void bt_power_vote(struct work_struct *work);
 
 static struct {
@@ -881,6 +884,34 @@ static int bt_configure_gpios(int on)
 	return rc;
 }
 
+static int handle_pwr_disable_req(int core, int reg_num, int retenion_state, int fmd_state)
+{
+	struct vreg_data *vregs;
+	int rc;
+
+	for (int i = 0; i < reg_num; i++) {
+		if (core == BT_CORE)
+			vregs = &pwr_data->bt_vregs[i];
+		else if (core == UWB_CORE)
+			vregs = &pwr_data->uwb_vregs[i];
+		else if (core == PLATFORM_CORE)
+			vregs = &pwr_data->platform_vregs[i];
+
+		if (fmd_state && vregs->fmd_mode_set) {
+			if (retenion_state != RETENTION_IDLE) {
+				vreg_disable_retention(vregs);
+				pr_err("%s: Brought %s reg out-of retention for FMD\n",
+					__func__, vregs->name);
+			}
+			pr_err("%s: Keeping %s reg on power-on state for FMD\n",
+				__func__, vregs->name);
+		} else {
+			rc = vreg_disable(vregs);
+		}
+	}
+	return rc;
+}
+
 static int bt_regulators_pwr(int pwr_state)
 {
 	int i, log_indx, bt_num_vregs, rc = 0;
@@ -940,26 +971,24 @@ static int bt_regulators_pwr(int pwr_state)
 				pr_err("%s: secure hw mode on, not allowed to access gpio",
 					__func__);
 			}else {
-				bt_configure_gpios(POWER_DISABLE);
+				if (!get_fmd_mode())
+					bt_configure_gpios(POWER_DISABLE);
 			}
 		}
 gpio_fail:
-		if (pwr_data->bt_gpio_sys_rst > 0)
-			gpio_free(pwr_data->bt_gpio_sys_rst);
-		if (pwr_data->bt_gpio_debug  >  0)
-			gpio_free(pwr_data->bt_gpio_debug);
-		if (pwr_data->bt_chip_clk)
-			bt_clk_disable(pwr_data->bt_chip_clk);
-regulator_fail:
-		for (i = 0; i < bt_num_vregs; i++) {
-			bt_vregs = &pwr_data->bt_vregs[i];
-			if (get_fmd_mode() && bt_vregs->fmd_mode_set) {
-				pr_err("%s: FMD Mode Set: Skipping regulator %s\n",
-					__func__, bt_vregs->name);
-				continue;
-			}
-			rc = vreg_disable(bt_vregs);
+		if (!get_fmd_mode()) {
+			if (pwr_data->bt_gpio_sys_rst > 0)
+				gpio_free(pwr_data->bt_gpio_sys_rst);
+			if (pwr_data->bt_gpio_debug  >  0)
+				gpio_free(pwr_data->bt_gpio_debug);
+			if (pwr_data->bt_chip_clk)
+				bt_clk_disable(pwr_data->bt_chip_clk);
 		}
+regulator_fail:
+		rc = handle_pwr_disable_req(BT_CORE,
+			bt_num_vregs,
+			btpower_get_retenion_mode_state(),
+			get_fmd_mode());
 	} else if (pwr_state == POWER_RETENTION) {
 		/* Retention mode */
 		for (i = 0; i < bt_num_vregs; i++) {
@@ -1125,17 +1154,10 @@ gpio_failed:
 				gpio_free(pwr_data->bt_gpio_debug);
 		}
 regulator_failed:
-		for (i = 0; i < platform_num_vregs; i++) {
-			platform_vregs = &pwr_data->platform_vregs[i];
-		pr_err("%s: FMD MODE regulator %s\n",
-					__func__, platform_vregs->name);
-			if (get_fmd_mode() && platform_vregs->fmd_mode_set) {
-				pr_err("%s: FMD Mode Set: Skipping regulator %s\n",
-					__func__, platform_vregs->name);
-				continue;
-			}
-			rc = vreg_disable(platform_vregs);
-		}
+		rc = handle_pwr_disable_req(PLATFORM_CORE,
+			platform_num_vregs,
+			btpower_get_retenion_mode_state(),
+			get_fmd_mode());
 		break;
 	case POWER_RETENTION:
 		for (i = 0; i < platform_num_vregs; i++) {
@@ -2593,39 +2615,37 @@ int perform_fmd_operation(void)
 	int ret = 0;
 	switch ((enum FmdOperation) fmdStruct.fmdOperation) {
 		case UPDATE_SOC_VER: {
-			if (fmdStruct.socFwVer == SOC_VERSION_1_0) {
-				pr_info("%s: UPDATE_SOC_VER :: SOC_VERSION_1_0\n",
+			if ((fmdStruct.socFwVer == INVALID_SOC) ||
+				(fmdStruct.socFwVer > OTHER_FMD_SUPPORTED_BT_SOC)) {
+				pr_err("%s: Invalid SOC VERSION sent = %d\n",
+					__func__, fmdStruct.socFwVer);
+				return -EINVAL;
+			}
+			pwr_data->is_fmd_mode_enable = true;
+			if (fmdStruct.socFwVer == PEACH_SOC_VERSION_1_0) {
+				pr_info("%s: UPDATE_SOC_VER :: PEACH_SOC_VER_1_0\n",
 					__func__);
-				pwr_data->is_fmd_mode_enable = true;
-				if (pwr_data->bt_chip_clk) {
-					ret = bt_clk_enable(pwr_data->bt_chip_clk);
-					if (ret < 0) {
-						pr_err("%s: failed to bt_chip_clk\n", __func__);
-						return -EINVAL;
-					}
-				}
-			} else if (fmdStruct.socFwVer == SOC_VERSION_2_0) {
-				pr_info("%s: UPDATE_SOC_VER :: SOC_VERSION_2_0\n",
+			} else if (fmdStruct.socFwVer == PEACH_SOC_VERSION_2_0) {
+				pr_info("%s: UPDATE_SOC_VER :: PEACH_SOC_VERSION_2_0\n",
 					__func__);
-				pwr_data->is_fmd_mode_enable = true;
 #ifdef CONFIG_FMD_ENABLE
 				cnss_utils_fmd_status(true);
 #endif
 				if (vote_wlan_reg_for_fmd() < 0) {
-					pr_err("%s: failed to vote_wlan_reg_for_fmd\n", __func__);
+					pr_err("%s: failed to vote wlan_reg\n", __func__);
 					return -EINVAL;
 				}
-				if (pwr_data->bt_chip_clk) {
-					ret = bt_clk_enable(pwr_data->bt_chip_clk);
-					if (ret < 0) {
-						pr_err("%s: failed to bt_chip_clk\n", __func__);
-						return -EINVAL;
-					}
-				}
 			} else {
-				pr_err("%s: Invalid SOC VERSION sent = %d\n",
-					__func__, fmdStruct.socFwVer);
-				return -EINVAL;
+				pr_info("%s: UPDATE_SOC_VER :: OTHER_FMD_SUPPORT_BT_SOC\n",
+					__func__);
+			}
+
+			if (pwr_data->bt_chip_clk) {
+				ret = bt_clk_enable(pwr_data->bt_chip_clk);
+				if (ret < 0) {
+					pr_err("%s: failed to bt_chip_clk\n", __func__);
+					return -EINVAL;
+				}
 			}
 			break;
 		}
@@ -2671,9 +2691,9 @@ int bt_kernel_panic(char *arg) {
 		pr_err("%s: failed copy to panic reason from BT-Transport\n",
 			__func__);
 		memset(&CrashInfo, 0, sizeof(CrashInfo));
-		strlcpy(CrashInfo. PrimaryReason,
+		strscpy(CrashInfo. PrimaryReason,
 			default_crash_reason, strlen(default_crash_reason));
-		strlcpy(CrashInfo. SecondaryReason,
+		strscpy(CrashInfo. SecondaryReason,
 			default_crash_reason, strlen(default_crash_reason));
 		ret = -EFAULT;
 	}
@@ -2728,6 +2748,7 @@ static long bt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	int chipset_version = 0;
 	unsigned long panic_reason = 0;
 	unsigned short primary_reason = 0, sec_reason = 0, source_subsystem = 0;
+	int current_ssr_state = SUB_STATE_IDLE;
 
 	if (!pwr_data || !probe_finished) {
 		pr_err("%s: BTPower Probing Pending.Try Again\n", __func__);
@@ -2856,6 +2877,17 @@ static long bt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			sec_reason, GetUwbSecondaryCrashReason(sec_reason),
 			source_subsystem, GetSourceSubsystemString(source_subsystem));
 		break;
+	case UWB_GET_SSR_STATE:
+		current_ssr_state = get_sub_state();
+		pr_err("%s: UWB_GET_SSR_STATE current_ssr_state:%d\n", __func__,
+			current_ssr_state);
+		if (copy_to_user((void __user *)arg, &current_ssr_state,
+			sizeof(current_ssr_state))) {
+			pr_err("%s: copy to user failed\n", __func__);
+			ret = -EFAULT;
+		}
+		break;
+
 	default:
 		return -ENOIOCTLCMD;
 	}
