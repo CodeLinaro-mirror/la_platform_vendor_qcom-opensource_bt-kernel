@@ -9,8 +9,8 @@ KBUILD_OPTIONS += CONFIG_MSM_BT_POWER=$(CONFIG_MSM_BT_POWER)
 KBUILD_OPTIONS += CONFIG_I2C_RTC6226_QCA=$(CONFIG_I2C_RTC6226_QCA)
 KBUILD_OPTIONS += CONFIG_BTFM_SLIM=$(CONFIG_BTFM_SLIM)
 
-KBUILD_EXTRA_SYMBOLS=$(call intermediates-dir-for,DLKM,wlan-platform-module-symvers)/Module.symvers
-KBUILD_EXTRA_SYMBOLS=$(OUT_DIR)/vendor/qcom/wlan/platform/Module.symvers
+#KBUILD_EXTRA_SYMBOLS=$(call intermediates-dir-for,DLKM,wlan-platform-module-symvers)/Module.symvers
+#KBUILD_EXTRA_SYMBOLS=$(OUT_DIR)/vendor/qcom/wlan/platform/Module.symvers
 ccflags-y += -I$(WORKSPACE)/wlan/platform/inc
 
 ifeq ($(TARGET_SUPPORT),genericarmv8)
