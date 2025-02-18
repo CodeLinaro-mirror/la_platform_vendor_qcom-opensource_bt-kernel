@@ -1266,7 +1266,7 @@ static int __spi_cnss_send_msg(struct spi_cnss_priv *spi_drv, struct spi_cnss_us
 			user_id = user_pkt->id;
 			ret = spi_cnss_prepare_xfer(spi_drv, user_pkt, USER_WRITE);
 			spi_drv->write_pending = false;
-			*usr = &spi_drv->user[user_pkt->id];
+			*usr = &spi_drv->user[user_id];
 			//mutex_unlock(&spi_drv->xfer_lock);
 		}
 	} else {
@@ -1702,7 +1702,7 @@ static int spi_cnss_transfer(struct spi_cnss_priv *spi_drv,
 
 	xfer_timeout = msecs_to_jiffies(XFER_TIMEOUT);
 	SPI_CNSS_DBG(spi_drv, "%s: waiting on sync_wait\n",__func__);
-	timeout = wait_for_completion_interruptible_timeout(
+	timeout = wait_for_completion_timeout(
 				&usr->sync_wait, xfer_timeout);
 	if (timeout <= 0) {
 		SPI_CNSS_DBG(spi_drv, "%s: err timeout for sync_wait\n",__func__);
