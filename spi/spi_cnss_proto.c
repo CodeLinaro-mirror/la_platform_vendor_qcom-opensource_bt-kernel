@@ -1876,6 +1876,12 @@ static int spi_cnss_controller_init(struct spi_cnss_priv *spi_drv)
 			return ret;
 		}
 
+		SPI_CNSS_DBG(spi_drv,"%s:read slave sanity reg\n",__func__);
+		ret = spi_cnss_register_xfer(spi_drv, SPI_SLAVE_SANITY_REG, SPI_REGISTER_READ);
+		if (ret < 0) {
+			SPI_CNSS_ERR(spi_drv, "%s: init failed, bailing out\n",__func__);
+			return ret;
+		}
 		SPI_CNSS_DBG(spi_drv,"%s:slave config written\n",__func__);
 		ret = spi_cnss_read_context_info(spi_drv, false);
 		if (ret < 0) {
@@ -1883,8 +1889,6 @@ static int spi_cnss_controller_init(struct spi_cnss_priv *spi_drv)
 			return ret;
 		}
 	}
-	SPI_CNSS_DBG(spi_drv,"%s:read slave sanity reg\n",__func__);
-	ret = spi_cnss_register_xfer(spi_drv, SPI_SLAVE_SANITY_REG, SPI_REGISTER_READ);
 	return ret;
 }
 static int spi_cnss_open(struct inode *inode, struct file *filp)
@@ -1933,6 +1937,7 @@ static int spi_cnss_open(struct inode *inode, struct file *filp)
 			SPI_CNSS_ERR(spi_drv, "%s: spi_cnss_controller_init failed\n", __func__);
 			spi_cnss_kfree(spi_drv, spi_drv->client_irq_buf);
 			disable_irq(spi_drv->irq);
+			spi_drv->client_init = false;
 #ifdef MEM_ALLOCATOR
 			spi_cnss_free_allocated_memory(spi_drv);
 #endif
@@ -1972,6 +1977,10 @@ static ssize_t spi_cnss_write(struct file *filp, const char __user *buf, size_t 
 		pr_err("%s: spi_drv is null\n",__func__);
 		ret = 0;
 		goto end;
+	}
+	if (!spi_drv->client_init) {
+		pr_err("%s: controller is not initialized\n",__func__);
+		return -EINVAL;
 	}
 	user_req = &user_pkt.user_req;
 	rc = usr->id;
@@ -2054,6 +2063,14 @@ static ssize_t spi_cnss_read(struct file *filp, char __user *buf, size_t count, 
 	}
 	usr = filp->private_data;
 	spi_drv = container_of(usr, struct spi_cnss_priv, user[usr->id]);
+	if (!spi_drv) {
+		pr_err("%s: spi_drv is null\n",__func__);
+		return -EINVAL;
+	}
+	if (!spi_drv->client_init) {
+		pr_err("%s: controller is not initialized\n",__func__);
+		return -EINVAL;
+	}
 	if (copy_from_user(&cp, buf, sizeof(struct spi_client_request)) != 0) {
 		SPI_CNSS_ERR(spi_drv,"%s: copy from user failed\n",__func__);
 		return -EFAULT;
@@ -2142,6 +2159,11 @@ static __poll_t spi_cnss_poll(struct file *filp, poll_table *wait)
 	spi_drv = container_of(usr, struct spi_cnss_priv, user[usr->id]);
 	if (!spi_drv) {
 		pr_err("%s: spi drv is null\n",__func__);
+		return -EINVAL;
+	}
+	if (!spi_drv->client_init) {
+		pr_err("%s: controller is not initialized\n",__func__);
+		return -EINVAL;
 	}
 	SPI_CNSS_DBG(spi_drv, "%s PID =%d\n", __func__, current->pid);
 	poll_wait(filp, &usr->readwq, wait);
