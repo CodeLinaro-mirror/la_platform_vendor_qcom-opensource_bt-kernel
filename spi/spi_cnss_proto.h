@@ -68,8 +68,9 @@
 #define BT                        0
 #define HOST_IRQ                  0x00000001
 #define SOFT_RESET_IRQ            0x00008000
-#define SLEEP_BYTE                0xFE
-#define SLEEP_BYTE_OFFSET         5
+#define SLEEP_CMD_BYTE            0xFE
+#define RESET_CMD_BYTE            0xF0
+#define CMD_BYTE_OFFSET           5
 #define REG_TX_SIZE               16
 #define REG_RX_SIZE               16
 //static u8 *client_irq_buf;
@@ -141,6 +142,7 @@ enum sleep_state {
 	AWAKE_PENDING,
 	CLIENT_WAKEUP,
 	AWAKE,
+	RESET,
 };
 
 struct memory_manager {
@@ -156,7 +158,7 @@ struct memory_manager {
 	u8 *len_rx_buf;
 	u8 *soft_reset_buf;
 	u8 *nop_cmd_buf;
-	u8 *sleep_cmd_buf;
+	u8 *single_byte_cmd_buf;
 	u8* register_tx_buf;
 	u8* register_rx_buf;
 	u8* clen_notifier_one;
