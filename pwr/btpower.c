@@ -1219,7 +1219,7 @@ static int btpower_pm_domain_attach(struct btpower_platform_data *pdata)
 		pr_info("%s: Attaching power domain %d\n", __func__, i);
 		pdata->pd_devs[i] = dev_pm_domain_attach_by_id(dev, i);
 		if (IS_ERR(pdata->pd_devs[i])) {
-			pr_err("%s: Failed to attach power domain %d, err 0x%x\n", __func__, i, pdata->pd_devs[i]);
+			pr_err("%s: Failed to attach power domain %d, err %p\n", __func__, i, pdata->pd_devs[i]);
 			ret = PTR_ERR(pdata->pd_devs[i]);
 			btpower_pm_domain_detach(pdata);
 			break;
