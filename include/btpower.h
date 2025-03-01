@@ -268,7 +268,7 @@ enum UwbPrimaryReasonCode{
 	UWB_HOST_REASON_PERI_SOC_CRASHED_DIAG_SSR = 0x02,             //PERI SOC CRASHED DIAG INITIATED SSR
 	UWB_HOST_REASON_INIT_FAILED = 0x03,                           //HOST INITIALIZATION FAILED
 	UWB_HOST_REASON_CLOSE_RCVD_DURING_INIT = 0x04,                //CLOSE RECEIVED FROM STACK DURING SOC INIT
-	UWB_HOST_REASON_ERROR_READING_DATA_FROM_Q2SPI = 0x05,         //ERROR READING DATA FROM Q2SPI
+	UWB_HOST_REASON_ERROR_READING_DATA_FROM_SPI = 0x05,           //ERROR READING DATA FROM SPI
 	UWB_HOST_REASON_WRITE_FAIL_SPCL_BUFF_CRASH_SOC = 0x06,        //FAILED TO WRITE SPECIAL BYTES TO CRASH SOC
 	UWB_HOST_REASON_RX_THREAD_STUCK = 0x07,                       //RX THREAD STUCK
 	UWB_HOST_REASON_SSR_CMD_TIMEDOUT = 0x08,                      //SSR DUE TO CMD TIMED OUT
@@ -401,8 +401,8 @@ enum UwbSecondaryReasonCode{
 	UWB_HOST_REASON_UWB_RESET_CC_NOT_RCVD           =  0x53,
 	UWB_HOST_REASON_UWB_ACTIVATE_CC_NOT_RCVD        =  0x54,
 	UWB_HOST_REASON_TME_ACTIVATE_CC_NOT_RCVD        =  0x55,
-	UWB_HOST_REASON_Q2SPI_INIT_STUCK                =  0x56,
-	UWB_HOST_REASON_Q2SPI_INIT_FAILED               =  0x57,
+	UWB_HOST_REASON_SPI_INIT_STUCK                  =  0x56,
+	UWB_HOST_REASON_SPI_INIT_FAILED                 =  0x57,
 	UWB_HOST_REASON_UWB_TLV_DOWNLOAD_FAILED         =  0x58,
 	UWB_HOST_REASON_UWB_ENHLOG_CMD_STUCK            =  0x59,
 	UWB_HOST_REASON_UWB_GETVER_CMD_FAILED           =  0x5A,
@@ -421,8 +421,13 @@ enum UwbSecondaryReasonCode{
 	UWB_HOST_REASON_TME_GETBLDINFO_CMD_STUCK        =  0x67,
 	UWB_HOST_REASON_TME_GETBLDINFO_CMD_FAILED       =  0x68,
 	UWB_HOST_REASON_TME_RAM_PATCH_READ_STUCK        =  0x69,
-	Q2SPI_REASON_DEFAULT                            =  0xFF
+	SPI_REASON_DEFAULT                              =  0xFF
 };
+
+typedef struct {
+  int reason;
+  char reasonstr[50];
+} UwbTransportErrorCodeMap;
 
 typedef struct {
   enum UwbSecondaryReasonCode reason;
@@ -442,7 +447,7 @@ static UwbPrimaryReasonMap uwbPriReasonMap[] = {
 	{UWB_HOST_REASON_UWB_SOC_CRASHED_DIAG_SSR, "UWB SOC crashed with diag initiated SSR"},
 	{UWB_HOST_REASON_INIT_FAILED, "Init failed"},
 	{UWB_HOST_REASON_CLOSE_RCVD_DURING_INIT, "Close received from stack during SOC init"},
-	{UWB_HOST_REASON_ERROR_READING_DATA_FROM_Q2SPI, "Error reading data from Q2SPI"},
+	{UWB_HOST_REASON_ERROR_READING_DATA_FROM_SPI, "Error reading data from SPI"},
 	{UWB_HOST_REASON_WRITE_FAIL_SPCL_BUFF_CRASH_SOC, "Failed to write special bytes to crash SOC"},
 	{UWB_HOST_REASON_RX_THREAD_STUCK, "Rx Thread Stuck"},
 	{UWB_HOST_REASON_SSR_CMD_TIMEDOUT, "SSR due to command timed out"},
@@ -577,10 +582,22 @@ static UwbSecondaryReasonMap uwbSecReasonMap[] = {
 	{ UWB_HOST_REASON_PERI_ARBITRATION_CMD_STUCK, "Peri arbitration cmd stuck"},
 	{ UWB_HOST_REASON_PERI_ARBITRATION_NTF_STUCK, "Peri arbitration ntf stuck"},
 	{ UWB_HOST_REASON_INITIALIZATION_FAILED, "Initialization Failed"},
-	{ UWB_HOST_REASON_Q2SPI_INIT_STUCK, "Q2SPI Init stuck"},
-	{ UWB_HOST_REASON_Q2SPI_INIT_FAILED, "Q2SPI Init Failed"},
+	{ UWB_HOST_REASON_SPI_INIT_STUCK, "SPI Init stuck"},
+	{ UWB_HOST_REASON_SPI_INIT_FAILED, "SPI Init Failed"},
 	{ UWB_HOST_REASON_UWB_TLV_DOWNLOAD_FAILED, "Uwb TLV/NVM download failed"},
-	{ Q2SPI_REASON_DEFAULT, "Q2SPI reason Default"},
+	{ SPI_REASON_DEFAULT, "SPI reason Default"},
+};
+
+static UwbTransportErrorCodeMap UwbTransErrCodeMap[] = {
+	{-ENOMEM, "Out of memory"},
+	{-EIO, "I/O error"},
+	{-EINVAL, "Invalid argument"},
+	{-ENODATA, "No data available"},
+	{-EBUSY, "Device or resource busy"},
+	{-ETIMEDOUT, "Operation timed out"},
+	{-ENODEV, "No such device"},
+	{-EFAULT, "Bad address"},
+	{-EAGAIN, "Try again"}
 };
 
 struct log_index {
