@@ -46,6 +46,21 @@ KBUILD_OPTIONS += $(foreach bt_select, \
        $(bt_select))
 BT_SRC_FILES := $(LOCAL_PATH)/pwr/btpower.c
 
+ifeq ($(LOCAL_DEV_NAME), btpower)
+########################### Module.symvers ############################
+include $(CLEAR_VARS)
+LOCAL_SRC_FILES           := $(BT_SRC_FILES)
+LOCAL_MODULE              := btpower-module-symvers
+LOCAL_MODULE_STEM         := Module.symvers
+LOCAL_MODULE_KBUILD_NAME  := Module.symvers
+LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
+include $(DLKM_DIR)/Build_external_kernelmodule.mk
+endif
+
+ifeq ($(LOCAL_DEV_NAME), btpower_new)
+KBUILD_OPTIONS += KBUILD_EXTRA_SYMBOLS=$(PWD)/$(call intermediates-dir-for,DLKM,btpower-module-symvers)/Module.symvers
+endif
+
 ################################ pwr ################################
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(BT_SRC_FILES)
@@ -54,6 +69,10 @@ LOCAL_MODULE_KBUILD_NAME  := $(LOCAL_DEV_NAME).ko
 LOCAL_MODULE_TAGS         := optional
 LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
+ifeq ($(LOCAL_DEV_NAME), btpower_new)
+LOCAL_REQUIRED_MODULES := btpower-module-symvers
+LOCAL_ADDITIONAL_DEPENDENCIES += $(call intermediates-dir-for,DLKM,btpower-module-symvers)/Module.symvers
+endif
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 ################################ slimbus ################################
 

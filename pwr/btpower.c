@@ -194,6 +194,12 @@ static int bt_major;
 static int soc_id;
 static bool probe_finished;
 
+#ifndef QCA_AUTO_SECONDARY
+bool btpower_is_probed(void) {
+	return probe_finished;
+}
+#endif
+
 #ifdef CONFIG_MSM_BT_OOBS
 static void btpower_uart_transport_locked(struct btpower_platform_data *drvdata,
 					  bool locked)
@@ -1025,6 +1031,14 @@ static int bt_power_probe(struct platform_device *pdev)
 
 	pr_debug("%s\n", __func__);
 
+#ifdef QCA_AUTO_SECONDARY
+	if (!btpower_is_probed()) {
+		pr_warn("%s btpower should be probed earlier than btpower_new; "
+			"try probing btpower_new later.\n", __func__);
+		return -EPROBE_DEFER;
+	}
+#endif
+
 	/* Fill whole array with -2 i.e NOT_AVAILABLE state by default
 	 * for any GPIO or Reg handle.
 	 */
@@ -1487,6 +1501,10 @@ static void __exit btpower_exit(void)
 
 	platform_driver_unregister(&bt_power_driver);
 }
+
+#ifndef QCA_AUTO_SECONDARY
+EXPORT_SYMBOL(btpower_is_probed);
+#endif
 
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("MSM Bluetooth power control driver");
