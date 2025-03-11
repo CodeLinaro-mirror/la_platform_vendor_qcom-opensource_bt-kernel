@@ -79,3 +79,22 @@ def define_canoe():
              "CONFIG_SPI_CNSS_PROTO",
         ]
     )
+
+
+def define_lahaina():
+    define_bt_modules(
+        target = "lahaina",
+        modules = [
+            "btpower",
+            #"bt_fm_slim",
+            "radio-i2c-rtc6226-qca",
+        ],
+        config_options = [
+            "CONFIG_MSM_BT_POWER",
+            #"CONFIG_BTFM_SLIM",
+            "CONFIG_I2C_RTC6226_QCA",
+            #"CONFIG_FMD_ENABLE",
+            #"CONFIG_BT_HW_SECURE_DISABLE",
+        ]
+    )
+

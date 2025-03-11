@@ -63,8 +63,8 @@ register_bt_modules(
         ]
     },
     deps = [
-        "//vendor/qcom/opensource/wlan/platform:all-wlan-platform-headers",
-        "//vendor/qcom/opensource/wlan/platform:%b_cnss_utils",
+#        "//vendor/qcom/opensource/wlan/platform:all-wlan-platform-headers",
+#        "//vendor/qcom/opensource/wlan/platform:%b_cnss_utils",
     ],
 )
 

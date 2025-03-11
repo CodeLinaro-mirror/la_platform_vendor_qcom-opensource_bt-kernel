@@ -11,7 +11,7 @@ PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/btfmcodec.ko
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/btfm_slim_codec.ko
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/bt_fm_swr.ko
 else
-BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/bt_fm_slim.ko
+PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/bt_fm_slim.ko
 endif
 endif
 ifeq ($(TARGET_USES_QTI_UWB), true)
