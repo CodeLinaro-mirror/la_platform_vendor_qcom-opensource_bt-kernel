@@ -34,7 +34,6 @@ u32 slave_config = 0x05000000;
 int user_id = 0xFFFF;
 
 
-#define MEM_ALLOCATOR
 #define CONFIG_SLEEP
 #define CONFIG_AGGRESSIVE_SLEEP
 
@@ -168,11 +167,6 @@ static void spi_cnss_parse_and_enqueue(struct spi_cnss_priv *spi_drv, u8 *rx_buf
 	struct spi_cnss_user *usr;
 	int ret = 0;
 	u8 index = FREAD_TX_SIZE;
-	//u8 i, len = data_len + FREAD_TX_SIZE;
-	//u8 *p_buf = rx_buf;
-	/*for (i = 0; i < len; i++){
-		SPI_CNSS_DBG(spi_drv, "%s: rxbuf[%d] = %x\n",__func__, i, rx_buf[i]);
-	}*/
 #ifdef CONFIG_SPI_LOOPBACK_ENABLED
 	index = 0;
 #endif
@@ -186,9 +180,8 @@ static void spi_cnss_parse_and_enqueue(struct spi_cnss_priv *spi_drv, u8 *rx_buf
 	}
 
 	cp.flow_id = (index+ret);//repurposed for offset.
-	//cp.data_buf = rx_buf;
 	cp.data_len = (data_len - ret);
-	cp.data_buf = spi_cnss_kzalloc(spi_drv, data_len+index); 
+	cp.data_buf = spi_cnss_kzalloc(spi_drv, data_len+index);
 	if (cp.data_buf) {
 		memcpy((u8*)cp.data_buf, rx_buf, data_len+index);
 	} else {
@@ -205,15 +198,6 @@ static void spi_cnss_parse_and_enqueue(struct spi_cnss_priv *spi_drv, u8 *rx_buf
 	SPI_CNSS_DBG(spi_drv, "%s: notify data available\n",__func__);
 	spi_cnss_notify_data_avail(usr);
 }
-/*
-static void spi_cnss_set_client_state(struct spi_cnss_priv *spi_drv,
-											enum sleep_state state)
-{
-	mutex_lock(&spi_drv->state_lock);
-	spi_drv->client_state = state;
-	mutex_unlock(&spi_drv->state_lock);
-}
-*/
 
 /**
  * spi_cnss_multi_transfer: submit multi xfers to SPI core
@@ -327,30 +311,11 @@ void spi_cnss_kfree(struct spi_cnss_priv *spi_drv, void **ptr)
 static int spi_cnss_nop_cmd(struct spi_cnss_priv *spi_drv)
 {
 	int ret = -1;
-	u8* nop_cmd_buf = NULL;
 	SPI_CNSS_DBG(spi_drv, "%s: writing NOP cmd\n",__func__);
-//#ifdef MEM_ALLOCATOR
-	if (spi_drv->mem_mngr.nop_cmd_buf) {
-		ret = spi_write(spi_drv->spi, spi_drv->mem_mngr.nop_cmd_buf, NOP_CMD_LEN);
-	} else {
-//#else
-		nop_cmd_buf = spi_cnss_kzalloc(spi_drv, NOP_CMD_LEN);
-		if (!nop_cmd_buf) {
-			SPI_CNSS_ERR(spi_drv, "%s: Mem allocation failed\n",__func__);
-			return -ENOMEM;
-		}
-		ret = spi_write(spi_drv->spi, nop_cmd_buf, NOP_CMD_LEN);
-	}
-//#endif
+	ret = spi_write(spi_drv->spi, spi_drv->mem_mngr.nop_cmd_buf, NOP_CMD_LEN);
 	if (ret < 0) {
 		SPI_CNSS_ERR(spi_drv, "%s: spi write failed = %d\n",__func__, ret);
 	}
-
-//#ifndef MEM_ALLOCATOR
-	if (nop_cmd_buf) {
-		spi_cnss_kfree(spi_drv, (void **)&nop_cmd_buf);
-	}
-//#endif
 	return ret;
 }
 
@@ -426,26 +391,8 @@ static int prepare_notifiers(struct spi_cnss_priv *spi_drv,
 	u32 val = HOST_IRQ;
 	int offset;
 	u32 addr;//, len;
-//#ifdef MEM_ALLOCATOR
-	if (spi_drv->mem_mngr.notifier_one && spi_drv->mem_mngr.notifier_two) {
-		txbuf = spi_drv->mem_mngr.notifier_one;
-		txbuf1 = spi_drv->mem_mngr.notifier_two;
-	} else {
-//#else
-		txbuf = spi_cnss_kzalloc(spi_drv, NOTIFIER_WRITE_SIZE);
-		if (!txbuf) {
-			SPI_CNSS_ERR(spi_drv, "%s: mem alloc failed for hlen\n",__func__);
-			return -ENOMEM;
-		}
-		txbuf1 = spi_cnss_kzalloc(spi_drv, IRQ_WRITE_SIZE);
-		if (!txbuf1) {
-			SPI_CNSS_ERR(spi_drv, "%s: memalloc failed for chirq\n",__func__);
-			spi_cnss_kfree(spi_drv, (void **)&txbuf);
-			return -ENOMEM;
-		}
-		txbuf1 = spi_drv->mem_mngr.notifier_two;
-	}
-//#endif
+	txbuf = spi_drv->mem_mngr.notifier_one;
+	txbuf1 = spi_drv->mem_mngr.notifier_two;
 	memcpy(txbuf, &cmnd, sizeof(cmnd));
 	offset = sizeof(cmnd);
 	addr = spi_drv->client.HBUF_LEN_ADDR;
@@ -474,37 +421,25 @@ static int prepare_notifiers(struct spi_cnss_priv *spi_drv,
 	memcpy(txbuf1 + offset,&val, 4);
 	return 0;
 }
-//#ifndef MEM_ALLOCATOR
-static void clear_notifiers(struct spi_cnss_priv *spi_drv, struct spi_transfer *xfer, int index, int num_xfer)
-{
-	for(int i = index; i < num_xfer; i++) {
-		spi_cnss_kfree(spi_drv, (void **)&xfer[i].tx_buf);
-		spi_cnss_kfree(spi_drv, (void **)&xfer[i].rx_buf);
-	}
-}
-//#endif
+
 /**
  * spi_cnss_build_transfer: build spi tx msg
  * @spi_drv: pointer to main spi_cnss struct
  * @tx_buf: pointer to tx buffer
  * @rx_buf: pointer to rx buffer
  * @payload_len: payload length
-   @len: total length of tx buffer
+ * @len: total length of tx buffer
  * return: zero on success, non-zero otherwise
  */
 static int spi_cnss_build_transfer(struct spi_cnss_priv *spi_drv,
 			u8* tx_buf, u8* rx_buf, int payload_len, int len, bool update_hlen)
 {
-//	struct spi_transfer *xfer =  spi_cnss_kzalloc(spi_drv, (sizeof(struct spi_transfer)*3));
 	struct spi_transfer xfer[3] = {};
 	//struct spi_device *spi;
 	struct spi_cnss_user *user = NULL;
 	int ret = 0, offset = 0, num_xfer = 0;
 	mutex_lock(&spi_drv->sleep_lock);
-	//xfer = *(&spi_drv->spi_xfer[0]);
-	//spi = spi_drv->spi;
 	SPI_CNSS_DBG(spi_drv,"%s: len = %d, payload = %d\n",__func__, len, payload_len);
-	//spi_cnss_reinit_xfer(xfer, 3);
 	xfer[offset].tx_buf = tx_buf;
 	xfer[offset].speed_hz = spi_drv->spi_max_freq;
 	xfer[offset].cs_change = 1;
@@ -529,12 +464,10 @@ static int spi_cnss_build_transfer(struct spi_cnss_priv *spi_drv,
 	}
 	num_xfer = 3;
 
-	//ret = spi_sync_transfer(spi, xfer, num_xfer);
 	spi_drv->client.HBUF_LEN = update_hlen?payload_len:0;
 	SPI_CNSS_DBG(spi_drv, "%s: HBUF_LEN = %d, client_state = %d\n",__func__, spi_drv->client.HBUF_LEN, spi_drv->client_state);
 #ifdef CONFIG_AGGRESSIVE_SLEEP
 	if (spi_drv->client_state == ASLEEP && update_hlen && (!gpio_get_value(spi_drv->gpio))) {
-		//spi_cnss_nop_cmd(spi_drv);
 		mod_timer(&spi_drv->client_sleep_timer, jiffies + msecs_to_jiffies(CLIENT_WAKE_TIME_OUT));
 		spi_cnss_wakeup_sequence(spi_drv);
 		if (spi_drv->client_state == AWAKE) {
@@ -554,13 +487,7 @@ static int spi_cnss_build_transfer(struct spi_cnss_priv *spi_drv,
 	if (ret < 0) {
 		SPI_CNSS_ERR(spi_drv, "%s: SPI transaction failed\n",__func__);
 	}
-//#ifndef MEM_ALLOCATOR
-	if (!spi_drv->mem_mngr.notifier_one || !spi_drv->mem_mngr.notifier_two) {
-		clear_notifiers(spi_drv, xfer, offset, num_xfer);
-	}
 	mutex_unlock(&spi_drv->sleep_lock);
-//#endif
-	//spi_cnss_kfree(spi_drv, xfer);
 	return ret;
 }
 #endif
@@ -595,19 +522,8 @@ static int spi_cnss_prepare_xfer(struct spi_cnss_priv *spi_drv,
 		alloc_size += ((alloc_size % DATA_WORD_LEN)?
 					DATA_WORD_LEN - (alloc_size % DATA_WORD_LEN) : 0);
 		alloc_size += ADDR_BYTES + CMD_SIZE;
-//#ifdef MEM_ALLOCATOR
-		if (spi_drv->mem_mngr.tx_payload) {
-			tx_buf = spi_drv->mem_mngr.tx_payload;
-			memset(tx_buf, 0, spi_drv->client.HBUF_SIZE);
-		} else {
-//#else
-			tx_buf = spi_cnss_kzalloc(spi_drv,alloc_size);
-			if (!tx_buf) {
-				SPI_CNSS_ERR(spi_drv, "%s: failed to allow tx buffer\n",__func__);
-				return -ENOMEM;
-			}
-		}
-//#endif
+		tx_buf = spi_drv->mem_mngr.tx_payload;
+		memset(tx_buf, 0, spi_drv->client.HBUF_SIZE);
 		cmnd = SPI_WRITE_OPCODE;
 
 		memcpy(tx_buf + offset, &cmnd, sizeof(cmnd));
@@ -629,10 +545,6 @@ static int spi_cnss_prepare_xfer(struct spi_cnss_priv *spi_drv,
 #else
 		ret = spi_cnss_build_transfer(spi_drv, tx_buf, rx_buf, payload_len, alloc_size, true);
 #endif
-//#ifndef MEM_ALLOCATOR
-		if (!spi_drv->mem_mngr.tx_payload)
-			spi_cnss_kfree(spi_drv, (void **)&tx_buf);
-//#endif
 		return ret;
 	}
 	return 0;
@@ -651,26 +563,8 @@ static int spi_cnss_clear_clen(struct spi_cnss_priv *spi_drv)
 	u32 addr, val = HOST_IRQ;
 	u8 cmd = SPI_WRITE_OPCODE;
 	SPI_CNSS_DBG(spi_drv,"%s\n",__func__);
-//#ifdef MEM_ALLOCATOR
-	if (spi_drv->mem_mngr.clen_notifier_one &&
-	spi_drv->mem_mngr.clen_notifier_two) {
-		txbuf = spi_drv->mem_mngr.clen_notifier_one;
-		txbuf1 = spi_drv->mem_mngr.clen_notifier_two;
-	} else {
-//#else
-		txbuf = spi_cnss_kzalloc(spi_drv, NOTIFIER_WRITE_SIZE);
-		if (txbuf == NULL) {
-			SPI_CNSS_ERR(spi_drv, "%s: failed to alloc memory\n",__func__);
-			return -ENOMEM;
-		}
-		txbuf1 = spi_cnss_kzalloc(spi_drv,IRQ_WRITE_SIZE);
-		if (!txbuf1) {
-			SPI_CNSS_ERR(spi_drv, "%s: failed to alloc memory\n",__func__);
-			spi_cnss_kfree(spi_drv, (void **)&txbuf);
-			return -ENOMEM;
-		}
-	}
-//#endif
+	txbuf = spi_drv->mem_mngr.clen_notifier_one;
+	txbuf1 = spi_drv->mem_mngr.clen_notifier_two;
 	addr = cpu_to_be32(spi_drv->client.CBUF_LEN_ADDR);
 	txbuf[0] = cmd;
 	memcpy(txbuf+sizeof(cmd), &addr, ADDR_BYTES);
@@ -693,13 +587,6 @@ static int spi_cnss_clear_clen(struct spi_cnss_priv *spi_drv)
 	if (ret < 0) {
 		SPI_CNSS_ERR(spi_drv, "%s: spi xfer failed to clear clen\n",__func__);
 	}
-//#ifndef MEM_ALLOCATOR
-	if (!spi_drv->mem_mngr.clen_notifier_one ||
-	!spi_drv->mem_mngr.clen_notifier_two) {
-		spi_cnss_kfree(spi_drv, (void **)&txbuf);
-		spi_cnss_kfree(spi_drv, (void **)&txbuf1);
-	}
-//#endif
 	return ret;
 }
 #endif
@@ -740,18 +627,7 @@ static int spi_cnss_send_byte_cmd(struct spi_cnss_priv *spi_drv, int cmd)
 		return -1;
 	}
 #endif
-//#ifdef MEM_ALLOCATOR
-	if (spi_drv->mem_mngr.single_byte_cmd_buf) {
-		txbuf = spi_drv->mem_mngr.single_byte_cmd_buf;
-	} else {
-//#else
-		txbuf = spi_cnss_kzalloc(spi_drv, IRQ_WRITE_SIZE);
-		if (!txbuf) {
-			SPI_CNSS_ERR(spi_drv, "%s: Failed to alloc mem for sleep cmd\n",__func__);
-			return -1;
-		}
-	}
-//#endif
+	txbuf = spi_drv->mem_mngr.single_byte_cmd_buf;
 	txbuf[0] = SPI_WRITE_OPCODE;
 	addr = cpu_to_be32(spi_drv->client.HBUF_BASE_ADDR);
 	memcpy(&txbuf[1], &addr, ADDR_BYTES);
@@ -760,11 +636,6 @@ static int spi_cnss_send_byte_cmd(struct spi_cnss_priv *spi_drv, int cmd)
 		spi_drv->client_state = ASLEEP;
 	}
 	ret = spi_cnss_build_transfer(spi_drv, txbuf, NULL, 1, IRQ_WRITE_SIZE, false);
-//#ifndef MEM_ALLOCATOR
-	if (!spi_drv->mem_mngr.single_byte_cmd_buf) {
-		spi_cnss_kfree(spi_drv, (void **)&txbuf);
-	}
-//#endif
 	return ret;
 }
 #endif
@@ -781,26 +652,10 @@ static int spi_cnss_read_len(struct spi_cnss_priv *spi_drv)
 	u32 addr;
 	SPI_CNSS_DBG(spi_drv,"%s\n",__func__);
 	u8 *clen_rx_buf, *clen_tx_buf;
-//#ifdef MEM_ALLOCATOR
-	if (spi_drv->mem_mngr.len_rx_buf &&  spi_drv->mem_mngr.len_tx_buf) {
-		memset(spi_drv->mem_mngr.len_tx_buf, 0, FREAD_TX_SIZE + (2* FREAD_RX_SIZE));
-		memset(spi_drv->mem_mngr.len_rx_buf, 0, FREAD_TX_SIZE + (2* FREAD_RX_SIZE));
-		clen_rx_buf = spi_drv->mem_mngr.len_rx_buf;
-		clen_tx_buf =  spi_drv->mem_mngr.len_tx_buf;
-	} else {
-//#else
-		clen_tx_buf = spi_cnss_kzalloc(spi_drv, FREAD_TX_SIZE);
-		if (!clen_tx_buf) {
-			SPI_CNSS_ERR(spi_drv, "%s: mem alloc failed for hlen_tx_buf\n",__func__);
-			return -ENOMEM;
-		}
-		clen_rx_buf = spi_cnss_kzalloc(spi_drv, (FREAD_TX_SIZE + (2* FREAD_RX_SIZE)));
-		if (!clen_rx_buf) {
-			SPI_CNSS_ERR(spi_drv, "%s: mem alloc failed for hlen_rx_buf\n",__func__);
-			return -ENOMEM;
-		}
-	}
-//#endif
+	memset(spi_drv->mem_mngr.len_tx_buf, 0, FREAD_TX_SIZE + (2* FREAD_RX_SIZE));
+	memset(spi_drv->mem_mngr.len_rx_buf, 0, FREAD_TX_SIZE + (2* FREAD_RX_SIZE));
+	clen_rx_buf = spi_drv->mem_mngr.len_rx_buf;
+	clen_tx_buf =  spi_drv->mem_mngr.len_tx_buf;
 	xfer = &spi_drv->spi_xfer1;
 	spi_cnss_reinit_xfer(xfer, 1);
 	xfer->tx_buf = clen_tx_buf;
@@ -809,12 +664,10 @@ static int spi_cnss_read_len(struct spi_cnss_priv *spi_drv)
 	addr = spi_drv->client.CBUF_LEN_ADDR;
 	addr = cpu_to_be32(addr);
 	memcpy(&clen_tx_buf[1], &addr, ADDR_BYTES);
-	//xfer->len = FREAD_TX_SIZE + FREAD_RX_SIZE + FREAD_RX_SIZE;
 	xfer->len = FREAD_TX_SIZE + (2* FREAD_RX_SIZE);
 	xfer->speed_hz = spi_drv->spi_max_freq;
 	ret = spi_cnss_single_transfer(spi_drv);
 	SPI_CNSS_DBG(spi_drv,"%s: spi xfer returned\n",__func__);
-	//ret = spi_sync(spi_drv->spi, &spi_drv->spi_msg1);
 	if (ret < 0) {
 		SPI_CNSS_ERR(spi_drv, "%s: spi xfer failed to read hlen\n",__func__);
 		goto err;
@@ -834,118 +687,10 @@ static int spi_cnss_read_len(struct spi_cnss_priv *spi_drv)
 		SPI_CNSS_ERR(spi_drv,"%s: Incorrect clen or hlen from controller \n",__func__);
 		ret = -EINVAL;
 	}
-	err:
-//#ifndef MEM_ALLOCATOR
-	if (!spi_drv->mem_mngr.len_tx_buf || !spi_drv->mem_mngr.len_rx_buf) {
-		spi_cnss_kfree(spi_drv, (void **)&clen_tx_buf);
-		spi_cnss_kfree(spi_drv, (void **)&clen_rx_buf);
-	}
-//#endif
-	return ret;
-}
-#if 0
-static int spi_cnss_read_clen(struct spi_cnss_priv *spi_drv)
-{
-	struct spi_transfer *xfer;
-	u8 ret, index;
-	u32 addr;
-	SPI_CNSS_DBG(spi_drv,"%s\n",__func__);
-	clen_tx_buf = spi_cnss_kzalloc(spi_drv, FREAD_TX_SIZE);
-	if (!clen_tx_buf) {
-		SPI_CNSS_ERR(spi_drv, "%s: mem alloc failed for hlen_tx_buf\n",__func__);
-		return -ENOMEM;
-	}
-	clen_rx_buf = spi_cnss_kzalloc(spi_drv, (FREAD_TX_SIZE + FREAD_RX_SIZE));
-	if (!clen_rx_buf) {
-		SPI_CNSS_ERR(spi_drv, "%s: mem alloc failed for hlen_rx_buf\n",__func__);
-		return -ENOMEM;
-	}
-	xfer = &spi_drv->spi_xfer1;
-	spi_cnss_reinit_xfer(xfer, 1);
-	xfer->tx_buf = clen_tx_buf;
-	xfer->rx_buf = clen_rx_buf;
-	clen_tx_buf[0] = SPI_FREAD_OPCODE;
-	addr = spi_drv->client.CBUF_LEN_ADDR;
-	addr = cpu_to_be32(addr);
-	memcpy(&clen_tx_buf[1], &addr, ADDR_BYTES);
-	xfer->len = FREAD_TX_SIZE + FREAD_RX_SIZE;
-	xfer->speed_hz = spi_drv->spi_max_freq;
-	ret = spi_cnss_single_transfer(spi_drv);
-	SPI_CNSS_DBG(spi_drv,"%s: spi xfer returned\n",__func__);
-	//ret = spi_sync(spi_drv->spi, &spi_drv->spi_msg1);
-	if (ret < 0) {
-		SPI_CNSS_ERR(spi_drv, "%s: spi xfer failed to read hlen\n",__func__);
-		goto err;
-	}
-	index = FREAD_TX_SIZE;
-	spi_drv->client.CBUF_LEN = ((clen_rx_buf[index + 3]) << 24 |
-								(clen_rx_buf[index + 2]) << 16 |
-								(clen_rx_buf[index + 1]) << 8 |
-								clen_rx_buf[index]);
-	SPI_CNSS_DBG(spi_drv,"%s: CLEN = %d\n",__func__, spi_drv->client.CBUF_LEN);
-	err:
-	spi_cnss_kfree(spi_drv, &clen_tx_buf);
-	spi_cnss_kfree(spi_drv, &clen_rx_buf);
-	return ret;
-}
-
-/**
- * spi_cnss_read_hlen:read hlen from controller
- * @spi_drv: pointer to main spi_cnss struct
- * return: zero on success, non-zero otherwise
- */
-static int spi_cnss_read_hlen(struct spi_cnss_priv *spi_drv)
-{
-	struct spi_transfer *xfer;
-	u8 ret, index;
-	u32 addr;
-	SPI_CNSS_DBG(spi_drv,"%s\n",__func__);
-
-	hlen_tx_buf = spi_cnss_kzalloc(spi_drv, FREAD_TX_SIZE);
-	if (!hlen_tx_buf) {
-		SPI_CNSS_ERR(spi_drv, "%s: mem alloc failed for hlen_tx_buf\n",__func__);
-		return -ENOMEM;
-	}
-
-	hlen_rx_buf = spi_cnss_kzalloc(spi_drv, (FREAD_TX_SIZE + FREAD_RX_SIZE));
-	if (!hlen_rx_buf) {
-		SPI_CNSS_ERR(spi_drv, "%s: mem alloc failed for hlen_rx_buf\n",__func__);
-		return -ENOMEM;
-	}
-
-	xfer = &spi_drv->spi_xfer1;
-	spi_cnss_reinit_xfer(xfer, 1);
-	xfer->tx_buf = hlen_tx_buf;
-	xfer->rx_buf = hlen_rx_buf;
-
-	hlen_tx_buf[0] = SPI_FREAD_OPCODE;
-	addr = spi_drv->client.HBUF_LEN_ADDR;
-	addr = cpu_to_be32(addr);
-	memcpy(&hlen_tx_buf[1], &addr, ADDR_BYTES);
-
-	xfer->len = FREAD_TX_SIZE + FREAD_RX_SIZE;
-	xfer->speed_hz = spi_drv->spi_max_freq;
-
-	ret = spi_cnss_single_transfer(spi_drv);
-	SPI_CNSS_DBG(spi_drv,"%s spi xfer returned\n",__func__);
-	//ret = spi_sync(spi_drv->spi, &spi_drv->spi_msg1);
-	if (ret < 0) {
-		SPI_CNSS_ERR(spi_drv, "%s: spi xfer failed to read hlen\n",__func__);
-		goto err;
-	}
-	index = FREAD_TX_SIZE;
-	spi_drv->client.HBUF_LEN = ((hlen_rx_buf[index + 3]) << 24 |
-								(hlen_rx_buf[index + 2]) << 16 |
-								(hlen_rx_buf[index + 1]) << 8 |
-								hlen_rx_buf[index]);
-	SPI_CNSS_DBG(spi_drv,"%s: HLEN = %d\n",__func__,spi_drv->client.HBUF_LEN);
 err:
-	spi_cnss_kfree(spi_drv, &hlen_tx_buf);
-	spi_cnss_kfree(spi_drv, &hlen_rx_buf);
 	return ret;
-
 }
-#endif
+
 /**
  * spi_cnss_clear_irq: clear client to host irq
  * @spi_drv: pointer to main spi_cnss struct
@@ -981,7 +726,6 @@ static int spi_cnss_clear_irq(struct spi_cnss_priv *spi_drv)
 
 	ret = spi_cnss_single_transfer(spi_drv);
 	SPI_CNSS_DBG(spi_drv,"%s spi xfer returned\n",__func__);
-	//ret = spi_sync(spi_drv->spi, &spi_drv->spi_msg1);
 	if (ret < 0) {
 		SPI_CNSS_ERR(spi_drv, "%s: spi xfer failed to clear clen\n",__func__);
 	}
@@ -1073,26 +817,10 @@ static int __spi_cnss_read_msg(struct spi_cnss_priv *spi_drv)
 		u8 *tx_buf, *rx_buf;
 		struct spi_transfer *xfer;
 		u32 addr;
-//#ifndef MEM_ALLOCATOR
-		if (spi_drv->mem_mngr.rx_payload && spi_drv->mem_mngr.rx_cmd_buf) {
-			rx_buf = spi_drv->mem_mngr.rx_payload;
-			memset(rx_buf, 0, CONTEXT_BUF_SIZE + FREAD_TX_SIZE);
-			tx_buf = spi_drv->mem_mngr.rx_cmd_buf;
-			memset(tx_buf, 0, CONTEXT_BUF_SIZE + FREAD_TX_SIZE);
-		}else {
-//#else
-			rx_buf = spi_cnss_kzalloc(spi_drv, FREAD_TX_SIZE + spi_drv->client.CBUF_LEN);
-			if (!rx_buf) {
-				SPI_CNSS_ERR(spi_drv, "%s: failed to alloc rx buf\n",__func__);
-				return -ENOMEM;
-			}
-			tx_buf = spi_cnss_kzalloc(spi_drv, FREAD_TX_SIZE);
-			if (!tx_buf) {
-				SPI_CNSS_ERR(spi_drv, "%s: failed to alloc rx buf\n",__func__);
-				spi_cnss_kfree(spi_drv, (void **)&rx_buf);
-				return -ENOMEM;
-			}
-		}
+		rx_buf = spi_drv->mem_mngr.rx_payload;
+		memset(rx_buf, 0, CONTEXT_BUF_SIZE + FREAD_TX_SIZE);
+		tx_buf = spi_drv->mem_mngr.rx_cmd_buf;
+		memset(tx_buf, 0, CONTEXT_BUF_SIZE + FREAD_TX_SIZE);
 		memcpy(tx_buf, &cmd, sizeof(cmd));
 		addr = cpu_to_be32(spi_drv->client.CBUF_BASE_ADDR);
 		memcpy(tx_buf+sizeof(cmd), &addr, ADDR_BYTES);
@@ -1112,13 +840,6 @@ static int __spi_cnss_read_msg(struct spi_cnss_priv *spi_drv)
 		ret = spi_cnss_single_transfer(spi_drv);
 		if (ret < 0) {
 			SPI_CNSS_ERR(spi_drv,"%s: spi transaction failed\n",__func__);
-
-//#ifndef MEM_ALLOCATOR
-			if(!spi_drv->mem_mngr.rx_payload || !spi_drv->mem_mngr.rx_cmd_buf) {
-				spi_cnss_kfree(spi_drv, (void **)&tx_buf);
-				spi_cnss_kfree(spi_drv, (void **)&rx_buf);
-			}
-//#endif
 			return ret;
 		}
 #ifdef CONFIG_SPI_LOOPBACK_ENABLED
@@ -1137,7 +858,6 @@ loop_back:
 			if (spi_drv->user[usr].fifo_full) {
 				SPI_CNSS_INFO(spi_drv,"%s: host buffer full, dont clear CBUF LEN\n", __func__);
 				spi_drv->user[usr].read_pending = true;
-				//spi_drv->read_pending = true;
 			} else {
 #ifdef CONFIG_SPI_LOOPBACK_ENABLED
 				spi_cnss_parse_and_enqueue(spi_drv, rx_buf, length);
@@ -1151,34 +871,12 @@ loop_back:
 					spi_drv->client.CBUF_LEN = 0;
 				}
 #endif
-				//spi_drv->user[usr].read_pending = false;
 				spi_drv->read_pending =  false;
 			}
-//#ifndef MEM_ALLOCATOR
-			if(!spi_drv->mem_mngr.rx_payload || !spi_drv->mem_mngr.rx_cmd_buf) {
-				spi_cnss_kfree(spi_drv, (void **)&tx_buf);
-				spi_cnss_kfree(spi_drv, (void **)&rx_buf);
-			}
-//#endif
 		} else {
 			SPI_CNSS_ERR(spi_drv, "%s: invalid data\n",__func__);
-//#ifndef MEM_ALLOCATOR
-			if(!spi_drv->mem_mngr.rx_payload || !spi_drv->mem_mngr.rx_cmd_buf) {
-				spi_cnss_kfree(spi_drv, (void **)&tx_buf);
-				spi_cnss_kfree(spi_drv, (void **)&rx_buf);
-			}
-//#endif
 			spi_drv->read_pending = false;
 		}
-#if 0
-#ifdef CONFIG_AGGRESSIVE_SLEEP
-		if (!timer_pending(&spi_drv->client_sleep_timer)) {
-			SPI_CNSS_DBG(spi_drv, "%s: ready complete set 2 msec timer to send sleep\n",__func__);
-			mod_timer(&spi_drv->client_sleep_timer, jiffies + msecs_to_jiffies(SPI_CLIENT_SLEEP_TIME_MS));
-			spi_cnss_send_sleep_cmd(spi_drv);
-		}
-#endif
-#endif
 	}else {
 		SPI_CNSS_ERR(spi_drv, "%s: No active client, bailing\n",__func__);
 		spi_drv->read_pending = false;
@@ -1418,7 +1116,6 @@ static int spi_cnss_allocate_memory(struct spi_cnss_priv *spi_drv)
 		ret = -ENOMEM;
 		goto err;
 	}
-	//spi_drv->mem_mngr.client_irq_buf =  spi_cnss_kzalloc(spi_drv, IRQ_WRITE_SIZE);
 	spi_drv->mem_mngr.clen_notifier_one = spi_cnss_kzalloc(spi_drv, NOTIFIER_WRITE_SIZE);
 	if (!spi_drv->mem_mngr.clen_notifier_one) {
 		SPI_CNSS_ERR(spi_drv, "%s:clen_notifier_one failed\n",__func__);
@@ -1482,29 +1179,12 @@ static int spi_cnss_read_context_info(struct spi_cnss_priv *spi_drv, bool is_irq
 		u32 addr = 0;
 		u8 index =0;
 
-//#ifndef MEM_ALLOCATOR
-		if (spi_drv->mem_mngr.rx_cmd_buf && spi_drv->mem_mngr.rx_payload) {
-			txbuf = spi_drv->mem_mngr.rx_cmd_buf;
-			rxbuf = spi_drv->mem_mngr.rx_payload;
-			SPI_CNSS_DBG(spi_drv, "%s: memsetting\n",__func__);
-			memset(txbuf, 0, CONTEXT_BUF_SIZE + FREAD_TX_SIZE);
-			memset(rxbuf, 0, CONTEXT_BUF_SIZE + FREAD_TX_SIZE);
-			SPI_CNSS_DBG(spi_drv, "%s: memsetting done\n",__func__);
-		} else {
-//#else
-			txbuf = spi_cnss_kzalloc(spi_drv, FREAD_TX_SIZE);
-			if (!txbuf) {
-				SPI_CNSS_ERR(spi_drv, "%s:tx memory alloc failed for context info\n",__func__);
-				return -ENOMEM;
-			}
-
-			rxbuf = spi_cnss_kzalloc(spi_drv, CONTEXT_INFO_READ_SIZE);
-			if (!rxbuf) {
-				SPI_CNSS_ERR(spi_drv, "%s:rx memory alloc failed for context info\n",__func__);
-				return -ENOMEM;
-			}
-		}
-//#endif
+		txbuf = spi_drv->mem_mngr.rx_cmd_buf;
+		rxbuf = spi_drv->mem_mngr.rx_payload;
+		SPI_CNSS_DBG(spi_drv, "%s: memsetting\n",__func__);
+		memset(txbuf, 0, CONTEXT_BUF_SIZE + FREAD_TX_SIZE);
+		memset(rxbuf, 0, CONTEXT_BUF_SIZE + FREAD_TX_SIZE);
+		SPI_CNSS_DBG(spi_drv, "%s: memsetting done\n",__func__);
 		cmd |= SPI_FREAD_OPCODE;
 		memcpy(txbuf, &cmd, sizeof(u8));
 		addr |= SPI_CONTEXT_INFO_BASE;
@@ -1553,14 +1233,6 @@ static int spi_cnss_read_context_info(struct spi_cnss_priv *spi_drv, bool is_irq
 			SPI_CNSS_DBG(spi_drv,"%s: HCINT_BASE_ADDR = %x, CHINT_BASE_ADDR = %x, HBUF_BASE_ADDR = %x, CBUF_BASE_ADDR = %x\n",
 				__func__, spi_drv->client.HCINT_BASE_ADDR, spi_drv->client.CHINT_BASE_ADDR,spi_drv->client.HBUF_BASE_ADDR, spi_drv->client.CBUF_BASE_ADDR);
 
-//#ifndef MEM_ALLOCATOR
-			if (!spi_drv->mem_mngr.rx_payload || !spi_drv->mem_mngr.rx_cmd_buf) {
-				spi_cnss_kfree(spi_drv, (void **)&txbuf);
-				spi_cnss_kfree(spi_drv, (void **)&rxbuf);
-			}
-//#endif
-			//spi_cnss_prepare_context_cmds(spi_drv);
-			//spi_cnss_clear_irq(spi_drv);
 #ifndef CONFIG_SPI_LOOPBACK_ENABLED
 			spi_cnss_read_context_info(spi_drv, true);
 #endif
@@ -1616,15 +1288,24 @@ void spi_cnss_wakeup_sequence(struct spi_cnss_priv *spi_drv)
  * @work: pointer bottom half work struct
  * return: void
  */
-
 static void spi_cnss_handle_work(struct work_struct *work)
 {
 	struct spi_cnss_priv *spi_drv = container_of(work, struct spi_cnss_priv, bh_work);
 	int ret;
 	bool none_scheduled = true;
 
-	SPI_CNSS_DBG(spi_drv,"%s\n",__func__);
-
+	if (atomic_cmpxchg(&spi_drv->check_resume_wait, TRUE, FALSE) == TRUE) {
+		SPI_CNSS_ERR(spi_drv, "%s: In suspend state. Wait for resume\n", __func__);
+		ret = wait_for_completion_timeout(&spi_drv->resume_wait, msecs_to_jiffies(CLIENT_WAKE_TIME_OUT));
+		if (ret < 0) {
+			SPI_CNSS_ERR(spi_drv, "%s: System resume did not happen:\n", __func__);
+			return;
+		} else if (ret == 0) {
+			SPI_CNSS_ERR(spi_drv, "%s: System resume didn't happen - timeout:\n", __func__);
+		} else {
+			SPI_CNSS_ERR(spi_drv, "%s: System resumed\n", __func__);
+		}
+	}
 #ifdef CONFIG_SPI_LOOPBACK_ENABLED
 	spi_drv->client.CBUF_LEN = 275;
 	kthread_queue_work(spi_drv->kreader, &spi_drv->read_msg);
@@ -1736,31 +1417,10 @@ static int spi_cnss_register_xfer(struct spi_cnss_priv *spi_drv, u8 reg, u8 opco
 	struct spi_transfer *xfer = NULL;
 #endif
 
-//#ifdef MEM_ALLOCATOR
-	if (spi_drv->mem_mngr.register_tx_buf &&
-		spi_drv->mem_mngr.register_tx_buf) {
-		tx_buf = spi_drv->mem_mngr.register_tx_buf;
-		rx_buf = spi_drv->mem_mngr.register_rx_buf;
-		memset(tx_buf, 0, REG_TX_SIZE);
-		memset(rx_buf, 0, REG_RX_SIZE);
-	} else {
-//#else
-		tx_buf = spi_cnss_kzalloc(spi_drv, REG_TX_SIZE);
-		if (!tx_buf) {
-			ret = -ENOMEM;
-			SPI_CNSS_ERR(spi_drv, "%s: Mem Alloc Failed:\n",__func__);
-			return ret;
-		}
-		rx_buf = spi_cnss_kzalloc(spi_drv, REG_RX_SIZE);
-
-		if (!rx_buf) {
-			SPI_CNSS_ERR(spi_drv, "%s: Mem Alloc Failed:\n",__func__);
-			spi_cnss_kfree(spi_drv, (void **)&tx_buf);
-			ret = -ENOMEM;
-			return ret;
-		}
-	}
-//#endif
+	tx_buf = spi_drv->mem_mngr.register_tx_buf;
+	rx_buf = spi_drv->mem_mngr.register_rx_buf;
+	memset(tx_buf, 0, REG_TX_SIZE);
+	memset(rx_buf, 0, REG_RX_SIZE);
 	tx_buf[0] = opcode;
 	tx_buf[1] = reg;
 
@@ -1792,14 +1452,9 @@ static int spi_cnss_register_xfer(struct spi_cnss_priv *spi_drv, u8 reg, u8 opco
 	if (ret < 0) {
 		SPI_CNSS_ERR(spi_drv, "%s: reg rd/wr failed = %d\n",__func__, ret);
 	} else {
-		//int val = (*((u32*)rx_buf+4));
 		u8 index = REGISTER_READ_SIZE;
 		int val = (rx_buf[index] << 24 | rx_buf[index+1] << 16 | rx_buf[index+2] << 8 | rx_buf[index+3]);
-		//int i;
 		SPI_CNSS_DBG(spi_drv, "%s: reg = %x", __func__, reg);
-		/*for (i = 0; i < CONTEXT_INFO_READ_SIZE; i++) {
-			SPI_CNSS_DBG(spi_drv, "%s: rx_buf[%d] = %x", __func__, i, rx_buf[i]);
-		}*/
 		SPI_CNSS_DBG(spi_drv, "%s: value = %x\n",__func__, val);
 		if (reg == SPI_SLAVE_CONFIG_REG && opcode == SPI_REGISTER_READ) {
 			val = val & 0xF0FFFFFF;
@@ -1815,12 +1470,6 @@ static int spi_cnss_register_xfer(struct spi_cnss_priv *spi_drv, u8 reg, u8 opco
 			}
 		}
 	}
-//#ifndef MEM_ALLOCATOR
-	if (!spi_drv->mem_mngr.register_tx_buf || !spi_drv->mem_mngr.register_tx_buf) {
-		spi_cnss_kfree(spi_drv, (void **)&tx_buf);
-		spi_cnss_kfree(spi_drv, (void **)&rx_buf);
-	}
-//#endif
 	return ret;
 }
 
@@ -1925,12 +1574,10 @@ static int spi_cnss_open(struct inode *inode, struct file *filp)
 		pr_err("%s: spi_cnss is null\n",__func__);
 	}
 	SPI_CNSS_DBG(spi_drv, "%s rc =%d PID =%d\n", __func__, rc, current->pid);
-#ifdef MEM_ALLOCATOR
 	ret = spi_cnss_allocate_memory(spi_drv);
 	if (ret < 0) {
 		goto end;
 	}
-#endif
 	if (!spi_drv->client_irq_buf) {
 		spi_drv->client_irq_buf = spi_cnss_kzalloc(spi_drv, IRQ_WRITE_SIZE);
 		if (!spi_drv->client_irq_buf) {
@@ -1947,9 +1594,7 @@ static int spi_cnss_open(struct inode *inode, struct file *filp)
 			spi_cnss_kfree(spi_drv, (void **)&spi_drv->client_irq_buf);
 			disable_irq(spi_drv->irq);
 			spi_drv->client_init = false;
-#ifdef MEM_ALLOCATOR
 			spi_cnss_free_allocated_memory(spi_drv);
-#endif
 			goto end;
 		}
 	}
@@ -2007,7 +1652,7 @@ static ssize_t spi_cnss_write(struct file *filp, const char __user *buf, size_t 
 
 	SPI_CNSS_DBG(spi_drv,"%s command = %d, len = %d, sleep bit = %d\n",
 				__func__, user_req->cmd, user_req->data_len, user_req->reserved[0]);
-	spi_drv->sleep_enabled = (user_req->reserved[0] & SPI_SLEEP_CMD_BIT); 
+	spi_drv->sleep_enabled = (user_req->reserved[0] & SPI_SLEEP_CMD_BIT);
 	if (user_req->cmd == USER_WRITE) {
 		data_buf = spi_cnss_kzalloc(spi_drv, user_req->data_len);
 		if (!data_buf) {
@@ -2063,9 +1708,6 @@ static ssize_t spi_cnss_read(struct file *filp, char __user *buf, size_t count, 
 	struct spi_cnss_priv *spi_drv;
 	struct spi_client_request cp;
 	int ret,status;
-	//unsigned long xfer_timeout = msecs_to_jiffies(XFER_TIMEOUT);
-	//pr_err("%s PID =%d\n", __func__, current->pid);
-	//pr_info("%s PID =%d\n", __func__, current->pid);
 	if (!filp || !filp->private_data) {
 		pr_err("%s Err Null pointer\n", __func__);
 		return -EINVAL;
@@ -2135,7 +1777,6 @@ static ssize_t spi_cnss_read(struct file *filp, char __user *buf, size_t count, 
 #endif
 			SPI_CNSS_DBG(spi_drv, "%s: read pending\n",__func__);
 			usr->read_pending = false;
-			//usr->fifo_full = false;
 			kthread_queue_work(spi_drv->kreader, &spi_drv->read_msg);
 #ifdef CONFIG_SLEEP
 			pm_runtime_mark_last_busy(spi_drv->dev);
@@ -2213,7 +1854,6 @@ static int spi_cnss_release(struct inode *inode, struct file *filp)
 	usr->is_active = false;
 	spi_drv->usr_cnt--;
 	SPI_CNSS_DBG(spi_drv, "%s usr_cnt = %d\n", __func__, spi_drv->usr_cnt);
-	//spi_cnss_clear_context_cmds(spi_drv);
 	if (spi_drv->usr_cnt == 0) {
 		disable_irq(spi_drv->irq);
 #ifdef CONFIG_SLEEP
@@ -2236,9 +1876,7 @@ static int spi_cnss_release(struct inode *inode, struct file *filp)
 		SPI_CNSS_DBG(spi_drv, "%s: pm_runtime_suspend status = %d\n",__func__,ret);
 #endif
 		spi_cnss_kfree(spi_drv, (void **)&spi_drv->client_irq_buf);
-#ifdef MEM_ALLOCATOR
 		spi_cnss_free_allocated_memory(spi_drv);
-#endif
 		spi_drv->client_irq_buf = NULL;
 		spi_drv->client_init = false;
 		spi_drv->sleep_enabled = false;
@@ -2283,7 +1921,6 @@ static int spi_cnss_create_chrdev(struct spi_cnss_priv *spi_drv)
 	spi_cnss_cdev_major = MAJOR(spi_drv->chrdev.spidev);
 	spi_drv->chrdev.spi_cnss_class = class_create("spicnssdev");
 	if (IS_ERR(spi_drv->chrdev.spi_cnss_class)) {
-		//printk("%ld",PTR_ERR(spi_drv->chrdev.spi_cnss_class));
 		SPI_CNSS_ERR(spi_drv, "%s err: %ld\n", __func__, PTR_ERR(spi_drv->chrdev.spi_cnss_class));
 		ret = PTR_ERR(spi_drv->chrdev.spi_cnss_class);
 		goto error_class_create;
@@ -2401,6 +2038,9 @@ static int spi_cnss_probe(struct spi_device *spi)
 	init_completion(&spi_drv->sync_wait);
 	init_completion(&spi_drv->wake_wait);
 	init_completion(&spi_drv->buff_wait);
+	init_completion(&spi_drv->resume_wait);
+	atomic_set(&spi_drv->check_resume_wait, FALSE);
+
 	spi_drv->client_state = ASLEEP;
 
 	spi_drv->bh_work_wq = alloc_workqueue("%s", WQ_UNBOUND|WQ_HIGHPRI, 1, dev_name(dev));
@@ -2551,6 +2191,8 @@ static int spi_cnss_runtime_resume(struct device *dev)
 static int spi_cnss_suspend(struct device *dev)
 {
 #ifdef CONFIG_SLEEP
+	int ret = 0;
+
 	struct spi_device *spi = to_spi_device(dev);
 	struct spi_cnss_priv *spi_drv = spi_get_drvdata(spi);
 
@@ -2560,13 +2202,17 @@ static int spi_cnss_suspend(struct device *dev)
 	}
 
 	SPI_CNSS_ERR(spi_drv, "%s\n", __func__);
-	if (pm_runtime_status_suspended(spi_drv->dev)) {
-		return 0;
+	if (!pm_runtime_status_suspended(spi_drv->dev)) {
+		ret = spi_cnss_runtime_suspend(dev);
+		if (ret != 0)
+			SPI_CNSS_ERR(spi_drv, "%s runtime suspend failed\n", __func__);
 	}
-	return spi_cnss_runtime_suspend(dev);
+	if (ret == 0) {
+		atomic_set(&spi_drv->check_resume_wait, TRUE);
+		reinit_completion(&spi_drv->resume_wait);
+	}
 #endif
-	SPI_CNSS_ERR(spi_drv, "%s PID=%d\n", __func__, current->pid);
-	return 0;
+	return ret;
 }
 
 static int spi_cnss_resume(struct device *dev)
@@ -2590,8 +2236,11 @@ static int spi_cnss_resume(struct device *dev)
 		SPI_CNSS_ERR(spi_drv, "%s client not suspended\n", __func__);
 		return 0;
 	}
-	SPI_CNSS_DBG(spi_drv, "%s: calling runtime resume\n", __func__);
-	return spi_cnss_runtime_resume(dev);
+	SPI_CNSS_ERR(spi_drv, "%s: calling runtime resume\n", __func__);
+	spi_cnss_runtime_resume(dev);
+	SPI_CNSS_ERR(spi_drv, "%s: Setting complete of resume\n", __func__);
+	complete(&spi_drv->resume_wait);
+	return 0;
 #endif
 	SPI_CNSS_ERR(spi_drv, "%s PID=%d\n", __func__, current->pid);
 	return 0;

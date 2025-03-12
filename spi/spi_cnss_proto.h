@@ -294,6 +294,8 @@ struct spi_cnss_priv {
 	bool state_transition;
 	struct completion wake_wait;
 	struct completion buff_wait;
+	struct completion resume_wait;
+	atomic_t check_resume_wait;
 	bool wait_to_notify;
 	struct mutex state_lock;
 	struct mutex mem_lock;
