@@ -6,6 +6,7 @@ LOCAL_PATH := $(call my-dir)
 ifeq ($(call is-board-platform-in-list,taro kalama bengal crow kona trinket), true)
 
 BT_SELECT := CONFIG_MSM_BT_POWER=m
+BT_SELECT += CONFIG_MSM_BT_POWER_NEW=m
 #ifdef CONFIG_SLIMBUS
 BT_SELECT += CONFIG_BTFM_SLIM=m
 #endif
@@ -38,6 +39,8 @@ BT_SRC_FILES := \
 	$(wildcard $(LOCAL_PATH)/*) \
 	$(wildcard $(LOCAL_PATH)/*/*) \
 
+BT_SRC_FILES_NEW := $(LOCAL_PATH)/pwr_new/btpower_new.c
+
 # Module.symvers needs to be generated as a intermediate module so that
 # other modules which depend on BT platform modules can set local
 # dependencies to it.
@@ -64,6 +67,15 @@ include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(BT_SRC_FILES)
 LOCAL_MODULE              := btpower.ko
 LOCAL_MODULE_KBUILD_NAME  := pwr/btpower.ko
+LOCAL_MODULE_TAGS         := optional
+LOCAL_MODULE_DEBUG_ENABLE := true
+LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
+include $(DLKM_DIR)/Build_external_kernelmodule.mk
+################################ pwr_new ################################
+include $(CLEAR_VARS)
+LOCAL_SRC_FILES           := $(BT_SRC_FILES_NEW)
+LOCAL_MODULE              := btpower_new.ko
+LOCAL_MODULE_KBUILD_NAME  := pwr_new/btpower_new.ko
 LOCAL_MODULE_TAGS         := optional
 LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
