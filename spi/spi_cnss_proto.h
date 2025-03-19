@@ -20,7 +20,7 @@
 #define MAX_INIT_RETRY 2
 #define DEVICE_NAME_MAX_LEN 64
 #define DATA_WORD_LEN 4
-#define XFER_TIMEOUT 500
+#define XFER_TIMEOUT 5000
 #define MAX_CLIENT_PKTS 32
 #define SPI_IRQ_TIMEOUT 200
 #define NOP_XFER_TIMEOUT 150
@@ -110,7 +110,7 @@ if (spi_ptr) { \
 		ipc_log_string(spi_ptr->ipc, x);\
 	if (spi_ptr->dev) \
 		spi_cnss_trace_log(spi_ptr->dev, x); \
-	pr_info(x); \
+	/*pr_info(x);*/ \
 } \
 } while (0)
 
@@ -121,7 +121,7 @@ if (spi_ptr) { \
 		ipc_log_string(spi_ptr->ipc, x); \
 	if (spi_ptr->dev) \
 		spi_cnss_trace_log(spi_ptr->dev, x); \
-	pr_info(x); \
+	/*pr_info(x);*/ \
 } \
 } while (0)
 
