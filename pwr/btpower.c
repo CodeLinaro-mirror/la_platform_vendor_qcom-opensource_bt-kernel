@@ -1146,8 +1146,10 @@ void btpower_fw_managed_domain_detach(struct btpower_platform_data *pdata)
 		return;
 
 	for (i = pdata->num_pds - 1; i >= 0; i--) {
-		if (!IS_ERR_OR_NULL(pdata->pd_devs[i]))
-			dev_pm_domain_detach(pdata->pd_devs[i], true);
+		if (pdata->pd_devs) {
+			if (!IS_ERR_OR_NULL(pdata->pd_devs[i]))
+				dev_pm_domain_detach(pdata->pd_devs[i], true);
+		}
 	}
 	if (pdata->pd_devs)
 		devm_kfree(&pdata->pdev->dev, pdata->pd_devs);
