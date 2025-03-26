@@ -15,7 +15,7 @@ endif
 
 all: modules
 
-%:
+modules:
 	$(MAKE) -C $(KERNEL_SRC) M=$(M) $@ $(KBUILD_OPTIONS)
 
 modules_install:
