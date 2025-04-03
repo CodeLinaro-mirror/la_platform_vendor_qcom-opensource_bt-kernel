@@ -70,7 +70,7 @@
 #define SOFT_RESET_IRQ            0x00008000
 #define SLEEP_BYTE                0xFE
 #define SLEEP_BYTE_OFFSET         5
-#define REG_TX_SIZE               16
+#define REG_TX_SIZE               8
 #define REG_RX_SIZE               16
 //static u8 *client_irq_buf;
 
