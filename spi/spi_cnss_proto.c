@@ -1059,7 +1059,7 @@ static int __spi_cnss_read_msg(struct spi_cnss_priv *spi_drv)
 		return -EINVAL;
 	}
 	read = spi_drv->usr_cnt;
-	SPI_CNSS_ERR(spi_drv, "%s: active clients = %d\n",__func__, read);
+	SPI_CNSS_DBG(spi_drv, "%s: active clients = %d\n",__func__, read);
 	for (i = 0; i < MAX_DEV; i++) {
 		if (spi_drv->user[i].is_active) { /*spi_drv->user[i].fifo_full*/
 			spi_drv->user[i].fifo_full =
@@ -1067,7 +1067,7 @@ static int __spi_cnss_read_msg(struct spi_cnss_priv *spi_drv)
 			if (spi_drv->user[i].fifo_full) read--;
 		}
 	}
-	SPI_CNSS_ERR(spi_drv, "%s: active clients = %d\n",__func__, read);
+	SPI_CNSS_INFO(spi_drv, "%s: active clients = %d\n",__func__, read);
 	if (read > 0) {
 		//fifo available to read
 		u8 *tx_buf, *rx_buf;
@@ -2209,19 +2209,7 @@ static int spi_cnss_release(struct inode *inode, struct file *filp)
 		SPI_CNSS_ERR(spi_drv,"%s: spi transfer in progress\n",__func__);
 		usleep_range(500000, 1000000);
 	}
-	SPI_CNSS_ERR(spi_drv, "%s: Before fifo size = %d\n",__func__, kfifo_len(&usr->user_fifo));
 	kfifo_free(&usr->user_fifo);
-	SPI_CNSS_ERR(spi_drv, "%s: After fifo size = %d\n",__func__, kfifo_len(&usr->user_fifo));
-
-	if (spi_drv->client_state == ASLEEP) {
-		SPI_CNSS_ERR(spi_drv, "%s: Client asleep. Waking it up\n",__func__);
-		spi_cnss_wakeup_sequence(spi_drv);
-		if (spi_drv->client_state != ASLEEP) {
-			SPI_CNSS_DBG(spi_drv, "%s: wakeup client success\n",__func__);
-		} else {
-			SPI_CNSS_ERR(spi_drv, "%s: Failed to wakeup client\n",__func__);
-		}
-	}
 	usr->is_active = false;
 	spi_drv->usr_cnt--;
 	SPI_CNSS_DBG(spi_drv, "%s usr_cnt = %d\n", __func__, spi_drv->usr_cnt);
@@ -2244,8 +2232,6 @@ static int spi_cnss_release(struct inode *inode, struct file *filp)
 			SPI_CNSS_ERR(spi_drv,"%s: failed to send reset indication cmd\n",__func__);
 			spi_drv->client_state = AWAKE;
 		}
-		// Wait for 100 msec after sending reset cmd byte.
-		msleep(100);
 		ret = pm_runtime_suspend(spi_drv->dev);
 		SPI_CNSS_DBG(spi_drv, "%s: pm_runtime_suspend status = %d\n",__func__,ret);
 #endif
