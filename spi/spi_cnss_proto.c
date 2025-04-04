@@ -1,11 +1,12 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 /*
 * SPI cnss protocol driver for UWB
 */
+
 
 #include <linux/init.h>
 #include <linux/module.h>
@@ -30,6 +31,7 @@
 
 #define WRITE_RETRY 2
 #define DATA_BYTES_PER_LINE 64
+#define SANITY_CHECK_ITERATION 5
 u32 slave_config = 0x05000000;
 int user_id = 0xFFFF;
 
@@ -766,7 +768,8 @@ int spi_cnss_wakeup_client(struct spi_cnss_priv *spi_drv, int retry)
 			ret = spi_cnss_nop_cmd(spi_drv);
 			break;
 		}
-		if (!spi_drv->client_init && (i%2 == 1) && spi_drv->client_state != AWAKE) {
+		if (!spi_drv->client_init && ((i + 1) % SANITY_CHECK_ITERATION == 0) &&
+			spi_drv->client_state != AWAKE) {
 			ret = spi_cnss_register_xfer(spi_drv, SPI_SLAVE_SANITY_REG, SPI_REGISTER_READ);
 			if (ret == 0) {
 				spi_drv->client_state = AWAKE;
@@ -2283,4 +2286,3 @@ static struct spi_driver spi_cnss_driver = {
 module_spi_driver(spi_cnss_driver);
 MODULE_DESCRIPTION("spi cnss driver");
 MODULE_LICENSE("GPL v2");
-
