@@ -63,8 +63,14 @@ static uint8_t log_lvl = THREAD_DEFAULT_LOG_LVL;
 	else \
 		pr_info("THREAD %s: " fmt "\n", __func__, ## arg); }
 
+#define GPIO_HIGH                       0x00000001
+#define GPIO_LOW                        0x00000000
+
+#define THREAD_STATE_SUCCESS            0x00
+#define THREAD_STATE_FAILED             0x01
+
 #define THREAD_CMD_PWR_VOTE             0xAAA1
-#define THREAD_CMD_GET_REG_VLTG         0xAAA2
+#define THREAD_CMD_GET_RESOURCE_STATE   0xAAA2
 #define THREAD_CMD_GET_CHIPSET_ID       0xAAA3
 #define THREAD_CMD_UPDATE_CHIPSET_VER   0xAAA4
 #define THREAD_CMD_PANIC                0xAAA5
@@ -91,6 +97,11 @@ struct log_index {
 	int crash;
 };
 
+struct log_gpio_status {
+	int during_pwr_on;
+	int during_crash;
+};
+
 struct vreg_data {
 	struct regulator *reg;  /* voltage regulator handle */
 	const char *name;       /* regulator name */
@@ -112,6 +123,8 @@ struct thread_pwr_struct {
 	int is_probe_pending;
 	char chip_set_id[MAX_PROP_SIZE];
 	int chipset_version;
+	int thread_enable_gpio;
+	struct log_gpio_status thread_en_pin_state;
 };
 
 

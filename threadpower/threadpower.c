@@ -6,10 +6,10 @@
 #include "threadpower.h"
 
 //--------------[FUNCTION PROTO TYPE]---------------------------------------------------
-static int vreg_enable(struct vreg_data *vreg);
-static int vreg_disable(struct vreg_data *vreg);
-static int vreg_enable_retention(struct vreg_data *vreg);
-static int vreg_disable_retention(struct vreg_data *vreg);
+static int thread_vreg_enable(struct vreg_data *vreg);
+static int thread_vreg_disable(struct vreg_data *vreg);
+static int thread_vreg_enable_retention(struct vreg_data *vreg);
+static int thread_vreg_disable_retention(struct vreg_data *vreg);
 static long thread_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
 static int thread_power_probe(struct platform_device *pdev);
 
@@ -49,10 +49,10 @@ static struct platform_driver thread_power_driver = {
 };
 
 static int (*voltage_regulator_handler[THREAD_PWR_MAX_OPTION])(struct vreg_data *) = {
-	vreg_enable,
-	vreg_disable,
-	vreg_enable_retention,
-	vreg_disable_retention
+	thread_vreg_enable,
+	thread_vreg_disable,
+	thread_vreg_enable_retention,
+	thread_vreg_disable_retention
 };
 
 char *default_crash_reason = "Crash reason not found";
@@ -64,7 +64,7 @@ static struct class *thread_class;
 //--------------[FUNCTIONS]---------------------------------------------------
 
 /**
- * vreg_configure() - this api handles the regulator configuration
+ * thread_vreg_configure() - this api handles the regulator configuration
  *
  * @arg: regulator info
  *
@@ -75,7 +75,7 @@ static struct class *thread_class;
  * Return: 0 on success.
  *         error code on failure.
  */
-static int vreg_configure(struct vreg_data *vreg, bool pull_down)
+static int thread_vreg_configure(struct vreg_data *vreg, bool pull_down)
 {
 	int rc = 0;
 
@@ -101,7 +101,7 @@ static int vreg_configure(struct vreg_data *vreg, bool pull_down)
 }
 
 /**
- * vreg_enable() - this api handles the regulator enable
+ * thread_vreg_enable() - this api handles the regulator enable
  *
  * @arg: regulator info
  *
@@ -111,7 +111,7 @@ static int vreg_configure(struct vreg_data *vreg, bool pull_down)
  * Return: 0 on success.
  *         error code on failure.
  */
-static int vreg_enable(struct vreg_data *vreg)
+static int thread_vreg_enable(struct vreg_data *vreg)
 {
 	int rc = 0;
 
@@ -126,7 +126,7 @@ static int vreg_enable(struct vreg_data *vreg)
 		return -EPERM;
 	}
 
-	rc = vreg_configure(vreg, false);
+	rc = thread_vreg_configure(vreg, false);
 	if (rc < 0)
 		return rc;
 
@@ -141,7 +141,7 @@ static int vreg_enable(struct vreg_data *vreg)
 }
 
 /**
- * vreg_disable() -  this api handles the regulator disable
+ * thread_vreg_disable() -  this api handles the regulator disable
  *
  * @arg: regulator info
  *
@@ -153,7 +153,7 @@ static int vreg_enable(struct vreg_data *vreg)
  * Return: 0 on success.
  *         error code on failure.
  */
-static int vreg_disable(struct vreg_data *vreg)
+static int thread_vreg_disable(struct vreg_data *vreg)
 {
 	int rc = 0;
 
@@ -176,11 +176,11 @@ static int vreg_disable(struct vreg_data *vreg)
 
 	vreg->is_enabled = false;
 
-	return vreg_configure(vreg, true);
+	return thread_vreg_configure(vreg, true);
 }
 
 /**
- * vreg_enable_retention() -  this api handles the regulator retention enable
+ * thread_vreg_enable_retention() -  this api handles the regulator retention enable
  *
  * @arg: regulator info
  *
@@ -190,7 +190,7 @@ static int vreg_disable(struct vreg_data *vreg)
  * Return: 0 on success.
  *         error code on failure.
  */
-static int vreg_enable_retention(struct vreg_data *vreg)
+static int thread_vreg_enable_retention(struct vreg_data *vreg)
 {
 	int rc = 0;
 
@@ -201,13 +201,13 @@ static int vreg_enable_retention(struct vreg_data *vreg)
 
 	if ((vreg->is_enabled) && (vreg->is_retention_supp))
 		if ((vreg->min_vol != 0) && (vreg->max_vol != 0))
-			rc = vreg_configure(vreg, true);
+			rc = thread_vreg_configure(vreg, true);
 
 	return rc;
 }
 
 /**
- * vreg_disable_retention() -  this api handles the regulator retention disable
+ * thread_vreg_disable_retention() -  this api handles the regulator retention disable
  *
  * @arg: regulator info
  *
@@ -217,7 +217,7 @@ static int vreg_enable_retention(struct vreg_data *vreg)
  * Return: 0 on success.
  *         error code on failure.
  */
-static int vreg_disable_retention(struct vreg_data *vreg)
+static int thread_vreg_disable_retention(struct vreg_data *vreg)
 {
 	int rc = 0;
 
@@ -227,13 +227,13 @@ static int vreg_disable_retention(struct vreg_data *vreg)
 	THREAD_ERR(" %s", vreg->name);
 
 	if ((vreg->is_enabled) && (vreg->is_retention_supp))
-		rc = vreg_configure(vreg, false);
+		rc = thread_vreg_configure(vreg, false);
 
 	return rc;
 }
 
 /**
- * ConvertPowerOptionToString() - this api covert power vote option into string
+ * convert_pwr_op_to_string() - this api covert power vote option into string
  *
  * @arg: power vote option.
  *
@@ -242,7 +242,7 @@ static int vreg_disable_retention(struct vreg_data *vreg)
  *
  * Return: return the coresponding poer vote oprtion string.
  */
-static inline char *ConvertPowerOptionToString(int arg)
+static inline char *convert_pwr_op_to_string(int arg)
 {
 	switch (arg) {
 	case POWER_ON:
@@ -259,14 +259,74 @@ static inline char *ConvertPowerOptionToString(int arg)
 };
 
 /**
+ * thread_power_gpio_handler() - this api handles all gpio configuration
+ * acording to the power vote request
+ *
+ * @arg1: power vote request
+ *
+ * Context:
+ *  - this api configures GPIO according to the power vote POWER ON,
+ *    POWER OFF, POWER RETENION ENABLE, POWER RETENTION DISABLE request.
+ *
+ * Return: 1 on success.
+ *         0 on failure.
+ */
+static int thread_power_gpio_handler(uint32_t option)
+{
+	int rc = 0;
+	int thread_en_pin = thrd_dev->thread_enable_gpio;
+
+	if (option == POWER_ON) {
+		rc = gpio_direction_output(thread_en_pin, GPIO_LOW);
+		if (rc) {
+			THREAD_ERR("Failed to pull down thread_en_pin [status = %d]",
+				gpio_get_value(thread_en_pin));
+			return THREAD_STATE_FAILED;
+		}
+		THREAD_ERR("thread_en_pin pulled down [status = %d]",
+			gpio_get_value(thread_en_pin));
+
+		msleep(50);
+
+		rc = gpio_direction_output(thread_en_pin, GPIO_HIGH);
+		if (rc) {
+			THREAD_ERR("Failed to pull up thread_en_pin [status = %d]",
+				gpio_get_value(thread_en_pin));
+			return THREAD_STATE_FAILED;
+		}
+		THREAD_ERR("thread_en_pin pulled up [status = %d]",
+			gpio_get_value(thread_en_pin));
+
+		msleep(75);
+
+		thrd_dev->thread_en_pin_state.during_pwr_on =
+				gpio_get_value(thread_en_pin);
+
+		THREAD_ERR("Gpio configuration completed thread_en_pin_state = %d",
+			thrd_dev->thread_en_pin_state.during_pwr_on);
+	} else {
+		rc = gpio_direction_output(thread_en_pin, GPIO_LOW);
+		if (rc) {
+			THREAD_ERR("Failed to pull down thread_en_pin [status = %d]",
+				gpio_get_value(thread_en_pin));
+			return THREAD_STATE_FAILED;
+		}
+		THREAD_ERR("thread_en_pin pulled down [status = %d]",
+			gpio_get_value(thread_en_pin));
+	}
+	return rc;
+}
+
+/**
  * thread_power_vote_handler() - this api handles all the power
  * vote request
  *
  * @arg1: power vote request
  *
  * Context:
- *  - this api queues all the power vote POWER ON, POWER OFF,
- * POWER RETENION ENABLE, POWER RETENTION DISABLE request.
+ *  - this api configures the resource like volatge regulator and GPIO etc
+ *    acording to the power vote POWER ON, POWER OFF, POWER RETENION ENABLE
+ *    POWER RETENTION DISABLE request.
  *
  * Return: 0 on success.
  *         error code on failure.
@@ -275,14 +335,20 @@ static int thread_power_vote_handler(uint32_t option)
 {
 	int ret = 0;
 
+	/* configures the regulator resource */
 	for (int i = 0; i < ARRAY_SIZE(thread_resources); i++) {
 		ret = voltage_regulator_handler[option](&thread_resources[i]);
 		if (ret) {
 			THREAD_ERR(" Failed to perform option = %d, for the regulator = %s",
 				option, (&thread_resources[i])->name);
-			return ret;
+			return THREAD_STATE_FAILED;
 		}
 	}
+
+	/* configures the gpio resource */
+	if ((option == POWER_ON) || (option == POWER_OFF))
+		ret = thread_power_gpio_handler(option);
+
 	return ret;
 }
 
@@ -345,7 +411,7 @@ static long thread_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	int ret = -1;
 	uint32_t power_option;
 
-	if (!thrd_dev->is_probe_pending) {
+	if (thrd_dev->is_probe_pending) {
 		THREAD_ERR("Probe is pending, returning from here");
 		return (long)ret;
 	}
@@ -358,10 +424,10 @@ static long thread_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			return ret;
 		}
 		THREAD_ERR("THREAD_CMD_PWR_VOTE to %s",
-			ConvertPowerOptionToString(power_option));
+			convert_pwr_op_to_string(power_option));
 		ret = thread_power_vote_handler(power_option);
 		break;
-	case THREAD_CMD_GET_REG_VLTG:
+	case THREAD_CMD_GET_RESOURCE_STATE:
 		THREAD_ERR("TODO : THREAD_CMD_GET_REG_VLTG");
 		break;
 	case THREAD_CMD_GET_CHIPSET_ID:
@@ -397,6 +463,41 @@ static long thread_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 }
 
 /**
+ * thread_power_get_gpio_info_from_dt() - this api helps to get the
+ * gpio info
+ *
+ * @arg1: pointer to dev node
+ *
+ * Context:
+ *  - this api helps to get the gpio info from the DTBO
+ *
+ * Return: 0 on success.
+ *         1 on failure.
+ */
+static int thread_power_get_gpio_info_from_dt(struct platform_device *pdev)
+{
+	int rc;
+	thrd_dev->thread_enable_gpio =
+		of_get_named_gpio(pdev->dev.of_node, "qcom,thread-enable-gpio", 0);
+
+	if (thrd_dev->thread_enable_gpio < 0) {
+		THREAD_ERR("thread_enable_gpio not provided in devicetree");
+		return THREAD_STATE_FAILED;
+	}
+
+	rc = gpio_request(thrd_dev->thread_enable_gpio, "thread_enable_gpio_n");
+	if (rc) {
+		THREAD_ERR("failed to get the thread_enable_gpio %d (%d)",
+			thrd_dev->thread_enable_gpio, rc);
+		return THREAD_STATE_FAILED;
+	}
+
+	THREAD_ERR("Gpio : thread_enable_gpio info provided in devicetree");
+	return THREAD_STATE_SUCCESS;
+}
+
+
+/**
  * thread_power_get_reg_info_from_dt() - this api helps to get the
  * regulator resource info
  *
@@ -406,28 +507,25 @@ static long thread_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
  * Context:
  *  - this api helps to get the regulator resource info from the DTBO
  *
- * Return: 0 on success.
- *         error code on failure.
+ * Return: 1 on success.
+ *         0 on failure.
  */
 static int thread_power_get_reg_info_from_dt(struct device *dev,
 	struct vreg_data *vreg_data)
 {
-
-	int len, ret = 0;
+	int len;
 	const __be32 *prop;
 	char prop_name[MAX_PROP_SIZE];
 	struct vreg_data *vreg = vreg_data;
-
-	THREAD_ERR("vreg dev tree parse for %s", vreg_data->name);
 
 	snprintf(prop_name, sizeof(prop_name), "%s-supply", vreg_data->name);
 	if (of_parse_phandle(dev->of_node, prop_name, 0)) {
 		vreg->reg = regulator_get(dev, vreg_data->name);
 		if (IS_ERR(vreg->reg)) {
-			ret = PTR_ERR(vreg->reg);
+			int ret = PTR_ERR(vreg->reg);
 			vreg->reg = NULL;
 			THREAD_ERR("failed to get: %s error:%d", vreg_data->name, ret);
-			return ret;
+			return THREAD_STATE_FAILED;
 		}
 
 		snprintf(prop_name, sizeof(prop_name), "%s-config", vreg->name);
@@ -435,21 +533,24 @@ static int thread_power_get_reg_info_from_dt(struct device *dev,
 		if (!prop) {
 			THREAD_ERR("Property %s %s, use default",
 				prop_name, prop ? "invalid format" : "doesn't exist");
-		} else if (len >= (4 * sizeof(__be32))) {
+			return THREAD_STATE_FAILED;
+		}
+		if (len >= (4 * sizeof(__be32))) {
 			vreg->min_vol = be32_to_cpup(&prop[0]);
 			vreg->max_vol = be32_to_cpup(&prop[1]);
 			vreg->load_curr = be32_to_cpup(&prop[2]);
 			vreg->is_retention_supp = be32_to_cpup(&prop[3]);
+			THREAD_ERR("Regulator: %s, min_vol: %u, max_vol: %u, load_curr: %u, retention: %u",
+				vreg->name, vreg->min_vol, vreg->max_vol,
+				vreg->load_curr, vreg->is_retention_supp);
+			return THREAD_STATE_SUCCESS;
 		}
-
-		THREAD_ERR("Regulator: %s, min_vol: %u, max_vol: %u, load_curr: %u, retention: %u",
-			vreg->name, vreg->min_vol, vreg->max_vol,
-			vreg->load_curr, vreg->is_retention_supp);
-	} else {
-		THREAD_ERR("%s is not provided in device tree",  vreg_data->name);
+		THREAD_ERR("All field of regulator '%s' info didn't provided in device tree",
+			vreg_data->name);
+		return THREAD_STATE_FAILED;
 	}
-
-	return ret;
+	THREAD_ERR("%s is not provided in device tree",  vreg_data->name);
+	return THREAD_STATE_FAILED;
 }
 
 /**
@@ -462,32 +563,32 @@ static int thread_power_get_reg_info_from_dt(struct device *dev,
  *  - this api helps to get the resource info from the DTBO
  *
  * Return: 0 on success.
- *         error code on failure.
+ *         1 on failure.
  */
 static int thread_power_decode_dt_handler(struct platform_device *pdev)
 {
-	int rc;
 	const struct pwr_data *data;
-
-	THREAD_ERR("");
 
 	data = of_device_get_match_data(&pdev->dev);
 	if (!data) {
 		THREAD_ERR("failed to get dev node");
-		return -EINVAL;
+		return THREAD_STATE_FAILED;
 	}
 
 	memcpy(&thrd_dev->chip_set_id, &data->compatible, MAX_PROP_SIZE);
 
-	THREAD_ERR("chip_set_id = %s, compatible=%s", thrd_dev->chip_set_id, data->compatible);
+	/* gets the chip_set_id from the device tree */
+	THREAD_ERR("chip_set_id = %s, Regulator count = %lu",
+		thrd_dev->chip_set_id, ARRAY_SIZE(thread_resources));
 
+	/* get the regulator info from the device tree */
 	for (int i = 0; i < ARRAY_SIZE(thread_resources); i++) {
-		rc = thread_power_get_reg_info_from_dt(&(pdev->dev), &thread_resources[i]);
-		/* No point to go further if failed to get regulator handler */
-		if (rc)
-			return rc;
+		if(thread_power_get_reg_info_from_dt(&(pdev->dev), &thread_resources[i]))
+			return THREAD_STATE_FAILED;
 	}
-	return rc;
+
+	/* gets the gpio info from the device tree */
+	return thread_power_get_gpio_info_from_dt(pdev);
 }
 
 /**
@@ -504,18 +605,21 @@ static int thread_power_decode_dt_handler(struct platform_device *pdev)
 static int thread_power_probe(struct platform_device *pdev)
 {
 	THREAD_ERR("Start");
-	thrd_dev = kzalloc(sizeof(*thrd_dev), GFP_KERNEL);
 
+	thrd_dev = kzalloc(sizeof(*thrd_dev), GFP_KERNEL);
 	if (!thrd_dev)
 		return -ENOMEM;
 
-	thrd_dev->is_probe_pending = false;
+	thrd_dev->is_probe_pending = THREAD_STATE_SUCCESS;
 
-	thread_power_decode_dt_handler(pdev);
+	/* gets all resource info from device tree */
+	thrd_dev->is_probe_pending = thread_power_decode_dt_handler(pdev);
 
-	thrd_dev->is_probe_pending = true;
-
-	THREAD_ERR("Completed");
+	if (thrd_dev->is_probe_pending) {
+		THREAD_ERR("Driver probe status is pending, client power vote will not be honoured");
+		return -ENOMEM;
+	}
+	THREAD_ERR("Driver probe completed");
 	return 0;
 }
 
@@ -534,7 +638,7 @@ static int __init thread_power_init(void)
 {
 	int ret = 0;
 
-	THREAD_ERR("starting up the module");
+	THREAD_ERR("Thread power driver booting up");
 
 	ret = platform_driver_register(&thread_power_driver);
 	if (ret) {
@@ -562,14 +666,13 @@ static int __init thread_power_init(void)
 		ret = -1;
 		goto delete_cdev;
 	}
-	THREAD_ERR("class_create sucessfull");
 
 	if (device_create(thread_class, NULL, threadpower_drv_id,
 		NULL, "threadpower") == NULL) {
 		THREAD_ERR("failed to allocate char dev");
 		goto destroy_class;
 	}
-	THREAD_ERR("Thread power driver insert sucessfull");
+	THREAD_ERR("Thread power driver insert sucessfull, boot completed");
 	return 0;
 
 destroy_class:
