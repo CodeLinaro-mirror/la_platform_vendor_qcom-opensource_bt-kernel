@@ -1,0 +1,11 @@
+load(":bt_modules.bzl", "bt_modules")
+load("//build/kernel/kleaf:kernel.bzl", "ddk_headers")
+
+bt_modules("sa510m", "debug")
+bt_modules("sa510m", "perf")
+
+package(
+    default_visibility = [
+        "//visibility:public",
+    ],
+)
