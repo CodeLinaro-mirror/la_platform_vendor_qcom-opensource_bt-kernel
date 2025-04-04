@@ -675,7 +675,6 @@ struct platform_pwr_data {
 	struct file *reffilp_obs;
 	struct task_struct *reftask_obs;
 #endif
-	struct task_struct *reftask;
 	struct task_struct *reftask_bt;
 	struct task_struct *reftask_uwb;
 	struct btpower_state_machine btpower_state;
