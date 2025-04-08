@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef __LINUX_SPI_CNSS_PROTO_H
@@ -305,5 +305,6 @@ struct spi_cnss_priv {
 	struct memory_manager mem_mngr;
 	void *ipc;
 	bool sleep_enabled;
+	atomic_t write_err_code;
 };
 #endif //__LINUX_SPI_CNSS_PROTO_H
