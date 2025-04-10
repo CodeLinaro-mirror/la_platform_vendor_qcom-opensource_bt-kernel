@@ -324,11 +324,16 @@ static void btfmcodec_dai_shutdown(struct snd_pcm_substream *substream,
 	struct btfmcodec_data *btfmcodec = snd_soc_component_get_drvdata(dai->component);
 	struct btfmcodec_state_machine *state = &btfmcodec->states;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
+	BTFMCODEC_DBG("dai->name: %s, dai->id: %d, dai->rate: %d", dai->name,
+		dai->id, dai->symmetric_rate);
+#else
 	BTFMCODEC_DBG("dai->name: %s, dai->id: %d, dai->rate: %d", dai->name,
 		dai->id, dai->rate);
+#endif
 
 	if (btfmcodec_get_current_transport(state) == IDLE) {
-		BTFMCODEC_INFO("%s not allowing shutdown as state is IDLE", __func__);   
+		BTFMCODEC_INFO("%s not allowing shutdown as state is IDLE", __func__);
 		return;
 	}
 
@@ -686,7 +691,11 @@ static int btfmcodec_dai_prepare(struct snd_pcm_substream *substream,
 	struct hwep_dai_driver *dai_drv = (struct hwep_dai_driver *)
 					      btfmcodec_get_dai_drvdata(hwep_info);
 	uint8_t *codectype = dai_drv->dai_ops->hwep_codectype;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
+	uint32_t sampling_rate = dai->symmetric_rate;
+#else
 	uint32_t sampling_rate = dai->rate;
+#endif
 	uint32_t direction = substream->stream;
 	int id = dai->id;
 	int ret ;
