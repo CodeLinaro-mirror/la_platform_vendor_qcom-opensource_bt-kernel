@@ -1244,8 +1244,9 @@ void spi_cnss_sleep_timeout_handler(struct timer_list *t)
 	struct spi_cnss_priv *spi_drv = from_timer(spi_drv, t, client_sleep_timer);
 	SPI_CNSS_DBG(spi_drv, "%s\n",__func__);
 	if (spi_drv->context_read_pending || spi_drv->read_pending || gpio_get_value(spi_drv->gpio) ||
-		spi_drv->client_state == ASLEEP || spi_drv->write_pending || timer_pending(&spi_drv->client_sleep_timer)) {
-		SPI_CNSS_DBG(spi_drv, "%s: read pending or client asleep ignore sleep cmd\n",__func__);
+		spi_drv->client_state == ASLEEP || spi_drv->write_pending ||
+		timer_pending(&spi_drv->client_sleep_timer) || spi_drv->client_state == RESET) {
+		SPI_CNSS_DBG(spi_drv, "%s: read pending or client asleep or resetting.Ignore sleep cmd\n",__func__);
 		return;
 	}
 
@@ -1258,12 +1259,16 @@ static void spi_cnss_handle_sleep(struct work_struct *work)
 	struct spi_cnss_priv *spi_drv = container_of(work, struct spi_cnss_priv, sleep_work);
 
 	SPI_CNSS_DBG(spi_drv,"%s\n",__func__);
+	mutex_lock(&spi_drv->state_lock);
 	if (spi_drv->context_read_pending || spi_drv->read_pending || gpio_get_value(spi_drv->gpio) ||
-		spi_drv->client_state == ASLEEP || spi_drv->write_pending || timer_pending(&spi_drv->client_sleep_timer)) {
-		SPI_CNSS_DBG(spi_drv, "%s: read pending or client asleep ignore sleep cmd\n",__func__);
-		return;
+		spi_drv->client_state == ASLEEP || spi_drv->write_pending ||
+		timer_pending(&spi_drv->client_sleep_timer) || spi_drv->client_state == RESET) {
+		SPI_CNSS_DBG(spi_drv, "%s: read pending or client asleep or resetting.Ignore sleep cmd\n",__func__);
+		goto unlock;
 	}
 	spi_cnss_send_byte_cmd(spi_drv, SLEEP_CMD_BYTE);
+unlock:
+	mutex_unlock(&spi_drv->state_lock);
 }
 #endif
 void spi_cnss_wakeup_sequence(struct spi_cnss_priv *spi_drv)
@@ -1857,28 +1862,21 @@ static int spi_cnss_release(struct inode *inode, struct file *filp)
 	kfifo_free(&usr->user_fifo);
 	SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError After fifo size = %d\n",__func__, kfifo_len(&usr->user_fifo));
 
-	if (spi_drv->client_state == ASLEEP) {
-		SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError Client asleep. Waking it up\n",__func__);
-		spi_cnss_wakeup_sequence(spi_drv);
-		if (spi_drv->client_state != ASLEEP) {
-			SPI_CNSS_DBG(spi_drv, "%s: wakeup client success\n",__func__);
-		} else {
-			SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError Failed to wakeup client\n",__func__);
-		}
-	}
 	usr->is_active = false;
 	spi_drv->usr_cnt--;
 	SPI_CNSS_DBG(spi_drv, "%s usr_cnt = %d\n", __func__, spi_drv->usr_cnt);
 	if (spi_drv->usr_cnt == 0) {
 		disable_irq(spi_drv->irq);
 #ifdef CONFIG_SLEEP
-		ret = spi_cnss_clear_clen(spi_drv);
-		if(ret < 0) {
-			SPI_CNSS_ERR(spi_drv,"%s: spi xfer to clear clen failed\n",__func__);
-			return ret;
+		if (spi_drv->client_state == ASLEEP) {
+			SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError Client asleep. Waking it up\n",__func__);
+			spi_cnss_wakeup_sequence(spi_drv);
+			if (spi_drv->client_state != ASLEEP) {
+				SPI_CNSS_DBG(spi_drv, "%s: wakeup client success\n",__func__);
+			} else {
+				SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError Failed to wakeup client\n",__func__);
+			}
 		}
-		// Wait for 100 msec before sending reset cmd byte.
-		msleep(100);
 		spi_drv->client_state = RESET;
 		SPI_CNSS_DBG(spi_drv, "%s:Sending RESET_CMD_BYTE\n",__func__);
 		ret = spi_cnss_send_byte_cmd(spi_drv, RESET_CMD_BYTE);
