@@ -1469,6 +1469,7 @@ static int get_gpio_dt_pinfo(struct platform_device *pdev)
 	struct pinctrl *pinctrl1;
 #ifdef CONFIG_FMD_ENABLE
 	struct pinctrl_state *sw_ctrl;
+	struct pinctrl_state *bt_en;
 #endif
 	child = pdev->dev.of_node;
 
@@ -1520,6 +1521,15 @@ static int get_gpio_dt_pinfo(struct platform_device *pdev)
 			ret = pinctrl_select_state(pinctrl1, sw_ctrl);
 			if (ret)
 				pr_err("Failed to select sw_ctrl state, err = %d\n", ret);
+		}
+		bt_en = pinctrl_lookup_state(pinctrl1, "bt_en");
+		if (IS_ERR_OR_NULL(bt_en)) {
+			ret = PTR_ERR(bt_en);
+			pr_err("Failed to get bt_en state, err = %d\n", ret);
+		} else {
+			ret = pinctrl_select_state(pinctrl1, bt_en);
+			if (ret)
+				pr_err("Failed to select bt_en state, err = %d\n", ret);
 		}
 	} else {
 		pr_err("%s: pinctrl is null\n", __func__);
@@ -2505,10 +2515,19 @@ int btpower_process_access_req(unsigned int cmd, int req)
 		ret = schedule_client_voting(UWB_ACCESS_REQ);
 	else if (cmd == UWB_CMD_ACCESS_CTRL && req == 2)
 		ret = schedule_client_voting(UWB_RELEASE_ACCESS);
-	else 
+	else
 		pr_err("%s: unhandled command %04x req %02x", __func__, cmd, req);
 
 	return ret;
+}
+
+char* GetUwbTransportCrashReason(int8_t reason)
+{
+  for(int i =0; i < (int)(sizeof(UwbTransErrCodeMap)/sizeof(UwbTransportErrorCodeMap)); i++)
+    if (UwbTransErrCodeMap[i].reason == reason)
+      return UwbTransErrCodeMap[i].reasonstr;
+
+  return CRASH_REASON_NOT_FOUND;
 }
 
 char* GetUwbSecondaryCrashReason(enum UwbSecondaryReasonCode reason)
@@ -2816,6 +2835,7 @@ static long bt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	int chipset_version = 0;
 	unsigned long panic_reason = 0;
 	unsigned short primary_reason = 0, sec_reason = 0, source_subsystem = 0;
+	int8_t  transport_err_code = 0;
 	int current_ssr_state = SUB_STATE_IDLE;
 
 	if (!pwr_data || !probe_finished) {
@@ -2864,7 +2884,7 @@ static long bt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case UWB_CMD_ACCESS_CTRL: {
 		ret = btpower_process_access_req(cmd, (int)arg);
 		break;
-	}	  
+	}
 	case BT_CMD_CHIPSET_VERS:
 		chipset_version = (int)arg;
 		pr_warn("%s: unified Current SOC Version : %x\n", __func__,
@@ -2934,16 +2954,25 @@ static long bt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		pr_err("%s: UWB_CMD_KERNEL_PANIC\n", __func__);
 		panic_reason = arg;
 		primary_reason = panic_reason & 0xFFFF;
-		sec_reason = (panic_reason & 0xFFFF0000) >> 16;
-		source_subsystem = (panic_reason & 0xFFFF00000000) >> 32;
-		pr_err("%s: UWB kernel panic PrimaryReason = (0x%02x)[%s] | SecondaryReason = (0x%02x)[%s] | SourceSubsystem = (0x%02x)[%s]\n",
+		sec_reason = (panic_reason >> 16) & 0xFFFF;
+		/*Source subsystem is stored in 2 bytes. 1 byte is free for future usage.
+		 * Last byte is used for transport error code.*/
+		source_subsystem = (panic_reason >> 32) & 0xFFFF;
+		transport_err_code = (int8_t)((panic_reason >> 56) & 0xFF);
+
+		pr_err("%s: UWB kernel panic PrimaryReason = (0x%02x)[%s] | SecondaryReason = (0x%02x)[%s] |"
+			"SourceSubsystem = (0x%02x)[%s] |  UwbTransportCrashReason = (0x%02x)[%s]\n",
 			__func__, primary_reason, GetUwbPrimaryCrashReason(primary_reason),
 			sec_reason, GetUwbSecondaryCrashReason(sec_reason),
-			source_subsystem, GetSourceSubsystemString(source_subsystem));
-		panic("%s: UWB kernel panic PrimaryReason = (0x%02x)[%s] | SecondaryReason = (0x%02x)[%s] | SourceSubsystem = (0x%02x)[%s]\n",
+			source_subsystem, GetSourceSubsystemString(source_subsystem),
+			transport_err_code, GetUwbTransportCrashReason(transport_err_code));
+
+		panic("%s: UWB kernel panic PrimaryReason = (0x%02x)[%s] | SecondaryReason = (0x%02x)[%s] |"
+			"SourceSubsystem = (0x%02x)[%s] | UwbTransportCrashReason = (0x%02x)[%s]\n",
 			__func__, primary_reason, GetUwbPrimaryCrashReason(primary_reason),
 			sec_reason, GetUwbSecondaryCrashReason(sec_reason),
-			source_subsystem, GetSourceSubsystemString(source_subsystem));
+			source_subsystem, GetSourceSubsystemString(source_subsystem),
+			transport_err_code, GetUwbTransportCrashReason(transport_err_code));
 		break;
 	case UWB_GET_SSR_STATE:
 		current_ssr_state = get_sub_state();
