@@ -41,7 +41,7 @@ int user_id = 0xFFFF;
 #define CONFIG_AGGRESSIVE_SLEEP
 
 #define NUM_OF_TRIALS_DURING_OPEN 10
-#define NUM_OF_TRIALS_DURING_TRANS 2
+#define NUM_OF_TRIALS_DURING_TRANS 5
 static void spi_cnss_notify_data_avail(struct spi_cnss_user *user);
 static void spi_cnss_reinit_xfer(struct spi_transfer* xfer, int size);
 static int spi_cnss_register_xfer(struct spi_cnss_priv *spi_drv, u8 reg, u8 opcode);
