@@ -241,14 +241,14 @@ int btfm_slim_disable_ch(struct btfmslim *btfmslim, struct btfmslim_ch *ch,
 	ch->dai.sruntime = NULL;
 	BTFMSLIM_INFO("calling slim suspend for LPI");
 	//slim_vote_for_suspend(btfmslim->slim_pgd);
-	pm_runtime_disable(&btfmslim->slim_pgd->dev);
-	ret = 0;
-	ret = pm_runtime_force_suspend(&btfmslim->slim_pgd->dev);
-	if (ret < 0) {
-		BTFMSLIM_ERR( "Failed to do pm runtime force suspend: %d\n", ret);
-	}
-	pm_runtime_enable(&btfmslim->slim_pgd->dev);
+	pm_runtime_put_sync_suspend(&btfmslim->slim_pgd->dev);
+	BTFMSLIM_INFO("called sync suspend");
 
+	pm_runtime_disable(&btfmslim->slim_pgd->dev);
+	pm_runtime_set_suspended(&btfmslim->slim_pgd->dev);
+	BTFMSLIM_INFO("called set suspend");
+	pm_runtime_enable(&btfmslim->slim_pgd->dev);
+	BTFMSLIM_INFO("after runtime enable");
 	BTFMSLIM_INFO("btfm_num_ports_open: %d", btfm_num_ports_open);
 
 	chipset_ver = btpower_get_chipset_version();
