@@ -31,8 +31,6 @@
 #define WRITE_RETRY 2
 #define DATA_BYTES_PER_LINE 64
 #define SANITY_CHECK_ITERATION 5
-#define BT_MINOR_DEV_NUM 0
-#define UWB_MINOR_DEV_NUM 1
 u32 slave_config = 0x05000000;
 int user_id = 0xFFFF;
 
@@ -1578,13 +1576,6 @@ static int spi_cnss_open(struct inode *inode, struct file *filp)
 		return -ENODEV;
 	}
 	SPI_CNSS_ERR(spi_drv, "%s rc =%d PID =%d\n", __func__, rc, current->pid);
-	mutex_lock(&spi_drv->state_lock);
-	usr = &spi_drv->user[rc];
-	if (usr->is_active) {
-		SPI_CNSS_ERR(spi_drv, "%s SpiCnssError spi open without release\n", __func__);
-		ret = -EBUSY;
-		goto end;
-	}
 	ret = spi_cnss_allocate_memory(spi_drv);
 	if (ret < 0) {
 		goto end;
@@ -1609,6 +1600,7 @@ static int spi_cnss_open(struct inode *inode, struct file *filp)
 			goto end;
 		}
 	}
+	usr = &spi_drv->user[rc];
 	usr->id = rc;
 	usr->is_active = true;
 	init_waitqueue_head(&usr->readq);
@@ -1618,7 +1610,6 @@ static int spi_cnss_open(struct inode *inode, struct file *filp)
 	filp->private_data = usr;
 	spi_drv->usr_cnt++;
 end:
-	mutex_unlock(&spi_drv->state_lock);
 	return ret;
 }
 
@@ -1863,7 +1854,6 @@ static int spi_cnss_release(struct inode *inode, struct file *filp)
 		return -EINVAL;
 	}
 	SPI_CNSS_ERR(spi_drv, "%s PID =%d\n", __func__, current->pid);
-	mutex_lock(&spi_drv->state_lock);
 	if (spi_drv->write_pending || spi_drv->read_pending || spi_drv->context_read_pending) {
 		SPI_CNSS_ERR(spi_drv,"%s: spi transfer in progress\n",__func__);
 		usleep_range(500000, 1000000);
@@ -1913,7 +1903,6 @@ static int spi_cnss_release(struct inode *inode, struct file *filp)
 #ifdef CONFIG_SPI_LOOPBACK_ENABLED
 	spi_stub_driver_unreg_cb();
 #endif
-	mutex_unlock(&spi_drv->state_lock);
 	return 0;
 }
 
@@ -1960,7 +1949,7 @@ static int spi_cnss_create_chrdev(struct spi_cnss_priv *spi_drv)
 			SPI_CNSS_ERR(spi_drv, "%s ret: %d\n", __func__, ret);
 			goto error_device_add;
 		}
-		if (i == UWB_MINOR_DEV_NUM) {
+		if (i) {
 			spi_drv->chrdev.class_dev = device_create(spi_drv->chrdev.spi_cnss_class, NULL,
 								MKDEV(spi_cnss_cdev_major,i),
 								NULL, "spiuwb");
