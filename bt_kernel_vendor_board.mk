@@ -18,8 +18,6 @@ else
 endif
 else
   ifneq (,$(call is-board-platform-in-list2, msmnile sm6150 gen4))
-    ifneq ($(filter $(PLATFORM_VERSION), 16 Baklava),$(PLATFORM_VERSION))
-      BOARD_VENDOR_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/btpower.ko
-    endif
+    BOARD_VENDOR_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/btpower.ko
   endif
 endif
