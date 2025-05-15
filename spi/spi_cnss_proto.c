@@ -1001,23 +1001,23 @@ static int __spi_cnss_send_msg(struct spi_cnss_priv *spi_drv, struct spi_cnss_us
 		return -EBUSY;
 		}
 	}
+	mutex_lock(&spi_drv->irq_lock);
 	len = spi_drv->client.HBUF_LEN;
 	SPI_CNSS_DBG(spi_drv,"%s: Read len again %d\n",__func__, len);
 	if (len == 0 && !spi_drv->write_pending) {
 		list_for_each_entry_safe(user_pkt, user_pkt_temp, &spi_drv->tx_list, list) {
 			SPI_CNSS_DBG(spi_drv,"%s user id = %d\n",__func__, user_pkt->id);
-			//mutex_lock(&spi_drv->xfer_lock);
 			spi_drv->write_pending = true;
 			user_id = user_pkt->id;
 			ret = spi_cnss_prepare_xfer(spi_drv, user_pkt, USER_WRITE);
 			spi_drv->write_pending = false;
 			*usr = &spi_drv->user[user_id];
-			//mutex_unlock(&spi_drv->xfer_lock);
 		}
 	} else {
 		SPI_CNSS_ERR(spi_drv,"%s: host buffer not available or write pending, wait for oob\n",__func__);
-		return -EBUSY;
+		ret = -EBUSY;
 	}
+	mutex_unlock(&spi_drv->irq_lock);
 	return ret;
 }
 
