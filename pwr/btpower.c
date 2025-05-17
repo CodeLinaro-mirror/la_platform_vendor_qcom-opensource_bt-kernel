@@ -1170,7 +1170,7 @@ free_pdata:
 	return ret;
 }
 
-static int bt_power_remove(struct platform_device *pdev)
+static void bt_power_remove(struct platform_device *pdev)
 {
 	dev_dbg(&pdev->dev, "%s\n", __func__);
 
@@ -1179,8 +1179,6 @@ static int bt_power_remove(struct platform_device *pdev)
 	bt_power_vreg_put();
 
 	kfree(bt_power_pdata);
-
-	return 0;
 }
 
 int btpower_register_slimdev(struct device *dev)
@@ -1431,7 +1429,7 @@ static int __init btpower_init(void)
 		goto chrdev_err;
 	}
 
-	bt_class = class_create(THIS_MODULE, "bt-dev");
+	bt_class = class_create("bt-dev");
 	if (IS_ERR(bt_class)) {
 		pr_err("%s: coudn't create class\n", __func__);
 		ret = -1;

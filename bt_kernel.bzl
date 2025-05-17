@@ -1,4 +1,4 @@
-load("//msm-kernel:target_variants.bzl", "get_all_variants")
+load(":target_variants.bzl", "get_all_variants")
 load("//build/kernel/kleaf:kernel.bzl", "ddk_module")
 load("//build/bazel_common_rules/dist:dist.bzl", "copy_to_dist_dir")
 load(":bt_modules.bzl", "bt_modules")
@@ -54,23 +54,39 @@ def define_target_variant_modules(target, variant, modules, config_options = [])
         modules: bt_modules dictionary defined in `bt_modules.bzl`
         config_options: decides which kernel modules to build
     """
-    kernel_build = "{}_{}".format(target, variant)
-    kernel_build_label = "//msm-kernel:{}".format(kernel_build)
+    print("target= ", target)
+    print("variant= ", variant)
+    print("modules= ", modules)
+
+    tv = "{}_{}".format(target, variant)
+
+    kernel_build = "//soc-repo:{}_base_kernel".format(tv)
+    print("kernel_build=", kernel_build)
     modules = [bt_modules.get(module_name) for module_name in modules]
     options = _get_build_options(modules, config_options)
     formatter = lambda s : s.replace("%b", kernel_build)
 
     all_modules = []
     for module in modules:
-        rule_name = "{}_{}".format(kernel_build, module.name)
+        print("module = ", module)
+        #_define_platform_config_rule(module.name, target, variant)
+        #defconfig = ":{}/{}_defconfig_generate_{}".format(module.name, kernel_build, variant)
+        #print("defconfig = ", defconfig)
+        rule_name = "{}_{}".format(tv, module.name)
+        print("rule_name = ", rule_name)
         module_srcs = _get_module_srcs(module, options)
+        print("module_srcs = ", module_srcs)
 
         ddk_module(
             name = rule_name,
-            kernel_build = kernel_build_label,
+            kernel_build = kernel_build,
+            #defconfig = defconfig,
             srcs = module_srcs,
             out = "{}.ko".format(module.name),
-            deps = ["//msm-kernel:all_headers"] + _get_module_deps(module, options, formatter),
+            deps = ["//common:all_headers",
+                    "//soc-repo:all_headers",
+                    "//soc-repo:{}/drivers/pinctrl/qcom/pinctrl-msm".format(tv),
+                   ],
             includes = ["include"],
             local_defines = options.keys(),
             visibility = ["//visibility:public"],
@@ -79,7 +95,7 @@ def define_target_variant_modules(target, variant, modules, config_options = [])
         all_modules.append(rule_name)
 
     copy_to_dist_dir(
-        name = "{}_bt-kernel_dist".format(kernel_build),
+        name = "{}_bt-kernel_dist".format(tv),
         data = all_modules,
         dist_dir = "out/target/product/{}/dlkm/lib/modules".format(target),
         flat = True,
@@ -89,7 +105,41 @@ def define_target_variant_modules(target, variant, modules, config_options = [])
         log = "info",
     )
 
+
+def _define_platform_config_rule(module, target, variant):
+    tv = "{}_{}".format(target, variant)
+    print("_define_platform_config_rule: module=", module);
+    print("_define_platform_config_rule: target=", target);
+    print("_define_platform_config_rule: variant=", variant);
+
+    native.genrule(
+        name = "{}/{}_defconfig_generate_perf".format(module, tv),
+        outs = ["{}/{}_defconfig.generated_perf".format(module, tv)],
+        srcs = [
+            "{}/{}_gki_defconfig".format(module, target),
+        ],
+        cmd = "cat $(SRCS) > $@",
+    )
+    native.genrule(
+        name = "{}/{}_defconfig_generate_perf-defconfig".format(module, tv),
+        outs = ["{}/{}_defconfig.generated_perf-defconfig".format(module, tv)],
+        srcs = [
+            "{}/{}_gki_defconfig".format(module, target),
+        ],
+        cmd = "cat $(SRCS) > $@",
+    )
+    native.genrule(
+        name = "{}/{}_defconfig_generate_consolidate".format(module, tv),
+        outs = ["{}/{}_defconfig.generated_consolidate".format(module, tv)],
+        srcs = [
+            "{}/{}_consolidate_defconfig".format("pwr", target),
+        ],
+        cmd = "cat $(SRCS) > $@",
+    )
+
+
 def define_bt_modules(target, modules, config_options = []):
+    print("target=", target)
     for (t, v) in get_all_variants():
         if t == target:
             define_target_variant_modules(t, v, modules, config_options)

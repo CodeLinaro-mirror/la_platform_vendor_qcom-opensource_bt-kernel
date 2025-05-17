@@ -14,9 +14,10 @@ BT_SELECT += CONFIG_I2C_RTC6226_QCA=m
 endif
 LOCAL_PATH := $(call my-dir)
 LOCAL_MODULE_DDK_BUILD := true
-LOCAL_MODULE_KO_DIRS := pwr/btpower.ko
-LOCAL_MODULE_KO_DIRS += slimbus/bt_fm_slim.ko
-LOCAL_MODULE_KO_DIRS += rtc6226/radio-i2c-rtc6226-qca.ko
+LOCAL_MODULE_DDK_ALLOW_UNSAFE_HEADERS := true
+LOCAL_MODULE_KO_DIRS := btpower.ko
+#LOCAL_MODULE_KO_DIRS += slimbus/bt_fm_slim.ko
+#LOCAL_MODULE_KO_DIRS += rtc6226/radio-i2c-rtc6226-qca.ko
 
 
 # This makefile is only for DLKM
@@ -62,10 +63,16 @@ include $(DLKM_DIR)/Build_external_kernelmodule.mk
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(BT_SRC_FILES)
 LOCAL_MODULE              := btpower.ko
-LOCAL_MODULE_KBUILD_NAME  := pwr/btpower.ko
+LOCAL_MODULE_KBUILD_NAME  := btpower.ko
 LOCAL_MODULE_TAGS         := optional
 LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
+
+TARGET_KERNEL_DLKM_OVERRIDE += $(LOCAL_MODULE)
+KBUILD_OPTIONS += BT_KERNEL_ROOT=$(BT_BLD_DIR)
+KBUILD_OPTIONS += $(BT_SELECT)
+KBUILD_OPTIONS += ENABLE_DDK_BUILD=true
+
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 ################################ slimbus ################################
 include $(CLEAR_VARS)
