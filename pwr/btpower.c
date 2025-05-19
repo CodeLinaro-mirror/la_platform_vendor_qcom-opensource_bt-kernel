@@ -1497,10 +1497,8 @@ static int get_gpio_dt_pinfo(struct platform_device *pdev)
 	int ret;
 	struct device_node *child;
 	struct pinctrl *pinctrl1;
-#ifdef CONFIG_FMD_ENABLE
 	struct pinctrl_state *sw_ctrl;
 	struct pinctrl_state *bt_en;
-#endif
 	child = pdev->dev.of_node;
 
 	pinctrl1 =  devm_pinctrl_get(&pdev->dev);
@@ -1541,7 +1539,7 @@ static int get_gpio_dt_pinfo(struct platform_device *pdev)
 	if (ret) {
 		pr_warn("sw_cntrl-gpio not provided in devicetree\n");
 	}
-#ifdef CONFIG_FMD_ENABLE
+
 	if (pinctrl1) {
 		sw_ctrl = pinctrl_lookup_state(pinctrl1, "sw_ctrl");
 		if (IS_ERR_OR_NULL(sw_ctrl)) {
@@ -1564,7 +1562,7 @@ static int get_gpio_dt_pinfo(struct platform_device *pdev)
 	} else {
 		pr_err("%s: pinctrl is null\n", __func__);
 	}
-#endif
+
 	pwr_data->bt_gpio_debug  = of_get_named_gpio(child,
 							"qcom,bt-debug-gpio", 0);
 	if (pwr_data->bt_gpio_debug < 0)
