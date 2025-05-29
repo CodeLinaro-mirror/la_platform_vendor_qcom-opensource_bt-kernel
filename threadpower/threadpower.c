@@ -276,17 +276,18 @@ static int thread_power_gpio_handler(uint32_t option)
 	int rc = 0;
 	int thread_en_pin = thrd_dev->thread_enable_gpio;
 
-	if (option == POWER_ON) {
-		rc = gpio_direction_output(thread_en_pin, GPIO_LOW);
-		if (rc) {
-			THREAD_ERR("Failed to pull down thread_en_pin [status = %d]",
-				gpio_get_value(thread_en_pin));
-			return THREAD_STATE_FAILED;
-		}
-		THREAD_ERR("thread_en_pin pulled down [status = %d]",
+	rc = gpio_direction_output(thread_en_pin, GPIO_LOW);
+	if (rc) {
+		THREAD_ERR("Failed to pull down thread_en_pin [status = %d]",
 			gpio_get_value(thread_en_pin));
+		return THREAD_STATE_FAILED;
+	}
 
-		msleep(50);
+	THREAD_ERR("thread_en_pin pulled down [status = %d]",
+		gpio_get_value(thread_en_pin));
+
+	if (option == POWER_ON) {
+		msleep(100);
 
 		rc = gpio_direction_output(thread_en_pin, GPIO_HIGH);
 		if (rc) {
@@ -294,25 +295,17 @@ static int thread_power_gpio_handler(uint32_t option)
 				gpio_get_value(thread_en_pin));
 			return THREAD_STATE_FAILED;
 		}
+
 		THREAD_ERR("thread_en_pin pulled up [status = %d]",
 			gpio_get_value(thread_en_pin));
 
-		msleep(75);
+		msleep(200);
 
 		thrd_dev->thread_en_pin_state.during_pwr_on =
 				gpio_get_value(thread_en_pin);
 
 		THREAD_ERR("Gpio configuration completed thread_en_pin_state = %d",
 			thrd_dev->thread_en_pin_state.during_pwr_on);
-	} else {
-		rc = gpio_direction_output(thread_en_pin, GPIO_LOW);
-		if (rc) {
-			THREAD_ERR("Failed to pull down thread_en_pin [status = %d]",
-				gpio_get_value(thread_en_pin));
-			return THREAD_STATE_FAILED;
-		}
-		THREAD_ERR("thread_en_pin pulled down [status = %d]",
-			gpio_get_value(thread_en_pin));
 	}
 	return rc;
 }
@@ -572,34 +565,28 @@ static int thread_power_get_reg_info_from_dt(struct device *dev,
  * Context:
  *  - this api helps to get the resource info from the DTBO
  *
- * Return: 0 on success.
- *         1 on failure.
  */
-static int thread_power_decode_dt_handler(struct platform_device *pdev)
+static void thread_power_decode_dt_handler(struct platform_device *pdev)
 {
 	const struct pwr_data *data;
 
 	data = of_device_get_match_data(&pdev->dev);
 	if (!data) {
 		THREAD_ERR("failed to get dev node");
-		return THREAD_STATE_FAILED;
+		return;
 	}
 
 	memcpy(&thrd_dev->chip_set_id, &data->compatible, MAX_PROP_SIZE);
 
 	/* gets the chip_set_id from the device tree */
-	THREAD_ERR("chip_set_id = %s, Regulator count = %lu",
-		thrd_dev->chip_set_id, ARRAY_SIZE(thread_resources));
+	THREAD_ERR("Thread SOC node = %s", thrd_dev->chip_set_id);
 
 	/* get the regulator info from the device tree */
 	for (int i = 0; i < ARRAY_SIZE(thread_resources); i++)
-		if(thread_power_get_reg_info_from_dt(&(pdev->dev), &thread_resources[i])) {
-			THREAD_ERR("failed to get the reg info");
-			return THREAD_STATE_FAILED;
-		}
+		thread_power_get_reg_info_from_dt(&(pdev->dev), &thread_resources[i]);
 
 	/* gets the gpio info from the device tree */
-	return thread_power_get_gpio_info_from_dt(pdev);
+	thread_power_get_gpio_info_from_dt(pdev);
 }
 
 /**
@@ -621,10 +608,7 @@ static int thread_power_probe(struct platform_device *pdev)
 
 	thread_power_decode_dt_handler(pdev);
 
-	if (thrd_dev->is_probe_pending) {
-		THREAD_ERR("Driver probe status is pending, client power vote will not be honoured");
-	}
-        thrd_dev->is_probe_pending = false;
+	thrd_dev->is_probe_pending = false;
 
 	THREAD_ERR("Driver probe completed");
 	return 0;
