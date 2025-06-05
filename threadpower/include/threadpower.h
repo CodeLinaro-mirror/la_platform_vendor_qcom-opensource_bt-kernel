@@ -121,6 +121,8 @@ struct pwr_data {
 
 struct thread_pwr_struct {
 	int is_probe_pending;
+	int is_reg_resource_avl;
+	int is_gpio_resource_avl;
 	char chip_set_id[MAX_PROP_SIZE];
 	int chipset_version;
 	int thread_enable_gpio;

@@ -27,14 +27,14 @@ static const struct file_operations thread_fops = {
 };
 
 static struct pwr_data thread_node_info = {
-	.compatible = "qcom,thread_node",
+	.compatible = "qcom,quartz",
 	.reg_resource = thread_resources,
 	.num_reg_resource = ARRAY_SIZE(thread_resources)
 };
 
 static const struct of_device_id thread_power_dt[] = {
 	{
-		.compatible = "qcom,thread_node",
+		.compatible = "qcom,quartz",
 		.data = &thread_node_info
 	},
 	{}
@@ -336,19 +336,25 @@ static int thread_power_vote_handler(uint32_t option)
 	int ret = 0;
 
 	/* configures the regulator resource */
-	for (int i = 0; i < ARRAY_SIZE(thread_resources); i++) {
-		ret = voltage_regulator_handler[option](&thread_resources[i]);
-		if (ret) {
-			THREAD_ERR(" Failed to perform option = %d, for the regulator = %s",
-				option, (&thread_resources[i])->name);
-			return THREAD_STATE_FAILED;
+	if (thrd_dev->is_reg_resource_avl) {
+		for (int i = 0; i < ARRAY_SIZE(thread_resources); i++) {
+			ret = voltage_regulator_handler[option](&thread_resources[i]);
+			if (ret) {
+				THREAD_ERR(" Failed to perform option = %d, for the regulator = %s",
+					option, (&thread_resources[i])->name);
+				return THREAD_STATE_FAILED;
+			}
 		}
+	} else {
+		THREAD_ERR("No Regulator resource is avilable to perform voting");
 	}
-
 	/* configures the gpio resource */
-	if ((option == POWER_ON) || (option == POWER_OFF))
-		ret = thread_power_gpio_handler(option);
-
+	if (thrd_dev->is_gpio_resource_avl) {
+		if ((option == POWER_ON) || (option == POWER_OFF))
+			ret = thread_power_gpio_handler(option);
+	} else {
+		THREAD_ERR("No Gpio resource is avilable to drive");
+	}
 	return ret;
 }
 
@@ -492,7 +498,10 @@ static int thread_power_get_gpio_info_from_dt(struct platform_device *pdev)
 		return THREAD_STATE_FAILED;
 	}
 
+	thrd_dev->is_gpio_resource_avl = true;
+
 	THREAD_ERR("Gpio : thread_enable_gpio info provided in devicetree");
+
 	return THREAD_STATE_SUCCESS;
 }
 
@@ -507,8 +516,8 @@ static int thread_power_get_gpio_info_from_dt(struct platform_device *pdev)
  * Context:
  *  - this api helps to get the regulator resource info from the DTBO
  *
- * Return: 1 on success.
- *         0 on failure.
+ * Return: 0 on success.
+ *         1 on failure.
  */
 static int thread_power_get_reg_info_from_dt(struct device *dev,
 	struct vreg_data *vreg_data)
@@ -543,6 +552,7 @@ static int thread_power_get_reg_info_from_dt(struct device *dev,
 			THREAD_ERR("Regulator: %s, min_vol: %u, max_vol: %u, load_curr: %u, retention: %u",
 				vreg->name, vreg->min_vol, vreg->max_vol,
 				vreg->load_curr, vreg->is_retention_supp);
+            thrd_dev->is_reg_resource_avl = true;
 			return THREAD_STATE_SUCCESS;
 		}
 		THREAD_ERR("All field of regulator '%s' info didn't provided in device tree",
@@ -582,10 +592,11 @@ static int thread_power_decode_dt_handler(struct platform_device *pdev)
 		thrd_dev->chip_set_id, ARRAY_SIZE(thread_resources));
 
 	/* get the regulator info from the device tree */
-	for (int i = 0; i < ARRAY_SIZE(thread_resources); i++) {
-		if(thread_power_get_reg_info_from_dt(&(pdev->dev), &thread_resources[i]))
+	for (int i = 0; i < ARRAY_SIZE(thread_resources); i++)
+		if(thread_power_get_reg_info_from_dt(&(pdev->dev), &thread_resources[i])) {
+			THREAD_ERR("failed to get the reg info");
 			return THREAD_STATE_FAILED;
-	}
+		}
 
 	/* gets the gpio info from the device tree */
 	return thread_power_get_gpio_info_from_dt(pdev);
@@ -606,19 +617,15 @@ static int thread_power_probe(struct platform_device *pdev)
 {
 	THREAD_ERR("Start");
 
-	thrd_dev = kzalloc(sizeof(*thrd_dev), GFP_KERNEL);
-	if (!thrd_dev)
-		return -ENOMEM;
-
-	thrd_dev->is_probe_pending = THREAD_STATE_SUCCESS;
-
 	/* gets all resource info from device tree */
-	thrd_dev->is_probe_pending = thread_power_decode_dt_handler(pdev);
+
+	thread_power_decode_dt_handler(pdev);
 
 	if (thrd_dev->is_probe_pending) {
 		THREAD_ERR("Driver probe status is pending, client power vote will not be honoured");
-		return -ENOMEM;
 	}
+        thrd_dev->is_probe_pending = false;
+
 	THREAD_ERR("Driver probe completed");
 	return 0;
 }
@@ -639,6 +646,14 @@ static int __init thread_power_init(void)
 	int ret = 0;
 
 	THREAD_ERR("Thread power driver booting up");
+
+	thrd_dev = kzalloc(sizeof(*thrd_dev), GFP_KERNEL);
+	if (!thrd_dev)
+		return -ENOMEM;
+
+	thrd_dev->is_probe_pending = true;
+	thrd_dev->is_reg_resource_avl = false;
+	thrd_dev->is_gpio_resource_avl = false;
 
 	ret = platform_driver_register(&thread_power_driver);
 	if (ret) {
