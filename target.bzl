@@ -27,6 +27,7 @@ def define_sun():
             "btfmcodec",
             "bt_fm_swr",
             "spi_cnss_proto",
+            "thqspi_proto",
          ],
          config_options = [
              "CONFIG_MSM_BT_POWER",
@@ -38,6 +39,7 @@ def define_sun():
 	     "CONFIG_FMD_ENABLE",
             "CONFIG_BTFM_SWR",
             "CONFIG_SPI_CNSS_PROTO",
+             "CONFIG_THQSPI_PROTO",
         ]
     )
 
@@ -67,6 +69,7 @@ def define_canoe():
             "btfmcodec",
             "bt_fm_swr",
             "spi_cnss_proto",
+            "thqspi_proto",
          ],
          config_options = [
              "CONFIG_MSM_BT_POWER",
@@ -77,5 +80,6 @@ def define_canoe():
              "CONFIG_BTFM_SWR",
              "CONFIG_FMD_ENABLE",
              "CONFIG_SPI_CNSS_PROTO",
+             "CONFIG_THQSPI_PROTO",
         ]
     )

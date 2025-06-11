@@ -4,6 +4,7 @@ FMRTC_PATH = "rtc6226"
 BTFMCODEC_PATH = "btfmcodec"
 SWR_PATH = "soundwire"
 SPI_CNSS_PATH = "spi"
+THQSPI_PATH = "thq-spi"
 
 # This dictionary holds all the BT modules included in the bt-kernel
 bt_modules = {}
@@ -152,6 +153,24 @@ register_bt_modules(
     config_deps = {
         "CONFIG_SPI_LOOPBACK_ENABLED" : [":spi_stub_headers",
         ":%b_spi_stub"
+        ]
+    },
+)
+register_bt_modules(
+    name = "thqspi_proto",
+    path = THQSPI_PATH,
+    config_opt = "CONFIG_THQSPI_PROTO",
+    srcs = [
+        "thqspi_proto.c",
+        "thqspi_reg.h",
+        "thqspi_mbox_reg.h",
+        "thqspi_proto.h",
+        "thqspi-trace.h",
+    ],
+    deps = [":thqspi_headers"],
+    config_deps = {
+        "CONFIG_THQSPI_LOOPBACK_ENABLED" : [":thqspi_stub_headers",
+        ":%b_thqspi_stub"
         ]
     },
 )
