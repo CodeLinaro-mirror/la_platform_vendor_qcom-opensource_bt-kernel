@@ -30,6 +30,10 @@ ifeq ($(CONFIG_SPI_CNSS_PROTO),m)
 KBUILD_CPPFLAGS += -DCONFIG_SPI_CNSS_PROTO
 endif
 
+ifeq ($(CONFIG_THQSPI_PROTO),m)
+KBUILD_CPPFLAGS += -DCONFIG_THQSPI_PROTO
+endif
+
 obj-$(CONFIG_MSM_BT_POWER) += pwr/
 obj-$(CONFIG_BTFM_SLIM) += slimbus/
 obj-$(CONFIG_I2C_RTC6226_QCA) += rtc6226/
@@ -37,3 +41,4 @@ obj-$(CONFIG_BTFM_CODEC) += btfmcodec/
 obj-$(CONFIG_SLIM_BTFM_CODEC) += slimbus/
 obj-$(CONFIG_BTFM_SWR) += soundwire/
 obj-$(CONFIG_SPI_CNSS_PROTO) += spi/
+obj-$(CONFIG_THQSPI_PROTO) += thq-spi/
