@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 /*
@@ -1247,7 +1247,7 @@ int btpower_fw_managed_power_enable(struct btpower_platform_data *pdata, bool en
 			 */
 			pr_info("%s: power off GPIO\n", __func__);
 			if (pdata->pd_devs[POWER_GPIO])
-				ret = pm_runtime_resume_and_get(pdata->pd_devs[POWER_GPIO]);
+				ret = pm_runtime_put_sync(pdata->pd_devs[POWER_GPIO]);
 
 			pr_info("%s: power off Regulator\n", __func__);
 			if (pdata->pd_devs[POWER_REGULATOR]) {
