@@ -1181,8 +1181,11 @@ static void btpower_pm_domain_detach(struct btpower_platform_data *pdata)
 {
 	int i;
 
-	if (pdata->num_pds != NUM_POWER_DOMAIN)
+	if (pdata->num_pds <= 0 || pdata->num_pds > NUM_POWER_DOMAIN)
 		return;
+
+	pm_runtime_dont_use_autosuspend(&pdata->pdev->dev);
+	pm_runtime_disable(&pdata->pdev->dev);
 
 	for (i = pdata->num_pds - 1; i >= 0; i--) {
 		pr_info("%s: detaching power domain %d\n", __func__, i);
@@ -1201,12 +1204,14 @@ static int btpower_pm_domain_attach(struct btpower_platform_data *pdata)
 
 	pdata->num_pds = of_count_phandle_with_args(
 		dev->of_node, "power-domains", "#power-domain-cells");
-	if (pdata->num_pds != NUM_POWER_DOMAIN) {
+	if (pdata->num_pds <= 0 || pdata->num_pds > NUM_POWER_DOMAIN) {
 		pr_err("Failed to get bt power domains\n");
 		return -EINVAL;
 	}
 
 	pr_err("bt power domains %d\n", pdata->num_pds);
+	devm_pm_runtime_enable(dev);
+
 	pdata->pd_devs = devm_kcalloc(dev, pdata->num_pds,
 					  sizeof(*pdata->pd_devs),
 					  GFP_KERNEL);
@@ -1216,13 +1221,19 @@ static int btpower_pm_domain_attach(struct btpower_platform_data *pdata)
 	}
 
 	for (i = 0; i < pdata->num_pds; i++) {
-		pr_info("%s: Attaching power domain %d\n", __func__, i);
-		pdata->pd_devs[i] = dev_pm_domain_attach_by_id(dev, i);
-		if (IS_ERR(pdata->pd_devs[i])) {
-			pr_err("%s: Failed to attach power domain %d, err %p\n", __func__, i, pdata->pd_devs[i]);
-			ret = PTR_ERR(pdata->pd_devs[i]);
-			btpower_pm_domain_detach(pdata);
-			break;
+		/* if only one pd, it is attached by default when btpower gets probed */
+		if (pdata->num_pds == 1)
+			pdata->pd_devs[i] = dev;
+		else {
+			pr_info("%s: Attaching power domain %d\n", __func__, i);
+			pdata->pd_devs[i] = dev_pm_domain_attach_by_id(dev, i);
+			if (IS_ERR(pdata->pd_devs[i])) {
+				pr_err("%s: Failed to attach power domain %d, err %ld\n",
+				       __func__, i, (long)pdata->pd_devs[i]);
+				ret = PTR_ERR(pdata->pd_devs[i]);
+				btpower_pm_domain_detach(pdata);
+				break;
+			}
 		}
 	}
 
@@ -1265,40 +1276,35 @@ static int btpower_fw_managed_power_domain(
 
 int btpower_pm_enable(struct btpower_platform_data *pdata)
 {
-	int ret = 0;
+	int i, ret = 0;
 
-	ret = btpower_fw_managed_power_domain(pdata, POWER_REGULATOR, true);
-	if (ret)
-		goto out;
+	if (pdata->num_pds <= 0 || pdata->num_pds > NUM_POWER_DOMAIN)
+		return -EINVAL;
 
-	msleep(50);
+	for (i = 0; i < pdata->num_pds; i++) {
+		ret = btpower_fw_managed_power_domain(pdata, i, true);
+		if (ret)
+			break;
+		msleep(50);
+	}
 
-	ret = btpower_fw_managed_power_domain(pdata, POWER_GPIO, true);
-	if (ret)
-		goto power_off;
+	if (ret && i > 0)
+		btpower_fw_managed_power_domain(pdata, i - 1, false);
 
-	msleep(50);
-
-	return 0;
-
-power_off:
-	btpower_fw_managed_power_domain(pdata, POWER_REGULATOR, false);
-out:
 	return ret;
 }
 
 int btpower_pm_disable(struct btpower_platform_data *pdata)
 {
-	int ret;
-	ret = btpower_fw_managed_power_domain(pdata, POWER_GPIO, false);
-	if (ret)
-		goto out;
+	int i, ret = 0;
+
+	if (pdata->num_pds <= 0 || pdata->num_pds > NUM_POWER_DOMAIN)
+		return -EINVAL;
+
+	for (i = pdata->num_pds - 1; i >= 0; i--)
+		ret = btpower_fw_managed_power_domain(pdata, i, false);
 
 	msleep(100);
-
-	ret = btpower_fw_managed_power_domain(pdata, POWER_REGULATOR, false);
-
-out:
 	return ret;
 }
 
