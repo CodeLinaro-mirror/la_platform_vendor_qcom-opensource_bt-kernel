@@ -133,4 +133,6 @@ enum btpower_obs_param {
 };
 #endif
 
+extern bool btpower_is_probed(void);
+
 #endif /* __LINUX_BLUETOOTH_POWER_H */

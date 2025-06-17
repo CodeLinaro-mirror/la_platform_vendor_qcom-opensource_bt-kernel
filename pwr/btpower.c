@@ -39,11 +39,19 @@
 #define BTPOWER_MBOX_TIMEOUT_MS 1000
 #define XO_CLK_RETRY_COUNT_MAX 5
 
+#if IS_ENABLED(CONFIG_SECOND_BT_POWER)
+#define RFKILL_NAME "bt_power_new"
+#define BT_POWER_DRIVER_NAME "bt_power_new"
+#define BT_MAJOR_NAME "bt-new"
+#define BT_CLASS_NAME "bt-dev-new"
+#define BT_DEVICE_NAME "btpower-new"
+#else
 #define RFKILL_NAME "bt_power"
 #define BT_POWER_DRIVER_NAME "bt_power"
 #define BT_MAJOR_NAME "bt"
 #define BT_CLASS_NAME "bt-dev"
 #define BT_DEVICE_NAME "btpower"
+#endif /* CONFIG_SECOND_BT_POWER */
 
 /**
  * enum btpower_vreg_param: Voltage regulator TCS param
@@ -122,6 +130,31 @@ enum power_src_pos {
 };
 
 // Regulator structure for QCA BT in automotive SPs
+#if IS_ENABLED(CONFIG_SECOND_BT_POWER)
+static struct bt_power bt_vreg_info_qca_auto_new = {
+	.compatible = "qcom,qca-auto-secondary",
+	.vregs = (struct bt_power_vreg_data []) {
+		{NULL, "qcom,bt-vdd-ctrl1", 0, 0, 0, false, false,
+			{BT_VDD_CTRL1_LDO, BT_VDD_CTRL1_LDO_CURRENT}},
+		{NULL, "qcom,bt-vdd-ctrl2", 0, 0, 0, false, false,
+			{BT_VDD_CTRL2_LDO, BT_VDD_CTRL2_LDO_CURRENT}},
+		{NULL, "qcom,bt-vdd-aon", 1055000, 1055000, 0, false, false,
+			{BT_VDD_AON_LDO, BT_VDD_AON_LDO_CURRENT}},
+		{NULL, "qcom,bt-vdd-rfa1", 1370000, 1370000, 0, false, false,
+			{BT_VDD_RFA1_LDO, BT_VDD_RFA1_LDO_CURRENT}},
+		{NULL, "qcom,bt-vdd-rfa2", 2040000, 2040000, 0, false, false,
+			{BT_VDD_RFA2_LDO, BT_VDD_RFA2_LDO_CURRENT}},
+		{NULL, "qcom,bt-vdd-rfa3", 1900000, 1900000, 0, false, false,
+			{BT_VDD_RFA3_LDO, BT_VDD_RFA3_LDO_CURRENT}},
+	},
+	.num_vregs = 6,
+};
+
+static const struct of_device_id bt_power_match_table[] = {
+	{	.compatible = "qcom,qca-auto-secondary", .data = &bt_vreg_info_qca_auto_new},
+	{},
+};
+#else
 static struct bt_power bt_vreg_info_qca_auto = {
 	.compatible = "qcom,qca-auto-converged",
 	.vregs = (struct bt_power_vreg_data []) {
@@ -146,6 +179,8 @@ static const struct of_device_id bt_power_match_table[] = {
 	{},
 };
 
+#endif /* CONFIG_SECOND_BT_POWER */
+
 static int bt_power_vreg_set(enum bt_power_modes mode);
 static int btpower_enable_ipa_vreg(struct btpower_platform_data *pdata);
 
@@ -157,6 +192,12 @@ static struct class *bt_class;
 static int bt_major;
 static int soc_id;
 static bool probe_finished;
+
+#if !IS_ENABLED(CONFIG_SECOND_BT_POWER)
+bool btpower_is_probed(void) {
+	return probe_finished;
+}
+#endif /* CONFIG_SECOND_BT_POWER */
 
 #ifdef CONFIG_MSM_BT_OOBS
 static void btpower_uart_transport_locked(struct btpower_platform_data *drvdata,
@@ -1158,6 +1199,16 @@ static int bt_power_probe(struct platform_device *pdev)
 	int ret = 0;
 	int itr;
 
+	pr_info("%s, driver name is %s\n", __func__, BT_POWER_DRIVER_NAME);
+
+#if IS_ENABLED(CONFIG_SECOND_BT_POWER)
+	if (!btpower_is_probed()) {
+		pr_warn("%s btpower should be probed earlier than btpower_new; "
+			"try probing btpower_new later.\n", __func__);
+		return -EPROBE_DEFER;
+	}
+#endif /* CONFIG_SECOND_BT_POWER */
+
 	/* Fill whole array with -2 i.e NOT_AVAILABLE state by default
 	 * for any GPIO or Reg handle.
 	 */
@@ -1471,7 +1522,6 @@ static int __init btpower_init(void)
 		goto class_err;
 	}
 
-
 	if (device_create(bt_class, NULL, MKDEV(bt_major, 0),
 		NULL, BT_DEVICE_NAME) == NULL) {
 		pr_err("%s: failed to allocate char dev\n", __func__);
@@ -1634,6 +1684,10 @@ static void __exit btpower_exit(void)
 
 	platform_driver_unregister(&bt_power_driver);
 }
+
+#if !IS_ENABLED(CONFIG_SECOND_BT_POWER)
+EXPORT_SYMBOL(btpower_is_probed);
+#endif /* CONFIG_SECOND_BT_POWER */
 
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("MSM Bluetooth power control driver");
