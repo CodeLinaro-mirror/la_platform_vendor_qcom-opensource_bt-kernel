@@ -1396,7 +1396,10 @@ static irqreturn_t spi_cnss_irq(int irq, void *data)
 	struct spi_cnss_priv *spi_drv = data;
 	//Read HLEN/CLEN and then schedule work
 	SPI_CNSS_INFO(spi_drv, "%s\n",__func__);
-
+	if (!gpio_get_value(spi_drv->gpio)) {
+		SPI_CNSS_INFO(spi_drv, "%s: stale irq.Igonore it \n",__func__);
+		return IRQ_HANDLED;
+	}
 	if (!spi_drv->client_init ||
 		spi_drv->client_state == AWAKE_PENDING) {
 		SPI_CNSS_INFO(spi_drv, "%s: power on ack\n",__func__);
@@ -1561,19 +1564,19 @@ static int spi_cnss_controller_init(struct spi_cnss_priv *spi_drv)
 		SPI_CNSS_DBG(spi_drv,"%s:status reg read\n",__func__);
 		ret = spi_cnss_register_xfer(spi_drv, SPI_SLAVE_CONFIG_REG, SPI_REGISTER_READ);
 		if (ret < 0) {
-			SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError SPI_SLAVE_STATUS_REG read failed: %d\n",__func__, ret);
+			SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError SPI_SLAVE_CONFIG_REG read failed: %d\n",__func__, ret);
 			return ret;
 		}
 
 		ret = spi_cnss_register_xfer(spi_drv, SPI_SLAVE_CONFIG_REG, SPI_REGISTER_WRITE);
 		if (ret < 0) {
-			SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError SPI_SLAVE_STATUS_REG read failed: %d\n",__func__, ret);
+			SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError SPI_SLAVE_CONFIG_REG write failed: %d\n",__func__, ret);
 			return ret;
 		}
 
 		ret = spi_cnss_register_xfer(spi_drv, SPI_SLAVE_CONFIG_REG, SPI_REGISTER_READ);
 		if (ret < 0) {
-			SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError SPI_SLAVE_STATUS_REG read failed: %d\n",__func__, ret);
+			SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError SPI_SLAVE_CONFIG_REG read failed: %d\n",__func__, ret);
 			return ret;
 		}
 
