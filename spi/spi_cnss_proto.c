@@ -996,9 +996,9 @@ static int __spi_cnss_send_msg(struct spi_cnss_priv *spi_drv, struct spi_cnss_us
 		if (timeout <= 0 && spi_drv->client.HBUF_LEN != 0) {
 			SPI_CNSS_ERR(spi_drv,"%s: couldnt get buffer free in time\n",__func__);
 			list_for_each_entry_safe(user_pkt, user_pkt_temp, &spi_drv->tx_list, list) {
-			*usr = &spi_drv->user[user_pkt->id];
-		}
-		return -EBUSY;
+				*usr = &spi_drv->user[user_pkt->id];
+			}
+			return -EBUSY;
 		}
 	}
 	mutex_lock(&spi_drv->irq_lock);
