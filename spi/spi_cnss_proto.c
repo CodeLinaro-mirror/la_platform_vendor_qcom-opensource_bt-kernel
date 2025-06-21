@@ -1915,9 +1915,6 @@ static int spi_cnss_release(struct inode *inode, struct file *filp)
 	spi_drv->usr_cnt--;
 	SPI_CNSS_DBG(spi_drv, "%s usr_cnt = %d\n", __func__, spi_drv->usr_cnt);
 	if (spi_drv->usr_cnt == 0) {
-		disable_irq(spi_drv->irq);
-		// Wait for 100 msec before sending reset cmd byte.
-		msleep(100);
 #ifdef CONFIG_SLEEP
 		if (spi_drv->client_state == ASLEEP) {
 			SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError Client asleep. Waking it up\n",__func__);
@@ -1928,6 +1925,9 @@ static int spi_cnss_release(struct inode *inode, struct file *filp)
 				SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError Failed to wakeup client\n",__func__);
 			}
 		}
+		disable_irq(spi_drv->irq);
+		// Wait for 100 msec before sending reset cmd byte.
+		msleep(100);
 		spi_drv->client_state = RESET;
 		SPI_CNSS_DBG(spi_drv, "%s:Sending RESET_CMD_BYTE\n",__func__);
 		ret = spi_cnss_send_byte_cmd(spi_drv, RESET_CMD_BYTE);
