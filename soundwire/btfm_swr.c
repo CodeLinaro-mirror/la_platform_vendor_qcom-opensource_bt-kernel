@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 
@@ -39,8 +39,14 @@ int btfm_get_bt_soc_index(int chipset_ver)
 	case QCA_GANGES_SOC_ID_0100:
 	case QCA_GANGES_SOC_ID_0200:
 	case QCA_ORNE_SOC_ID_0100:
+	case QCA_COLOGNE_SOC_ID_0100:
 		return GANGES;
 	case QCA_EVROS_SOC_ID_0100:
+	case QCA_EVROS_SOC_ID_0101:
+	case QCA_EVROS_SOC_ID_0102:
+	case QCA_EVROS_SOC_ID_0103:
+	case QCA_EVROS_SOC_ID_0104:
+	case QCA_EVROS_SOC_ID_0105:
 	case QCA_EVROS_SOC_ID_0200:
 		return EVROS;
 	default:
