@@ -426,6 +426,9 @@ char *default_crash_reason = "Crash reason not found";
 static int btpower_enable_ipa_vreg(struct platform_pwr_data *pdata);
 static inline int btpower_get_retenion_mode_state(void);
 static void bt_power_vote(struct work_struct *work);
+void fmd_set_sdam_bit(unsigned char arg);
+void fmd_reboot_on_usb_detection(unsigned char arg);
+void fmd_write_stop_counter(unsigned char arg);
 
 static struct {
 	int platform_state[BT_POWER_SRC_SIZE];
@@ -1844,6 +1847,10 @@ static int bt_power_probe(struct platform_device *pdev)
 		} else {
 			pr_info("%s: Got fmd_cnt2_stop nvmem-cells\n", __func__);
 		}
+		fmd_set_sdam_bit((unsigned char)POWER_DISABLE);
+		fmd_reboot_on_usb_detection((unsigned char)0);
+		fmd_write_stop_counter((unsigned char)0);
+
 	}
 	pr_info("%s: FMD nvmem-cells read completed\n", __func__);
 
