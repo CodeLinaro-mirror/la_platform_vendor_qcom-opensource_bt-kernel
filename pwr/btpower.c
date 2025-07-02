@@ -690,6 +690,14 @@ static const struct rfkill_ops btpower_rfkill_ops = {
 	.set_block = btpower_toggle_radio,
 };
 
+static ssize_t extldo_show(struct device *dev, struct device_attribute *attr,
+			char *buf)
+{
+	return scnprintf(buf, 6, "false\n");
+}
+
+static DEVICE_ATTR_RO(extldo);
+
 static int btpower_rfkill_probe(struct platform_device *pdev)
 {
 	struct rfkill *rfkill;
@@ -703,6 +711,11 @@ static int btpower_rfkill_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "rfkill allocate failed\n");
 		return -ENOMEM;
 	}
+
+	/* add file into rfkill0 to handle LDO27 */
+	ret = device_create_file(&pdev->dev, &dev_attr_extldo);
+	if (ret < 0)
+		pr_err("%s: device create file error\n", __func__);
 
 	/* force Bluetooth off during init to allow for user control */
 	rfkill_init_sw_state(rfkill, 1);
