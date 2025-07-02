@@ -17,3 +17,6 @@ endif
 ifeq ($(TARGET_USES_QTI_UWB), true)
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/spi_cnss_proto.ko
 endif
+ifeq ($(BOARD_HAVE_STANDALONE_THREAD), true)
+PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/thqspi_proto.ko
+endif

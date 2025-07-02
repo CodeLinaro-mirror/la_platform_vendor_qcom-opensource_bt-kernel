@@ -15,6 +15,15 @@ ddk_headers(
     ]),
     includes = ["spi/include"]
 )
+
+ddk_headers(
+    name = "thqspi_headers",
+    hdrs = glob([
+        "thq-spi/include/*.h"
+    ]),
+    includes = ["thq-spi/include"]
+)
+
 load(":target.bzl", "define_pineapple")
 load(":target.bzl", "define_sun")
 load(":target.bzl", "define_parrot")
