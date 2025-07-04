@@ -1592,8 +1592,13 @@ static int get_gpio_dt_pinfo(struct platform_device *pdev)
 		bt_en = pinctrl_lookup_state(pinctrl1, "bt_en");
 		if (IS_ERR_OR_NULL(bt_en)) {
 			ret = PTR_ERR(bt_en);
-			pr_err("Failed to get bt_en state, err = %d\n", ret);
-		} else {
+			if (pwr_data->is_multi_tech_soc_dt ) {
+				bt_en = pinctrl_lookup_state(pinctrl1, "bt_uwb_en");
+			} else {
+				pr_err("Failed to get bt_en state, err = %d\n", ret);
+			}
+		}
+		if (!IS_ERR_OR_NULL(bt_en)) {
 			ret = pinctrl_select_state(pinctrl1, bt_en);
 			if (ret)
 				pr_err("Failed to select bt_en state, err = %d\n", ret);
