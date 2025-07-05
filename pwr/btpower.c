@@ -1461,7 +1461,7 @@ static int get_gpio_dt_pinfo(struct platform_device *pdev)
 	struct pinctrl *pinctrl1;
 #ifdef CONFIG_FMD_ENABLE
 	struct pinctrl_state *sw_ctrl;
-	struct pinctrl_state *bt_en;
+        struct pinctrl_state *bt_en;
 #endif
 	child = pdev->dev.of_node;
 
@@ -1515,15 +1515,6 @@ static int get_gpio_dt_pinfo(struct platform_device *pdev)
 				pr_err("Failed to select sw_ctrl state, err = %d\n", ret);
 		}
 		bt_en = pinctrl_lookup_state(pinctrl1, "bt_en");
-		if (IS_ERR_OR_NULL(bt_en)) {
-			ret = PTR_ERR(bt_en);
-			pr_err("Failed to get bt_en state, err = %d\n", ret);
-		} else {
-			ret = pinctrl_select_state(pinctrl1, bt_en);
-			if (ret)
-				pr_err("Failed to select bt_en state, err = %d\n", ret);
-		}
-                bt_en = pinctrl_lookup_state(pinctrl1, "bt_en");
 		if (IS_ERR_OR_NULL(bt_en)) {
 			ret = PTR_ERR(bt_en);
 			pr_err("Failed to get bt_en state, err = %d\n", ret);
