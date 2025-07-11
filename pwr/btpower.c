@@ -199,6 +199,27 @@ static struct vreg_data bt_vregs_info_qca6xx0[] = {
 		{BT_VDD_IPA_2p2, BT_VDD_IPA_2p2_CURRENT}},
 };
 
+// Regulator structure for WCN6450 BT SoC series
+static struct vreg_data bt_vregs_info_wcn6450[] = {
+	{NULL, "qcom,bt-vdd-io",	  1256000, 1408000, 0, false, true,
+		{BT_VDD_IO_LDO, BT_VDD_IO_LDO_CURRENT}},
+	{NULL, "qcom,bt-vdd-aon",	  920000,  1040000,	0, false, true,
+		{BT_VDD_AON_LDO, BT_VDD_AON_LDO_CURRENT}},
+	/* BT_CX_MX */
+	{NULL, "qcom,bt-vdd-dig",	   920000,	1040000,  0, false, true,
+		{BT_VDD_DIG_LDO, BT_VDD_DIG_LDO_CURRENT}},
+	{NULL, "qcom,bt-vdd-rfa-0p8",  920000,  1040000,  0, false, true,
+		{BT_VDD_RFA_0p8, BT_VDD_RFA_0p8_CURRENT}},
+	{NULL, "qcom,bt-vdd-rfa1",	   1856000, 2040000, 0, false, true,
+		{BT_VDD_RFA1_LDO, BT_VDD_RFA1_LDO_CURRENT}},
+	{NULL, "qcom,bt-vdd-rfa2",	   1256000, 1408000, 0, false, true,
+		{BT_VDD_RFA2_LDO, BT_VDD_RFA2_LDO_CURRENT}},
+	{NULL, "qcom,bt-vdd-pa",	   3300000, 3300000, 0, false, true,
+		{BT_VDD_PA_LDO, BT_VDD_PA_LDO_CURRENT}},
+	{NULL, "qcom,bt-vdd-pa-5g",	   3300000, 3300000, 0, false, true,
+		{BT_VDD_PA_LDO, BT_VDD_PA_LDO_CURRENT}},
+};
+
 // Regulator structure for kiwi BT SoC series
 static struct vreg_data bt_vregs_info_kiwi[] = {
 	{NULL, "qcom,bt-vdd18-aon",      1800000, 1800000, 0, false, true,
@@ -311,6 +332,12 @@ static struct pwr_data vreg_info_wcn6750 = {
 	.bt_num_vregs = ARRAY_SIZE(bt_vregs_info_qca6xx0),
 };
 
+static struct pwr_data vreg_info_wcn6450 = {
+	.compatible = "qcom,wcn6450-bt",
+	.bt_vregs = bt_vregs_info_wcn6450,
+	.bt_num_vregs = ARRAY_SIZE(bt_vregs_info_wcn6450),
+};
+
 /* Peach supports both BT & UWB SS. For now it requires
  * only platform regulators to be powered ON.
  */
@@ -335,6 +362,7 @@ static const struct of_device_id bt_power_match_table[] = {
 	{	.compatible = "qcom,kiwi-no-share-ant-power",
 			.data = &vreg_info_kiwi_no_share_ant_power},
 	{	.compatible = "qcom,wcn6750-bt", .data = &vreg_info_wcn6750},
+	{	.compatible = "qcom,wcn6450-bt", .data = &vreg_info_wcn6450},
 	{	.compatible = "qcom,bt-qca-converged", .data = &vreg_info_converged},
 	{	.compatible = "qcom,peach-bt", .data = &vreg_info_peach},
 	{	.compatible = "qcom,wcn786x", .data = &vreg_info_wcn786x},
@@ -716,6 +744,8 @@ void bt_configure_wakeup_gpios(int on)
 }
 #endif
 
+
+
 static int get_fmd_mode(void)
 {
 	return pwr_data->is_fmd_mode_enable;
@@ -1000,6 +1030,17 @@ static int bt_regulators_pwr(int pwr_state)
 			}
 		}
 
+		/* Parse dt_info and check if a target requires clock voting.
+		 * Enable BT clock when BT is on and disable it when BT is off
+		 */
+		if (pwr_data->bt_chip_clk) {
+			rc = bt_clk_enable(pwr_data->bt_chip_clk);
+			if (rc < 0) {
+				pr_err("%s: bt_power gpio config failed\n",
+					__func__);
+				goto clk_fail;
+			}
+		}
 		if (pwr_data->bt_gpio_sys_rst > 0) {
 			power_src.bt_state[BT_RESET_GPIO] = DEFAULT_INVALID_VALUE;
 			power_src.bt_state[BT_SW_CTRL_GPIO] = DEFAULT_INVALID_VALUE;
@@ -1032,6 +1073,7 @@ gpio_fail:
 			if (pwr_data->bt_gpio_resetb  >  0)
 				gpio_free(pwr_data->bt_gpio_resetb);
 		}
+clk_fail:
 regulator_fail:
 		rc = handle_pwr_disable_req(BT_CORE,
 			bt_num_vregs,
@@ -1086,8 +1128,21 @@ static int uwb_regulators_pwr(int pwr_state)
 				}
 			}
 		}
+		rc = bt_configure_gpios(POWER_ENABLE);
+		if (rc < 0) {
+			pr_err("%s: bt_power gpio config failed\n",
+				__func__);
+			goto UWB_gpio_fail;
+		}
 		break;
 	case POWER_DISABLE:
+		rc = bt_configure_gpios(POWER_DISABLE);
+		if (rc < 0) {
+			pr_err("%s: bt_power gpio config failed\n",
+				__func__);
+			goto UWB_gpio_fail;
+		}
+UWB_gpio_fail:
 regulator_failed:
 		for (i = 0; i < uwb_num_vregs; i++) {
 			uwb_vregs = &pwr_data->uwb_vregs[i];
@@ -1467,6 +1522,11 @@ static int get_gpio_dt_pinfo(struct platform_device *pdev)
 	child = pdev->dev.of_node;
 
 	pinctrl1 =  devm_pinctrl_get(&pdev->dev);
+	if (IS_ERR(pinctrl1)) {
+		pr_err("%s: Failed to get pinctrl: %ld\n", __func__, PTR_ERR(pinctrl1));
+		pinctrl1 = NULL;
+	}
+
 	pwr_data->bt_gpio_sys_rst =
 		of_get_named_gpio(child,
 					"qcom,bt-reset-gpio", 0);
@@ -1656,10 +1716,15 @@ static int bt_power_populate_dt_pinfo(struct platform_device *pdev)
 	return 0;
 }
 
-static void bt_power_pdc_init_params(struct platform_pwr_data *pdata)
+static inline bool bt_is_ganges_dt(struct platform_device *plat_dev)
 {
+	return of_property_read_bool(plat_dev->dev.of_node, "qcom,peach-bt");
+}
+
+static void bt_power_pdc_init_params(struct platform_pwr_data *pdata) {
 	int ret;
 	struct device *dev = &pdata->pdev->dev;
+
 	pdata->pdc_init_table_len = of_property_count_strings(dev->of_node,
 				"qcom,pdc_init_table");
 	if (pdata->pdc_init_table_len > 0) {
@@ -2092,7 +2157,8 @@ int power_disable (enum SubSystem SubSystemType)
 				btpower_set_retenion_mode_state(UWB_IN_RETENTION);
 			else if (ret_mode_state == BT_IN_RETENTION)
 				btpower_set_retenion_mode_state(RETENTION_IDLE);
-			if(get_sub_state() == SSR_ON_BT) {
+			if (get_sub_state() == SSR_ON_BT) {
+				update_sub_state(SUB_STATE_IDLE);
 				send_signal_to_subsystem(UWB, BT_SSR_COMPLETED);
 			}
 			if (grant_state == BT_HAS_GRANT) {
