@@ -18,6 +18,7 @@
 #include <linux/clk.h>
 #include <linux/of_device.h>
 #include <linux/kthread.h>
+#include <linux/version.h>
 #include <linux/pm_runtime.h>
 #include <linux/suspend.h>
 #include <linux/device.h>
@@ -1952,7 +1953,11 @@ static int spi_cnss_release(struct inode *inode, struct file *filp)
 		spi_drv->sleep_enabled = false;
 		atomic_set(&usr->rx_avail, 0);
 #ifdef CONFIG_AGGRESSIVE_SLEEP
+#if (KERNEL_VERSION(6, 15, 0) > LINUX_VERSION_CODE)
 		del_timer_sync(&spi_drv->client_sleep_timer);
+#else
+		timer_delete_sync(&spi_drv->client_sleep_timer);
+#endif
 #endif
 	}
 	SPI_CNSS_ERR(spi_drv,"%s: memory alloc = %d\n",__func__, atomic_read(&spi_drv->spi_alloc_cnt));
