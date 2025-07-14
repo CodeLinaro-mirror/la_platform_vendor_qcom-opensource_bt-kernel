@@ -674,7 +674,7 @@ static int btfm_slim_probe(struct slim_device *slim)
 		goto register_err;
 	}
 
-	btfm_slim_class = class_create(THIS_MODULE,"btfmslim-dev");
+	btfm_slim_class = class_create(THIS_MODULE, "btfmslim-dev");
 	if (IS_ERR(btfm_slim_class)) {
 		BTFMSLIM_ERR("%s: coudn't create class\n", __func__);
 		ret = -1;

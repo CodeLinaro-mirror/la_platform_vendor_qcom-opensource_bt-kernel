@@ -41,6 +41,7 @@ int btfm_get_bt_soc_index(int chipset_ver)
 		return GANGES;
 	case QCA_EVROS_SOC_ID_0100:
 	case QCA_EVROS_SOC_ID_0200:
+	case QCA_EVROS_SOC_ID_0104:
 		return EVROS;
 	default:
 		BTFMSWR_ERR("no BT SOC id defined, returning EVROS");
@@ -115,7 +116,7 @@ int btfm_swr_enable_port(u8 port_num, u8 ch_count, u32 sample_rate, u8 usecase)
 	ch_rate[0] = sample_rate;
 	port_type[0] = usecase;
 
-	BTFMSWR_INFO("enabling port : %d\n", port_num);
+	BTFMSWR_INFO("enabling port : %d, with num channels %d\n", port_num, ch_count);
 	ret = swr_connect_port(pbtfmswr->swr_slave, &port_id[0], num_port,
 							&ch_mask[0], &ch_rate[0], &num_ch[0],
 							&port_type[0]);
@@ -153,7 +154,7 @@ int btfm_swr_disable_port(u8 port_num, u8 ch_count, u8 usecase)
 	ch_mask[0] = ch_count == 2 ? TWO_CHANNEL_MASK :	ONE_CHANNEL_MASK;
 	port_type[0] = usecase;
 
-	BTFMSWR_INFO("disabling port : %d\n", port_num);
+	BTFMSWR_INFO("disabling port : %d, with num channels %d\n", port_num, ch_count);
 	ret = swr_disconnect_port(pbtfmswr->swr_slave, &port_id[0], num_port,
 							&ch_mask[0], &port_type[0]);
 
@@ -227,7 +228,6 @@ static int btfm_swr_probe(struct swr_device *pdev)
 	}
 
 	btfm_swr_class = class_create(THIS_MODULE, "btfmswr-dev");
-	//btfm_swr_class = class_create("btfmswr-dev");
 	if (IS_ERR(btfm_swr_class)) {
 		BTFMSWR_ERR("%s: coudn't create class\n", __func__);
 		ret = -1;

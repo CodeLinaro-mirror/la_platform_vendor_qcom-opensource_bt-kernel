@@ -8,18 +8,22 @@ ddk_headers(
     includes = ["btfmcodec/include"]
 )
 
-ddk_headers(
-    name = "spi_cnss_headers",
-    hdrs = glob([
-        "spi/include/*.h"
-    ]),
-    includes = ["spi/include"]
-)
 load(":target.bzl", "define_pineapple")
-load(":target.bzl", "define_sun")
-load(":target.bzl", "define_volcano")
-load(":target.bzl", "define_parrot")
+
 define_pineapple()
-define_sun()
+
+load(":target.bzl", "define_anorak61")
+
+define_anorak61()
+
+load(":target.bzl", "define_neo61")
+
+define_neo61()
+
+load(":target.bzl", "define_volcano")
+
 define_volcano()
-define_parrot()
+
+load(":target.bzl", "define_seraph")
+
+define_seraph()

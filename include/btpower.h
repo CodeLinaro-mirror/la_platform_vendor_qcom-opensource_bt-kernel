@@ -9,7 +9,8 @@
 
 #include <linux/cdev.h>
 #include <linux/types.h>
-#include <linux/soc/qcom/qcom_aoss.h>
+#include <linux/mailbox_client.h>
+#include <linux/mailbox/qmp.h>
 #include <linux/workqueue.h>
 #include <linux/skbuff.h>
 
@@ -28,12 +29,6 @@ enum power_modes {
 enum SubSystem {
 	BLUETOOTH = 1,
 	UWB,
-};
-
-enum FmdOperation {
-	ENABLE_FMD,
-	DISABLE_FMD,
-	UPDATE_SOC_VER
 };
 
 enum power_states {
@@ -75,42 +70,6 @@ enum grant_states {
 	UWB_WAITING_FOR_GRANT,
 };
 
-static inline char *ConvertGrantRetToString(enum grant_return_values state)
-{
-	switch (state) {
-	case ACCESS_GRANTED:
-		return "ACCESS_GRANTED";
-	case ACCESS_DENIED:
-		return "ACCESS_DENIED";
-	case ACCESS_RELEASED:
-		return "ACCESS_RELEASED";
-	case ACCESS_DISALLOWED:
-		return "ACCESS_DISALLOWED";
-	default:
-		return "INVALID State";
-	}
-}
-
-static inline char *ConvertGrantToString(enum grant_states state)
-{
-	switch (state) {
-	case NO_GRANT_FOR_ANY_SS:
-		return "NO_GRANT_FOR_ANY_SS";
-	case NO_OTHER_CLIENT_WAITING_FOR_GRANT:
-		return "NO_OTHER_CLIENT_WAITING_FOR_GRANT";
-	case BT_HAS_GRANT:
-		return "BT_HAS_GRANT";
-	case UWB_HAS_GRANT:
-		return "UWB_HAS_GRANT";
-	case BT_WAITING_FOR_GRANT:
-		return "BT_WAITING_FOR_GRANT";
-	case UWB_WAITING_FOR_GRANT:
-		return "UWB_WAITING_FOR_GRANT";
-	default:
-		return "INVALID STATE";
-	}
-}
-
 enum cores {
 	BT_CORE = 0,
 	UWB_CORE,
@@ -148,8 +107,44 @@ enum {
 	PWR_CLIENT_KILLED,
 };
 
-static inline char *ConvertRetentionModeToString(int state)
-{
+static inline char *ConvertGrantRetToString(enum grant_return_values state) {
+
+	switch (state) {
+	case ACCESS_GRANTED:
+		return "ACCESS_GRANTED";
+	case ACCESS_DENIED:
+		return "ACCESS_DENIED";
+	case ACCESS_RELEASED:
+		return "ACCESS_RELEASED";
+	case ACCESS_DISALLOWED:
+		return "ACCESS_DISALLOWED";
+	default:
+		return "INVALID STATE";
+	}
+}
+
+static inline char *ConvertGrantToString(enum grant_states state) {
+
+	switch (state) {
+	case NO_GRANT_FOR_ANY_SS:
+		return "NO_GRANT_FOR_ANY_SS";
+	case NO_OTHER_CLIENT_WAITING_FOR_GRANT:
+		return "NO_OTHER_CLIENT_WAITING_FOR_GRANT";
+	case BT_HAS_GRANT:
+		return "BT_HAS_GRANT";
+	case UWB_HAS_GRANT:
+		return "UWB_HAS_GRANT";
+	case BT_WAITING_FOR_GRANT:
+		return "BT_WAITING_FOR_GRANT";
+	case UWB_WAITING_FOR_GRANT:
+		return "UWB_WAITING_FOR_GRANT";
+	default:
+		return "INVALID STATE";
+	}
+}
+
+static inline char *ConvertRetentionModeToString(int state) {
+
 	switch (state) {
 	case IDLE:
 		return "Both client not in Retention";
@@ -168,8 +163,8 @@ static inline char *ConvertRetentionModeToString(int state)
 	}
 }
 
-static inline char *ConvertClientReqToString(int arg)
-{
+static inline char *ConvertClientReqToString(int arg) {
+
 	switch (arg) {
 	case POWER_DISABLE:
 		return "Power OFF";
@@ -182,8 +177,8 @@ static inline char *ConvertClientReqToString(int arg)
 	}
 }
 
-static inline char *ConvertPowerStatusToString(int state)
-{
+static inline char *ConvertPowerStatusToString(int state) {
+
 	switch (state) {
 	case IDLE:
 		return "Current state is ALL Client OFF";
@@ -198,8 +193,8 @@ static inline char *ConvertPowerStatusToString(int state)
 	}
 }
 
-static inline char *ConvertSsrStatusToString(int state)
-{
+static inline char *ConvertSsrStatusToString(int state) {
+
 	switch (state) {
 	case SUB_STATE_IDLE:
 		return "and No SSR";
@@ -216,8 +211,8 @@ static inline char *ConvertSsrStatusToString(int state)
 	}
 }
 
-static inline char *ConvertPowerReqToString(int arg)
-{
+static inline char *ConvertPowerReqToString(int arg) {
+
 	switch (arg) {
 	case POWER_ON_BT:
 		return "POWER_ON_BT";
@@ -246,8 +241,8 @@ static inline char *ConvertPowerReqToString(int arg)
 	}
 };
 
-static inline char *ConvertRegisterModeToString(int reg_mode)
-{
+static inline char *ConvertRegisterModeToString(int reg_mode) {
+
 	switch (reg_mode) {
 	case POWER_DISABLE:
 		return "vote off";
@@ -588,13 +583,6 @@ struct log_index {
 	int crash;
 };
 
-struct fmdOperationStruct {
-	unsigned char fmdOperation;
-	unsigned char socFwVer;
-	short int rebootStatus;
-	short int fmdCycles;
-};
-
 struct vreg_data {
 	struct regulator *reg;  /* voltage regulator handle */
 	const char *name;       /* regulator name */
@@ -604,7 +592,6 @@ struct vreg_data {
 	bool is_enabled;        /* is this regulator enabled? */
 	bool is_retention_supp; /* does this regulator support retention mode */
 	struct log_index indx;  /* Index for reg. w.r.t init & crash */
-	bool fmd_mode_set;
 };
 
 struct pwr_data {
@@ -631,7 +618,8 @@ struct btpower_state_machine {
 	enum grant_states grant_pending;
 };
 
-#define BTPWR_MAX_REQ         BT_MAX_PWR_STATE 
+#define BTPWR_MAX_REQ         BT_MAX_PWR_STATE
+
 /*
  * Platform data for the bluetooth power driver.
  */
@@ -640,9 +628,9 @@ struct platform_pwr_data {
 	int bt_gpio_sys_rst;                   /* Bluetooth reset gpio */
 	int wl_gpio_sys_rst;                   /* Wlan reset gpio */
 	int bt_gpio_sw_ctrl;                   /* Bluetooth sw_ctrl gpio */
-	int bt_gpio_fmd_clk_ctrl;              /* Bluetooth fmd_clk_ctrl gpio */
 	int bt_gpio_debug;                     /* Bluetooth debug gpio */
 	unsigned int wlan_sw_ctrl_gpio;        /* Wlan switch control gpio*/
+	int bt_gpio_resetb;                    /* BT RESETB GPIO */
 #ifdef CONFIG_MSM_BT_OOBS
 	int bt_gpio_dev_wake;                  /* Bluetooth bt_wake */
 	int bt_gpio_host_wake;                 /* Bluetooth bt_host_wake */
@@ -653,15 +641,14 @@ struct platform_pwr_data {
 	struct device *slim_dev;
 	struct vreg_data *bt_vregs;
 	struct vreg_data *uwb_vregs;
-	struct vreg_data *wlan_vregs;
 	struct vreg_data *platform_vregs;
 	struct bt_power_clk_data *bt_chip_clk; /* bluetooth reference clock */
-	int (*power_setup)(int core, int id);  /* Bluetooth power setup function */
-	char compatible[32];                   /*Bluetooth SoC name */
+	int (*power_setup)(int core, int id); /* Bluetooth power setup function */
+	char compatible[32]; /*Bluetooth SoC name */
 	int bt_num_vregs;
 	int uwb_num_vregs;
 	int platform_num_vregs;
-	struct qmp *qmp;
+	struct mbox_client mbox_client_data;
 	struct mbox_chan *mbox_chan;
 	const char *vreg_ipa;
 	bool is_ganges_dt;
@@ -690,11 +677,6 @@ struct platform_pwr_data {
 	struct work_struct wq_pwr_voting;
 	struct sk_buff_head rxq;
 	struct mutex pwr_mtx;
-	bool is_fmd_mode_enable;
-	struct nvmem_cell *nvmem_cell_fmd_set;
-	struct nvmem_cell *nvmem_cell_fmd_chg_pon;
-	struct nvmem_cell *nvmem_cell_fmd_cnt2_stop;
-	u32 fmd_clk_gpio_id;
 };
 
 int btpower_register_slimdev(struct device *dev);
@@ -702,7 +684,7 @@ int btpower_get_chipset_version(void);
 int btpower_aop_mbox_init(struct platform_pwr_data *pdata);
 int bt_aop_pdc_reconfig(struct platform_pwr_data *pdata);
 
-#define WLAN_SW_CTRL_GPIO           "qcom,wlan-sw-ctrl-gpio"
+#define WLAN_SW_CTRL_GPIO       "qcom,wlan-sw-ctrl-gpio"
 #define BT_CMD_SLIM_TEST            0xbfac
 #define BT_CMD_PWR_CTRL             0xbfad
 #define BT_CMD_CHIPSET_VERS         0xbfae
@@ -713,15 +695,15 @@ int bt_aop_pdc_reconfig(struct platform_pwr_data *pdata);
 #define BT_CMD_KERNEL_PANIC         0xbfc1
 #define UWB_CMD_KERNEL_PANIC        0xbfc2
 #define UWB_CMD_PWR_CTRL            0xbfe1
-#define BT_CMD_REGISTRATION         0xbfe2
+#define BT_CMD_REGISTRATION	        0xbfe2
 #define UWB_CMD_REGISTRATION        0xbfe3
 #define BT_CMD_ACCESS_CTRL          0xbfe4
 #define UWB_CMD_ACCESS_CTRL         0xbfe5
-#define UWB_GET_SSR_STATE           0xbfe6
-#define BT_CMD_FMD_OPERATION        0xbfb2
 
 #ifdef CONFIG_MSM_BT_OOBS
 #define BT_CMD_OBS_VOTE_CLOCK		0xbfd1
+
+
 /**
  * enum btpower_obs_param: OOBS low power param
  * @BTPOWER_OBS_CLK_OFF: Transport bus is no longer acquired
@@ -736,4 +718,5 @@ enum btpower_obs_param {
 	BTPOWER_OBS_DEV_ON,
 };
 #endif
+
 #endif /* __LINUX_BLUETOOTH_POWER_H */

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef __LINUX_BTFM_CODEC_PKT_H
@@ -48,7 +48,6 @@ struct btm_ctrl_pkt {
 
 #define BTM_MASTER_CONFIG_REQ_LEN			13
 #define BTM_MASTER_CONFIG_RSP_TIMEOUT			5000
-#define BTM_BEARER_SWITCH_IND_TIMEOUT			17000
 #define BTM_MASTER_DMA_CONFIG_RSP_TIMEOUT		5000
 #define BTM_HEADER_LEN					8
 #define BTM_PREPARE_AUDIO_BEARER_SWITCH_RSP_LEN		2
@@ -61,10 +60,8 @@ struct btm_ctrl_pkt {
 #define BTM_ADSP_STATE_IND_LEN				4
 #define BTM_CODEC_CONFIG_DMA_REQ_LEN			11
 
-#define BTM_BTFMCODEC_USECASE_START_REQ			0x58000008
-#define BTM_BTFMCODEC_USECASE_START_RSP			0x58000009
-#define BTM_USECASE_START_IND_LEN                       2
-#define BTM_USECASE_START_RSP_LEN                       1
+#define BTM_BTFMCODEC_USECASE_START_IND			0x58000008
+#define BTM_USECASE_START_IND_LEN                       1
 
 enum rx_status {
 	/* Waiting for response */
@@ -120,7 +117,6 @@ struct btm_usecase_start_ind {
 	btm_opcode opcode;
 	uint32_t len;
 	uint8_t transport;
-	uint8_t stream_id;
 } __packed;
 
 struct btm_master_shutdown_req {
@@ -135,8 +131,6 @@ struct btm_adsp_state_ind {
 	uint32_t action;
 } __attribute__((packed));
 
-int btfmcodec_dev_enqueue_pkt(struct btfmcodec_char_device *btfmcodec_dev, void *buf, int len);
-bool btfmcodec_is_valid_cache_avb(struct btfmcodec_data *btfmcodec);
-int btfmcodec_enqueue_transport(struct btfmcodec_char_device *btfmcodec_dev, uint8_t transport);
-int btfmcodec_dequeue_transport(struct btfmcodec_char_device *btfmcodec_dev);
+int btfmcodec_dev_enqueue_pkt(struct btfmcodec_char_device *, void *, int);
+bool btfmcodec_is_valid_cache_avb(struct btfmcodec_data *);
 #endif /* __LINUX_BTFM_CODEC_PKT_H*/
