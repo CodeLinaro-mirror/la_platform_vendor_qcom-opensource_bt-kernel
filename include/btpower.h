@@ -682,7 +682,7 @@ struct platform_pwr_data {
 	struct qmp *qmp;
 	struct mbox_chan *mbox_chan;
 	const char *vreg_ipa;
-	bool is_ganges_dt;
+	bool is_multi_tech_soc_dt;
 	int pdc_init_table_len;
 	const char **pdc_init_table;
 	int bt_device_type;

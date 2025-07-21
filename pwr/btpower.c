@@ -274,6 +274,35 @@ static struct vreg_data platform_vregs_info_peach[] = {
 		{BT_VDD_WLAN_AON_LDO, BT_VDD_WLAN_AON_LDO_CURRENT}},
 };
 
+static struct vreg_data platform_vregs_info_wcn8850[] = {
+	/* VDD1P8_AON */
+	{NULL, "qcom,bt-vdd18-aon",      1800000, 1800000, 0, false, true,
+		{BT_VDD_LDO, BT_VDD_LDO_CURRENT}},
+	/* VDD1P2_IOAV91C_VDD Extractor */
+	{NULL, "qcom,bt-vdd12-io",      1200000, 1200000, 0, false, true,
+		{BT_VDD_IO_LDO, BT_VDD_IO_LDO_CURRENT}},
+	/* AV91C_VDD Extractor */
+	{NULL, "qcom,bt-ant-ldo",  1800000, 1860000, 0, false, true,
+		{BT_VDD_ANT_LDO, BT_VDD_ANT_LDO_CURRENT}},
+	/* BT_CX_MX */
+	{NULL, "qcom,bt-vdd-dig",      620000,  1036000,  0, false, true,
+		{BT_VDD_DIG_LDO, BT_VDD_DIG_LDO_CURRENT}},
+	/* RFA_CMN/AON */
+	{NULL, "qcom,bt-vdd-aon",     620000,  1036000,  0, false, true,
+		{BT_VDD_AON_LDO, BT_VDD_AON_LDO_CURRENT}},
+	/* RFA_OP75 */
+	{NULL, "qcom,bt-vdd-rfa0p75",  620000,  1036000,  0, false, true,
+		{BT_VDD_RFA_0p8, BT_VDD_RFA_0p8_CURRENT}},
+	/* RFA_1P8 */
+	{NULL, "qcom,bt-vdd-rfa1p8",     1876000, 2000000, 0, false, true,
+		{BT_VDD_RFA2_LDO, BT_VDD_RFA2_LDO_CURRENT}},
+	/* RFA_1P25 */
+	{NULL, "qcom,bt-vdd-rfa1p25",     1328000, 1340000, 0, false, true,
+		{BT_VDD_RFA1_LDO, BT_VDD_RFA1_LDO_CURRENT}},
+	{NULL, "qcom,bt-vdd-wlan-aon", 892000, 1000000, 0, false, false,
+		{BT_VDD_WLAN_AON_LDO, BT_VDD_WLAN_AON_LDO_CURRENT}},
+};
+
 // Regulator structure for WCN399x BT SoC series
 static struct pwr_data vreg_info_wcn399x = {
 	.compatible = "qcom,wcn3990",
@@ -361,6 +390,12 @@ static struct pwr_data bt_vreg_info_wcn7750 = {
 	.bt_num_vregs = ARRAY_SIZE(bt_vregs_info_qca6xx0),
 };
 
+static struct pwr_data vreg_info_wcn8850 = {
+	.compatible = "qcom,wcn8850-bt",
+	.platform_vregs = platform_vregs_info_wcn8850,
+	.platform_num_vregs = ARRAY_SIZE(platform_vregs_info_wcn8850),
+};
+
 static const struct of_device_id bt_power_match_table[] = {
 	{	.compatible = "qcom,qca6174", .data = &vreg_info_qca6174},
 	{	.compatible = "qcom,wcn3990", .data = &vreg_info_wcn399x},
@@ -374,6 +409,7 @@ static const struct of_device_id bt_power_match_table[] = {
 	{	.compatible = "qcom,peach-bt", .data = &vreg_info_peach},
 	{	.compatible = "qcom,wcn786x", .data = &vreg_info_wcn786x},
 	{	.compatible = "qcom,wcn7750-bt", .data = &bt_vreg_info_wcn7750},
+	{	.compatible = "qcom,wcn8850-bt", .data = &vreg_info_wcn8850},
 	{	.compatible = "qcom,wcn7760-bt", .data = &vreg_info_cologne},
 	{},
 };
@@ -390,6 +426,9 @@ char *default_crash_reason = "Crash reason not found";
 static int btpower_enable_ipa_vreg(struct platform_pwr_data *pdata);
 static inline int btpower_get_retenion_mode_state(void);
 static void bt_power_vote(struct work_struct *work);
+void fmd_set_sdam_bit(unsigned char arg);
+void fmd_reboot_on_usb_detection(unsigned char arg);
+void fmd_write_stop_counter(unsigned char arg);
 
 static struct {
 	int platform_state[BT_POWER_SRC_SIZE];
@@ -1553,8 +1592,13 @@ static int get_gpio_dt_pinfo(struct platform_device *pdev)
 		bt_en = pinctrl_lookup_state(pinctrl1, "bt_en");
 		if (IS_ERR_OR_NULL(bt_en)) {
 			ret = PTR_ERR(bt_en);
-			pr_err("Failed to get bt_en state, err = %d\n", ret);
-		} else {
+			if (pwr_data->is_multi_tech_soc_dt ) {
+				bt_en = pinctrl_lookup_state(pinctrl1, "bt_uwb_en");
+			} else {
+				pr_err("Failed to get bt_en state, err = %d\n", ret);
+			}
+		}
+		if (!IS_ERR_OR_NULL(bt_en)) {
 			ret = pinctrl_select_state(pinctrl1, bt_en);
 			if (ret)
 				pr_err("Failed to select bt_en state, err = %d\n", ret);
@@ -1607,7 +1651,7 @@ static int get_power_dt_pinfo(struct platform_device *pdev)
 	pwr_data->bt_vregs = data->bt_vregs;
 	pwr_data->bt_num_vregs = data->bt_num_vregs;
 
-	if (pwr_data->is_ganges_dt) {
+	if (pwr_data->is_multi_tech_soc_dt) {
 		pwr_data->uwb_vregs = data->uwb_vregs;
 		pwr_data->platform_vregs = data->platform_vregs;
 		pwr_data->uwb_num_vregs = data->uwb_num_vregs;
@@ -1622,7 +1666,7 @@ static int get_power_dt_pinfo(struct platform_device *pdev)
 			return rc;
 	}
 
-	if (pwr_data->is_ganges_dt) {
+	if (pwr_data->is_multi_tech_soc_dt) {
 		for (i = 0; i < pwr_data->platform_num_vregs; i++) {
 			if (is_wlan_mx_buck(&pwr_data->platform_vregs[i])) {
 				pwr_data->wlan_vregs = &pwr_data->platform_vregs[i];
@@ -1666,7 +1710,7 @@ static int bt_power_populate_dt_pinfo(struct platform_device *pdev)
 	if (!pwr_data)
 		return -ENOMEM;
 
-	if (pwr_data->is_ganges_dt) {
+	if (pwr_data->is_multi_tech_soc_dt) {
 		for_each_available_child_of_node(pdev->dev.of_node, of_node) {
 			if (!strcmp(of_node->name, "bt_ganges")) {
 				pwr_data->bt_of_node = of_node;
@@ -1808,14 +1852,20 @@ static int bt_power_probe(struct platform_device *pdev)
 		} else {
 			pr_info("%s: Got fmd_cnt2_stop nvmem-cells\n", __func__);
 		}
+		fmd_set_sdam_bit((unsigned char)POWER_DISABLE);
+		fmd_reboot_on_usb_detection((unsigned char)0);
+		fmd_write_stop_counter((unsigned char)0);
+
 	}
 	pr_info("%s: FMD nvmem-cells read completed\n", __func__);
 
-	pwr_data->is_ganges_dt = of_property_read_bool(pdev->dev.of_node,
+	pwr_data->is_multi_tech_soc_dt = of_property_read_bool(pdev->dev.of_node,
 							"qcom,peach-bt") ||
 							of_property_read_bool(pdev->dev.of_node,
-							"qcom,wcn786x");
-	pr_info("%s: is_ganges_dt = %d\n", __func__, pwr_data->is_ganges_dt);
+							"qcom,wcn786x") ||
+							of_property_read_bool(pdev->dev.of_node,
+							"qcom,wcn8850-bt");
+	pr_info("%s: is_multi_tech_soc_dt = %d\n", __func__, pwr_data->is_multi_tech_soc_dt);
 
 	pwr_data->workq = alloc_workqueue("workq", WQ_HIGHPRI, WQ_DFL_ACTIVE);
 	if (!pwr_data->workq) {
@@ -1894,7 +1944,7 @@ static int bt_power_remove(struct platform_device *pdev)
 	probe_finished = false;
 	btpower_rfkill_remove(pdev);
 	bt_power_vreg_put();
-	if (pwr_data->is_ganges_dt)
+	if (pwr_data->is_multi_tech_soc_dt)
 		destroy_workqueue(pwr_data->workq);
 	kfree(pwr_data);
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)

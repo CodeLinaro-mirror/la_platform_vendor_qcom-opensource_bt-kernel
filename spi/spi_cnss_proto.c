@@ -18,6 +18,7 @@
 #include <linux/clk.h>
 #include <linux/of_device.h>
 #include <linux/kthread.h>
+#include <linux/version.h>
 #include <linux/pm_runtime.h>
 #include <linux/suspend.h>
 #include <linux/device.h>
@@ -948,7 +949,7 @@ static void spi_cnss_read_msg(struct kthread_work *work)
 			SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError failed\n",__func__);
 		}
 	} else {
-		SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError CBUF LEN is cleared, ignore read request\n",__func__);
+		SPI_CNSS_DBG(spi_drv, "%s: CBUF LEN is cleared, ignore read request\n",__func__);
 	}
 	mutex_unlock(&spi_drv->read_lock);
 #ifdef CONFIG_AGGRESSIVE_SLEEP
@@ -996,9 +997,9 @@ static int __spi_cnss_send_msg(struct spi_cnss_priv *spi_drv, struct spi_cnss_us
 		if (timeout <= 0 && spi_drv->client.HBUF_LEN != 0) {
 			SPI_CNSS_ERR(spi_drv,"%s: couldnt get buffer free in time\n",__func__);
 			list_for_each_entry_safe(user_pkt, user_pkt_temp, &spi_drv->tx_list, list) {
-			*usr = &spi_drv->user[user_pkt->id];
-		}
-		return -EBUSY;
+				*usr = &spi_drv->user[user_pkt->id];
+			}
+			return -EBUSY;
 		}
 	}
 	mutex_lock(&spi_drv->irq_lock);
@@ -1755,9 +1756,10 @@ static ssize_t spi_cnss_write(struct file *filp, const char __user *buf, size_t 
 	mutex_unlock(&spi_drv->queue_lock);
 end:
 #ifdef CONFIG_SLEEP
-	//SPI_CNSS_DBG(spi_drv, "%s: spi_cnss_runtime_mark_last_busy",__func__);
-	pm_runtime_mark_last_busy(spi_drv->dev);
-	pm_runtime_put_autosuspend(spi_drv->dev);
+	if (spi_drv) {
+		pm_runtime_mark_last_busy(spi_drv->dev);
+		pm_runtime_put_autosuspend(spi_drv->dev);
+	}
 #endif
 	return ret;
 }
@@ -1915,9 +1917,6 @@ static int spi_cnss_release(struct inode *inode, struct file *filp)
 	spi_drv->usr_cnt--;
 	SPI_CNSS_DBG(spi_drv, "%s usr_cnt = %d\n", __func__, spi_drv->usr_cnt);
 	if (spi_drv->usr_cnt == 0) {
-		disable_irq(spi_drv->irq);
-		// Wait for 100 msec before sending reset cmd byte.
-		msleep(100);
 #ifdef CONFIG_SLEEP
 		if (spi_drv->client_state == ASLEEP) {
 			SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError Client asleep. Waking it up\n",__func__);
@@ -1928,6 +1927,9 @@ static int spi_cnss_release(struct inode *inode, struct file *filp)
 				SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError Failed to wakeup client\n",__func__);
 			}
 		}
+		disable_irq(spi_drv->irq);
+		// Wait for 100 msec before sending reset cmd byte.
+		msleep(100);
 		spi_drv->client_state = RESET;
 		SPI_CNSS_DBG(spi_drv, "%s:Sending RESET_CMD_BYTE\n",__func__);
 		ret = spi_cnss_send_byte_cmd(spi_drv, RESET_CMD_BYTE);
@@ -1951,7 +1953,11 @@ static int spi_cnss_release(struct inode *inode, struct file *filp)
 		spi_drv->sleep_enabled = false;
 		atomic_set(&usr->rx_avail, 0);
 #ifdef CONFIG_AGGRESSIVE_SLEEP
+#if (KERNEL_VERSION(6, 15, 0) > LINUX_VERSION_CODE)
 		del_timer_sync(&spi_drv->client_sleep_timer);
+#else
+		timer_delete_sync(&spi_drv->client_sleep_timer);
+#endif
 #endif
 	}
 	SPI_CNSS_ERR(spi_drv,"%s: memory alloc = %d\n",__func__, atomic_read(&spi_drv->spi_alloc_cnt));
@@ -2039,6 +2045,10 @@ static int spi_cnss_probe(struct spi_device *spi)
 	struct device *dev = &spi->dev;
 	int i;
 
+	if (dev == NULL) {
+		pr_err("%s dev is null\n", __func__);
+		return -ENODEV;
+	}
 	spi_drv = devm_kzalloc(&spi->dev, sizeof(*spi_drv), GFP_KERNEL);
 	if (!spi_drv) {
 		pr_err("%s No Memory\n", __func__);
@@ -2055,9 +2065,7 @@ static int spi_cnss_probe(struct spi_device *spi)
 	spi_drv->irq = gpio_to_irq(spi_drv->gpio);
 	SPI_CNSS_DBG(spi_drv, "%s: irq = %d\n",__func__, spi_drv->irq);
 	irq_set_status_flags(spi_drv->irq, IRQ_NOAUTOEN);
-	if (dev != NULL) {
-		SPI_CNSS_DBG(spi_drv, "%s: device name = %s\n",__func__,dev_name(dev));
-	}
+	SPI_CNSS_DBG(spi_drv, "%s: device name = %s\n",__func__,dev_name(dev));
 	ret = devm_request_irq(dev, spi_drv->irq, spi_cnss_irq,
 				/*IRQF_TRIGGER_HIGH*/IRQF_TRIGGER_RISING, dev_name(dev), spi_drv);
 	if (ret) {
@@ -2115,7 +2123,6 @@ static int spi_cnss_probe(struct spi_device *spi)
 	spi_drv->bh_work_wq = alloc_workqueue("%s", WQ_UNBOUND|WQ_HIGHPRI, 1, dev_name(dev));
 	if (!spi_drv->bh_work_wq) {
 			SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError falied to alloc workqueue", __func__);
-			destroy_workqueue(spi_drv->bh_work_wq);
 			return -ENOMEM;
 	}
 	INIT_WORK(&spi_drv->bh_work,spi_cnss_handle_work);
@@ -2127,7 +2134,7 @@ static int spi_cnss_probe(struct spi_device *spi)
 	spi_drv->sleep_wq = alloc_workqueue("spi_sleep_wq",WQ_UNBOUND|WQ_HIGHPRI, 0);
 	if (!spi_drv->sleep_wq) {
 			SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError falied to alloc spi sleep workqueue", __func__);
-			destroy_workqueue(spi_drv->sleep_wq);
+			destroy_workqueue(spi_drv->bh_work_wq);
 			return -ENOMEM;
 	}
 	INIT_WORK(&spi_drv->sleep_work, spi_cnss_handle_sleep);
