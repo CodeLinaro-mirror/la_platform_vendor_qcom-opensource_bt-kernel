@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef __LINUX_BLUETOOTH_POWER_H
@@ -643,6 +643,7 @@ struct platform_pwr_data {
 	int bt_gpio_fmd_clk_ctrl;              /* Bluetooth fmd_clk_ctrl gpio */
 	int bt_gpio_debug;                     /* Bluetooth debug gpio */
 	unsigned int wlan_sw_ctrl_gpio;        /* Wlan switch control gpio*/
+	int bt_gpio_resetb;                    /* BT RESETB GPIO */
 #ifdef CONFIG_MSM_BT_OOBS
 	int bt_gpio_dev_wake;                  /* Bluetooth bt_wake */
 	int bt_gpio_host_wake;                 /* Bluetooth bt_host_wake */
@@ -674,7 +675,6 @@ struct platform_pwr_data {
 	struct file *reffilp_obs;
 	struct task_struct *reftask_obs;
 #endif
-	struct task_struct *reftask;
 	struct task_struct *reftask_bt;
 	struct task_struct *reftask_uwb;
 	struct btpower_state_machine btpower_state;
