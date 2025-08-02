@@ -1319,7 +1319,9 @@ void spi_cnss_wakeup_sequence(struct spi_cnss_priv *spi_drv)
 		return;
 	}
 	if (ret != -1) {
+		spi_drv->context_read_pending = true;
 		spi_cnss_read_context_info(spi_drv, true);
+		spi_drv->context_read_pending = false;
 	}
 }
 
