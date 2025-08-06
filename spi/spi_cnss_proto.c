@@ -813,7 +813,7 @@ int spi_cnss_wakeup_client(struct spi_cnss_priv *spi_drv, int retry)
 		if (ret < 0) {
 			SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError Controller is in bad state or not powered on: %d\n",__func__, ret);
 			spi_drv->client_state = ASLEEP;
-			ret = -ENODEV;
+			ret = -EIO;
 		}
 	}
 	return ret;
@@ -1515,7 +1515,7 @@ static int spi_cnss_register_xfer(struct spi_cnss_priv *spi_drv, u8 reg, u8 opco
 				ret = 0;
 			} else {
 				SPI_CNSS_ERR(spi_drv,"%s: sanity reg val incorrect.Either controller in bad state or not powered on\n",__func__);
-				ret = -ENODEV;
+				ret = -EIO;
 			}
 		}
 	}
@@ -1546,7 +1546,7 @@ static int spi_cnss_controller_init(struct spi_cnss_priv *spi_drv)
 		if (ret < 0) {
 			SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError Controller is in bad state or not powered on: %d\n",__func__, ret);
 			spi_drv->client_state = ASLEEP;
-			return -ENODEV;
+			return -EIO;
 		} else {
 			spi_drv->client_state = AWAKE;
 		}
