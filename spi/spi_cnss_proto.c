@@ -576,7 +576,8 @@ static int spi_cnss_prepare_xfer(struct spi_cnss_priv *spi_drv,
 static int spi_cnss_clear_clen(struct spi_cnss_priv *spi_drv)
 {
 	struct spi_transfer xfer[2] = {};
-	u8 *txbuf,*txbuf1, ret,offset = 0;
+	u8 *txbuf,*txbuf1, offset = 0;
+	int ret = 0;
 	u32 addr, val = HOST_IRQ;
 	u8 cmd = SPI_WRITE_OPCODE;
 	SPI_CNSS_DBG(spi_drv,"%s\n",__func__);
@@ -674,7 +675,8 @@ static int spi_cnss_send_byte_cmd(struct spi_cnss_priv *spi_drv, int cmd)
 static int spi_cnss_read_len(struct spi_cnss_priv *spi_drv)
 {
 	struct spi_transfer *xfer;
-	u8 ret, index;
+	u8 index;
+	int ret = 0;
 	u32 addr;
 	SPI_CNSS_DBG(spi_drv,"%s\n",__func__);
 	u8 *clen_rx_buf, *clen_tx_buf;
@@ -732,7 +734,7 @@ err:
 static int spi_cnss_clear_irq(struct spi_cnss_priv *spi_drv)
 {
 	struct spi_transfer *xfer;
-	u8 ret;
+	int ret = 0;
 	u32 addr;
 	bool local_alloc = false;
 	SPI_CNSS_DBG(spi_drv,"%s\n",__func__);
@@ -775,7 +777,7 @@ static int spi_cnss_clear_irq(struct spi_cnss_priv *spi_drv)
  */
 int spi_cnss_wakeup_client(struct spi_cnss_priv *spi_drv, int retry)
 {
-	int i,ret = 0;
+	int i, ret = 0;
 	SPI_CNSS_INFO(spi_drv, "%s\n",__func__);
 	if (spi_drv->client_init && spi_drv->client_state != ASLEEP) {
 		SPI_CNSS_ERR(spi_drv,"%s: client is not asleep, bailing\n",__func__);
@@ -894,7 +896,7 @@ loop_back:
 				usr = get_usr(rx_buf[index]);
 			}
 			SPI_CNSS_INFO(spi_drv,"%s: data valid, usr = %d\n", __func__, usr);
-			if (spi_drv->user[usr].fifo_full) {
+			if ((0 <= usr) && (usr < MAX_DEV) && spi_drv->user[usr].fifo_full) {
 				SPI_CNSS_INFO(spi_drv,"%s: host buffer full, dont clear CBUF LEN\n", __func__);
 				spi_drv->user[usr].read_pending = true;
 			} else {
