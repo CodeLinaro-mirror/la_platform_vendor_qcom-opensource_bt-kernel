@@ -2439,9 +2439,8 @@ static void spi_cnss_remove(struct spi_device *spi)
 		device_destroy(spi_drv->chrdev.spi_cnss_class, MKDEV(spi_cnss_cdev_major, i));
 		cdev_del(&spi_drv->chrdev.c_dev[i]);
 	}
-	class_unregister(spi_drv->chrdev.spi_cnss_class);
-	unregister_chrdev_region(MKDEV(spi_cnss_cdev_major, 0), MINORMASK);
 	class_destroy(spi_drv->chrdev.spi_cnss_class);
+	unregister_chrdev_region(MKDEV(spi_cnss_cdev_major, 0), MINORMASK);
 	devm_kfree(&spi->dev, spi_drv);
 	spi_set_drvdata(spi, NULL);
 }

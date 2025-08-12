@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 /*
@@ -37,6 +37,7 @@
 #include <linux/pinctrl/devinfo.h>
 #include <linux/pinctrl/machine.h>
 #include <linux/pinctrl/pinctrl.h>
+#include <linux/version.h>
 
 #include "btpower.h"
 #ifdef CONFIG_FMD_ENABLE
@@ -76,6 +77,9 @@
 #define SIGIO_GPIO_LOW            0x00000000
 #define SIGIO_SSR_ON_UWB          0x00000001
 #define SIGIO_UWB_SSR_COMPLETED   0x00000002
+
+#define RESETB_GPIO_HIGH         0x00000001
+#define RESETB_GPIO_LOW          0x00000000
 
 #define CRASH_REASON_NOT_FOUND  ((char *)"Crash reason not found")
 
@@ -717,6 +721,34 @@ static int get_fmd_mode(void)
 	return pwr_data->is_fmd_mode_enable;
 }
 
+static int bt_pull_resetb(int resetb_gpio, int value)
+{
+	int rc = 0;
+
+	rc = gpio_direction_output(resetb_gpio, value);
+	if (rc) {
+		pr_err("%s: Unable to set direction\n", __func__);
+		return rc;
+	}
+	return rc;
+}
+
+static int bt_resetb_operation(int resetb)
+{
+	int rc = 0;
+
+	/* making resetb to low */
+	pr_info("BTON: Turn bt_resetb_gpio to low\n");
+	rc = bt_pull_resetb(resetb, RESETB_GPIO_LOW);
+	if (rc)
+		return rc;
+	msleep(20);
+	/* making resetb to high after delay */
+	pr_info("BTON: Turn bt_resetb_gpio to High\n");
+	rc = bt_pull_resetb(resetb, RESETB_GPIO_HIGH);
+	return rc;
+}
+
 static int bt_configure_gpios(int on)
 {
 	int rc = 0;
@@ -724,6 +756,7 @@ static int bt_configure_gpios(int on)
 	int wl_reset_gpio = pwr_data->wl_gpio_sys_rst;
 	int bt_sw_ctrl_gpio  =  pwr_data->bt_gpio_sw_ctrl;
 	int bt_debug_gpio  =  pwr_data->bt_gpio_debug;
+	int bt_resetb_gpio = pwr_data->bt_gpio_resetb;
 	int assert_dbg_gpio = 0;
 
 	if (on) {
@@ -732,6 +765,14 @@ static int bt_configure_gpios(int on)
 			pr_err("%s: unable to request gpio %d (%d)\n",
 					__func__, bt_reset_gpio, rc);
 			return rc;
+		}
+		if (bt_resetb_gpio  >=  0) {
+			rc = gpio_request(bt_resetb_gpio, "bt_resetb_gpio_n");
+			if (rc) {
+				pr_err("%s: unable to request gpio %d (%d)\n",
+						__func__, bt_resetb_gpio, rc);
+				return rc;
+			}
 		}
 
 		pr_info("BTON:Turn Bt OFF asserting BT_EN to low\n");
@@ -795,13 +836,18 @@ static int bt_configure_gpios(int on)
 				}
 				power_src.platform_state[BT_RESET_GPIO] =
 					gpio_get_value(bt_reset_gpio);
+				if (bt_resetb_gpio  >=  0) {
+					pr_err("BTON:Turn resetb High\n");
+					bt_pull_resetb(bt_resetb_gpio, RESETB_GPIO_HIGH);
+				}
 			}
 			pr_info("BTON: WLAN OFF waiting for 100ms delay\n");
 			pr_info("for AON output to fully discharge\n");
 			msleep(100);
 			pr_info("BTON: WLAN OFF Asserting BT_EN to high\n");
 			btpower_set_xo_clk_gpio_state(true);
-
+			if (bt_resetb_gpio  >=  0)
+				bt_resetb_operation(bt_resetb_gpio);
 			rc = gpio_direction_output(bt_reset_gpio, 1);
 			if (rc) {
 				pr_err("%s: Unable to set direction\n", __func__);
@@ -983,6 +1029,8 @@ gpio_fail:
 				gpio_free(pwr_data->bt_gpio_debug);
 			if (pwr_data->bt_chip_clk)
 				bt_clk_disable(pwr_data->bt_chip_clk);
+			if (pwr_data->bt_gpio_resetb  >  0)
+				gpio_free(pwr_data->bt_gpio_resetb);
 		}
 regulator_fail:
 		rc = handle_pwr_disable_req(BT_CORE,
@@ -1414,7 +1462,7 @@ static int get_gpio_dt_pinfo(struct platform_device *pdev)
 	struct pinctrl *pinctrl1;
 #ifdef CONFIG_FMD_ENABLE
 	struct pinctrl_state *sw_ctrl;
-
+        struct pinctrl_state *bt_en;
 #endif
 	child = pdev->dev.of_node;
 
@@ -1430,6 +1478,13 @@ static int get_gpio_dt_pinfo(struct platform_device *pdev)
 					"qcom,wl-reset-gpio", 0);
 	if (pwr_data->wl_gpio_sys_rst < 0)
 		pr_err("%s: wl-reset-gpio not provided in device tree\n",
+			__func__);
+
+	pwr_data->bt_gpio_resetb =
+		of_get_named_gpio(child,
+					"qcom,wl-resetb-gpio", 0);
+	if (pwr_data->bt_gpio_resetb < 0)
+		pr_err("%s: bt_gpio_resetb not provided in device tree\n",
 			__func__);
 
 	pwr_data->bt_gpio_sw_ctrl  =
@@ -1459,6 +1514,15 @@ static int get_gpio_dt_pinfo(struct platform_device *pdev)
 			ret = pinctrl_select_state(pinctrl1, sw_ctrl);
 			if (ret)
 				pr_err("Failed to select sw_ctrl state, err = %d\n", ret);
+		}
+		bt_en = pinctrl_lookup_state(pinctrl1, "bt_en");
+		if (IS_ERR_OR_NULL(bt_en)) {
+			ret = PTR_ERR(bt_en);
+			pr_err("Failed to get bt_en state, err = %d\n", ret);
+		} else {
+			ret = pinctrl_select_state(pinctrl1, bt_en);
+			if (ret)
+				pr_err("Failed to select bt_en state, err = %d\n", ret);
 		}
 	} else {
 		pr_err("%s: pinctrl is null\n", __func__);
@@ -1670,6 +1734,8 @@ static int bt_power_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	pwr_data->pdev = pdev;
+	pwr_data->reftask_bt = NULL;
+	pwr_data->reftask_uwb = NULL;
 
 	pr_info("%s: Get FMD nvmem-cells\n", __func__);
 	/* Get fmd_set NVMEM  Cell Handler */
@@ -1783,7 +1849,11 @@ free_pdata:
 	return ret;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static void bt_power_remove(struct platform_device *pdev)
+#else
 static int bt_power_remove(struct platform_device *pdev)
+#endif
 {
 	dev_dbg(&pdev->dev, "%s\n", __func__);
 	probe_finished = false;
@@ -1792,7 +1862,9 @@ static int bt_power_remove(struct platform_device *pdev)
 	if (pwr_data->is_ganges_dt)
 		destroy_workqueue(pwr_data->workq);
 	kfree(pwr_data);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
 	return 0;
+#endif
 }
 
 int btpower_register_slimdev(struct device *dev)
@@ -1984,10 +2056,21 @@ int power_enable (enum SubSystem SubSystemType)
 void send_signal_to_subsystem(int SubSystemType, int state)
 {
 	pwr_data->wrkq_signal_state = state;
-	if (SubSystemType == BLUETOOTH)
+	if (SubSystemType == BLUETOOTH) {
+		if (!pwr_data->reftask_bt) {
+			pr_err("%s: BT client is not register to send signal\n",
+				__func__);
+			return;
+		}
 		queue_work(pwr_data->workq, &pwr_data->bt_wq);
-	else
+	} else {
+		if (!pwr_data->reftask_uwb) {
+			pr_err("%s: UWB client is not register to send signal\n",
+				__func__);
+			return;
+		}
 		queue_work(pwr_data->workq, &pwr_data->uwb_wq);
+	}
 }
 
 int power_disable (enum SubSystem SubSystemType)
@@ -2084,25 +2167,13 @@ static int client_state_notified(int SubSystemType)
 
 	if (SubSystemType == BLUETOOTH) {
 		update_sub_state(SSR_ON_BT);
-		if (get_pwr_state() == ALL_CLIENTS_ON) {
-			if (!pwr_data->reftask_uwb) {
-				pr_err("%s: UWB PID is not register to send signal\n",
-					__func__);
-				return -1;
-			}
+		if (get_pwr_state() == ALL_CLIENTS_ON)
 			send_signal_to_subsystem(UWB, SSR_ON_BT);
-		}
 	} else {
 		update_sub_state(SSR_ON_UWB);
-		if (get_pwr_state() == ALL_CLIENTS_ON) {
-			if (!pwr_data->reftask_bt) {
-				pr_err("%s: BT PID is not register to send signal\n",
-					__func__);
-				return -1;
-			}
+		if (get_pwr_state() == ALL_CLIENTS_ON)
 			send_signal_to_subsystem(BLUETOOTH,
 				(SIGIO_NOTIFICATION_SIGNAL|SIGIO_SSR_ON_UWB));
-		}
 	}
 	return 0;
 }
@@ -2926,8 +2997,11 @@ static int __init btpower_init(void)
 		ret = -1;
 		goto chrdev_err;
 	}
-
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(6, 1, 128)
 	bt_class = class_create(THIS_MODULE,"bt-dev");
+#else
+        bt_class = class_create("bt-dev");
+#endif
 	if (IS_ERR(bt_class)) {
 		pr_err("%s: coudn't create class\n", __func__);
 		ret = -1;
