@@ -1523,7 +1523,56 @@ static int spi_cnss_register_xfer(struct spi_cnss_priv *spi_drv, u8 reg, u8 opco
 	}
 	return ret;
 }
+#ifndef CONFIG_SPI_LOOPBACK_ENABLED
+static int spi_cnss_switch_mode(struct spi_cnss_priv *spi_drv)
+{
+	int ret = 0;
+	u8 *tx_buf;
+	struct spi_transfer *xfer = NULL;
+	uint8_t cmd[8] = {0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04};
 
+	SPI_CNSS_ERR(spi_drv, "%s:Entered",__func__);
+	if (spi_drv->mem_mngr.register_tx_buf == NULL) {
+		SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError buffer is null",__func__);
+		return -ENOMEM;
+	}
+
+	tx_buf = spi_drv->mem_mngr.register_tx_buf;
+	memset(tx_buf, 0, REG_TX_SIZE);
+	memcpy(tx_buf, cmd, 8);
+
+	xfer = &spi_drv->spi_xfer1;
+	spi_cnss_reinit_xfer(xfer, 1);
+	xfer->tx_buf = tx_buf;
+	xfer->rx_buf = NULL;
+	xfer->len = 8;
+	xfer->speed_hz = spi_drv->spi_max_freq;
+	ret = spi_cnss_single_transfer(spi_drv);
+	SPI_CNSS_ERR(spi_drv, "%s:Exit",__func__);
+	return ret;
+}
+
+static int spi_cnss_switch_transport_mode(struct spi_cnss_priv *spi_drv)
+{
+	int i, ret;
+	ret = spi_cnss_switch_mode(spi_drv);
+	if (ret < 0) {
+		SPI_CNSS_ERR(spi_drv,"%s:spi cnss switch mode cmd failed\n",__func__);
+		return ret;
+	}
+	for (i = 0; i < 5; i++) {
+		msleep(100);
+		spi_cnss_nop_cmd(spi_drv);
+		SPI_CNSS_ERR(spi_drv,"%s:read slave sanity reg cnt = %d\n",__func__, i);
+		ret = spi_cnss_register_xfer(spi_drv, SPI_SLAVE_SANITY_REG, SPI_REGISTER_READ);
+		if (ret == 0) {
+			SPI_CNSS_ERR(spi_drv,"%s:successfully switched to SPI mode\n",__func__);
+			return ret;
+		}
+	}
+	return ret;
+}
+#endif
 /**
  * spi_cnss_controller_init: controller initialization during uwb on
  * @spi_drv: pointer to spi_cnss main struct
@@ -1555,6 +1604,16 @@ static int spi_cnss_controller_init(struct spi_cnss_priv *spi_drv)
 	}
 #endif
 	if (spi_drv->client_state == AWAKE) {
+		SPI_CNSS_DBG(spi_drv,"%s:read slave sanity reg\n",__func__);
+		ret = spi_cnss_register_xfer(spi_drv, SPI_SLAVE_SANITY_REG, SPI_REGISTER_READ);
+		if (ret < 0) {
+			SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError Send protcol switch command\n",__func__);
+			ret = spi_cnss_switch_transport_mode(spi_drv);
+			if (ret < 0) {
+				SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError SPI mode switch failed\n",__func__);
+				return ret;
+			}
+		}
 		ret = spi_cnss_register_xfer(spi_drv, SPI_SLAVE_DEVICE_ID_REG, SPI_REGISTER_READ);
 		if (ret < 0) {
 			SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError SPI_SLAVE_DEVICE_ID_REG read failed: %d\n",__func__, ret);
