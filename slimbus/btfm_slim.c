@@ -674,10 +674,10 @@ static int btfm_slim_probe(struct slim_device *slim)
 		ret = -1;
 		goto register_err;
 	}
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(6, 1, 128)
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(6, 6, 0)
 	btfm_slim_class = class_create(THIS_MODULE,"btfmslim-dev");
 #else
-        btfm_slim_class = class_create("btfmslim-dev");
+	btfm_slim_class = class_create("btfmslim-dev");
 #endif
 	if (IS_ERR(btfm_slim_class)) {
 		BTFMSLIM_ERR("%s: coudn't create class\n", __func__);
