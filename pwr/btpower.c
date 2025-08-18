@@ -1764,6 +1764,13 @@ static void bt_signal_handler(struct work_struct *w_arg)
 	siginfo.si_signo = SIGIO;
 	siginfo.si_code = SI_QUEUE;
 	siginfo.si_int = pwr_data->wrkq_signal_state;
+
+	if (!pid_alive(pwr_data->reftask_bt)) {
+		pr_err("%s: HAL(%d) is dead, failed to send signal\n", __func__,
+			pwr_data->reftask_bt->pid);
+		return;
+	}
+
 	rc = send_sig_info(siginfo.si_signo, &siginfo, pwr_data->reftask_bt);
 	if (rc < 0)
 		pr_err("%s: failed (%d) to send SIG to HAL(%d)\n", __func__,
@@ -1782,6 +1789,13 @@ static void uwb_signal_handler(struct work_struct *w_arg)
 	siginfo.si_signo =  SIGIO;
 	siginfo.si_code = SI_QUEUE;
 	siginfo.si_int = pwr_data->wrkq_signal_state;
+
+	if (!pid_alive(pwr_data->reftask_uwb)) {
+		pr_err("%s: HAL(%d) is dead, failed to send signal\n", __func__,
+			pwr_data->reftask_uwb->pid);
+		return;
+	}
+
 	rc = send_sig_info(siginfo.si_signo, &siginfo, pwr_data->reftask_uwb);
 	if (rc < 0)
 		pr_err("%s: failed (%d) to send SIG to HAL(%d)\n", __func__,
