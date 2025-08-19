@@ -5,7 +5,7 @@ def define_pineapple():
         target = "pineapple",
         modules = [
             "btpower",
-            "radio-i2c-rtc6226-qca",
+            #"radio-i2c-rtc6226-qca",
             "bt_fm_slim",
             "btfmcodec",
             "bt_fm_swr",
@@ -13,7 +13,7 @@ def define_pineapple():
          ],
          config_options = [
             "CONFIG_MSM_BT_POWER",
-            "CONFIG_I2C_RTC6226_QCA",
+            #"CONFIG_I2C_RTC6226_QCA",
             "CONFIG_BTFM_CODEC",
             "CONFIG_FMD_ENABLE",
             #"CONFIG_BT_HW_SECURE_DISABLE",
@@ -49,7 +49,7 @@ def define_volcano():
         target = "volcano",
         modules = [
             "btpower",
-            "radio-i2c-rtc6226-qca",
+            #"radio-i2c-rtc6226-qca",
             "bt_fm_slim",
             "btfm_slim_codec",
             "btfmcodec",
@@ -57,7 +57,7 @@ def define_volcano():
          ],
          config_options = [
              "CONFIG_MSM_BT_POWER",
-             "CONFIG_I2C_RTC6226_QCA",
+             #"CONFIG_I2C_RTC6226_QCA",
              "CONFIG_SLIM_BTFM_CODEC",
 	     "CONFIG_BTFM_CODEC",
            #  "CONFIG_BT_HW_SECURE_DISABLE",
@@ -71,12 +71,12 @@ def define_parrot():
         modules = [
             "btpower",
             "bt_fm_slim",
-            "radio-i2c-rtc6226-qca",
+            #"radio-i2c-rtc6226-qca",
         ],
         config_options = [
             "CONFIG_MSM_BT_POWER",
             "CONFIG_BTFM_SLIM",
-            "CONFIG_I2C_RTC6226_QCA",
+            #"CONFIG_I2C_RTC6226_QCA",
             #"CONFIG_BT_HW_SECURE_DISABLE",
         ]
     )
