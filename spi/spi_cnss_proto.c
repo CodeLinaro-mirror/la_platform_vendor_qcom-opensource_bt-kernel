@@ -1517,7 +1517,7 @@ static int spi_cnss_register_xfer(struct spi_cnss_priv *spi_drv, u8 reg, u8 opco
 				ret = 0;
 			} else {
 				SPI_CNSS_ERR(spi_drv,"%s: sanity reg val incorrect.Either controller in bad state or not powered on\n",__func__);
-				ret = -EIO;
+				ret = -ENODEV;
 			}
 		}
 	}
@@ -1597,17 +1597,26 @@ static int spi_cnss_controller_init(struct spi_cnss_priv *spi_drv)
 		if (ret < 0) {
 			SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError Controller is in bad state or not powered on: %d\n",__func__, ret);
 			spi_drv->client_state = ASLEEP;
-			return -EIO;
 		} else {
 			spi_drv->client_state = AWAKE;
 		}
 	}
 #endif
+	if (spi_drv->client_state != AWAKE) {
+		SPI_CNSS_ERR(spi_drv, "%s: SpiCnssError no wake up irq .Send protcol switch command", __func__);
+		ret = spi_cnss_switch_transport_mode(spi_drv);
+		if (ret < 0) {
+			SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError SPI mode switch failed\n",__func__);
+			spi_drv->client_state = ASLEEP;
+			return ret;
+		}
+		spi_drv->client_state = AWAKE;
+	}
 	if (spi_drv->client_state == AWAKE) {
 		SPI_CNSS_DBG(spi_drv,"%s:read slave sanity reg\n",__func__);
 		ret = spi_cnss_register_xfer(spi_drv, SPI_SLAVE_SANITY_REG, SPI_REGISTER_READ);
 		if (ret < 0) {
-			SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError Send protcol switch command\n",__func__);
+			SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError Client awake , Send protcol switch command\n",__func__);
 			ret = spi_cnss_switch_transport_mode(spi_drv);
 			if (ret < 0) {
 				SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError SPI mode switch failed\n",__func__);
