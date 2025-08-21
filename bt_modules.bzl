@@ -55,3 +55,11 @@ register_bt_modules(
     config_opt = "CONFIG_MSM_BT_POWER",
     srcs = ["btpower.c"],
 )
+
+register_bt_modules(
+    name = "btpower_new",
+    path = PWR_PATH,
+    config_opt = "CONFIG_SECOND_BT_POWER",
+    srcs = ["btpower.c"],
+    deps = ["%b_btpower"],
+)

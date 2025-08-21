@@ -5,6 +5,7 @@ def define_autogvm():
         target = "autogvm",
         modules = [
             "btpower",
+            "btpower_new",
             #"bt_fm_slim",
             #"radio-i2c-rtc6226-qca",
             # "btfm_slim_codec",
