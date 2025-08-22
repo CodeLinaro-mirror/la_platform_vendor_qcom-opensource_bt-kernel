@@ -2886,6 +2886,36 @@ int bt_kernel_panic(char *arg) {
 	return ret;
 }
 
+static void __noreturn uwb_kernel_panic(unsigned long arg)
+{
+	unsigned long panic_reason = 0;
+	unsigned short primary_reason, sec_reason, source_subsystem;
+	int8_t  transport_err_code;
+
+	pr_err("%s: UWB_CMD_KERNEL_PANIC\n", __func__);
+	panic_reason = arg;
+	primary_reason = panic_reason & 0xFFFF;
+	sec_reason = (panic_reason >> 16) & 0xFFFF;
+	/*Source subsystem is stored in 2 bytes. 1 byte is free for future usage.
+	 * Last byte is used for transport error code.*/
+	source_subsystem = (panic_reason >> 32) & 0xFFFF;
+	transport_err_code = (int8_t)((panic_reason >> 56) & 0xFF);
+
+	pr_err("%s: UWB kernel panic PrimaryReason = (0x%02x)[%s] | SecondaryReason = (0x%02x)[%s] |"
+		"SourceSubsystem = (0x%02x)[%s] |  UwbTransportCrashReason = (0x%02x)[%s]\n",
+		__func__, primary_reason, GetUwbPrimaryCrashReason(primary_reason),
+		sec_reason, GetUwbSecondaryCrashReason(sec_reason),
+		source_subsystem, GetSourceSubsystemString(source_subsystem),
+		transport_err_code, GetUwbTransportCrashReason(transport_err_code));
+
+	panic("%s: UWB kernel panic PrimaryReason = (0x%02x)[%s] | SecondaryReason = (0x%02x)[%s] |"
+		"SourceSubsystem = (0x%02x)[%s] | UwbTransportCrashReason = (0x%02x)[%s]\n",
+		__func__, primary_reason, GetUwbPrimaryCrashReason(primary_reason),
+		sec_reason, GetUwbSecondaryCrashReason(sec_reason),
+		source_subsystem, GetSourceSubsystemString(source_subsystem),
+		transport_err_code, GetUwbTransportCrashReason(transport_err_code));
+}
+
 #ifdef CONFIG_MSM_BT_OOBS
 int bt_oobs_handler(enum btpower_obs_param clk_cntrl)
 {
@@ -2925,9 +2955,6 @@ static long bt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	int ret = 0;
 	int chipset_version = 0;
-	unsigned long panic_reason = 0;
-	unsigned short primary_reason = 0, sec_reason = 0, source_subsystem = 0;
-	int8_t  transport_err_code = 0;
 	int current_ssr_state = SUB_STATE_IDLE;
 
 	if (!pwr_data || !probe_finished) {
@@ -3043,28 +3070,7 @@ static long bt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 		break;
 	case UWB_CMD_KERNEL_PANIC:
-		pr_err("%s: UWB_CMD_KERNEL_PANIC\n", __func__);
-		panic_reason = arg;
-		primary_reason = panic_reason & 0xFFFF;
-		sec_reason = (panic_reason >> 16) & 0xFFFF;
-		/*Source subsystem is stored in 2 bytes. 1 byte is free for future usage.
-		 * Last byte is used for transport error code.*/
-		source_subsystem = (panic_reason >> 32) & 0xFFFF;
-		transport_err_code = (int8_t)((panic_reason >> 56) & 0xFF);
-
-		pr_err("%s: UWB kernel panic PrimaryReason = (0x%02x)[%s] | SecondaryReason = (0x%02x)[%s] |"
-			"SourceSubsystem = (0x%02x)[%s] |  UwbTransportCrashReason = (0x%02x)[%s]\n",
-			__func__, primary_reason, GetUwbPrimaryCrashReason(primary_reason),
-			sec_reason, GetUwbSecondaryCrashReason(sec_reason),
-			source_subsystem, GetSourceSubsystemString(source_subsystem),
-			transport_err_code, GetUwbTransportCrashReason(transport_err_code));
-
-		panic("%s: UWB kernel panic PrimaryReason = (0x%02x)[%s] | SecondaryReason = (0x%02x)[%s] |"
-			"SourceSubsystem = (0x%02x)[%s] | UwbTransportCrashReason = (0x%02x)[%s]\n",
-			__func__, primary_reason, GetUwbPrimaryCrashReason(primary_reason),
-			sec_reason, GetUwbSecondaryCrashReason(sec_reason),
-			source_subsystem, GetSourceSubsystemString(source_subsystem),
-			transport_err_code, GetUwbTransportCrashReason(transport_err_code));
+		uwb_kernel_panic(arg);
 		break;
 	case UWB_GET_SSR_STATE:
 		current_ssr_state = get_sub_state();
