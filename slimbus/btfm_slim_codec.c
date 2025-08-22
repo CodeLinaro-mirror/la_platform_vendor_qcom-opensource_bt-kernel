@@ -21,7 +21,7 @@
 #include <sound/soc-dapm.h>
 #include <sound/tlv.h>
 #include "btfm_slim.h"
-
+#include <linux/version.h>
 static int bt_soc_enable_status;
 int btfm_feedback_ch_setting;
 
