@@ -27,7 +27,7 @@ LOCAL_PATH := $(call my-dir)
 LOCAL_MODULE_DDK_BUILD := true
 LOCAL_MODULE_KO_DIRS := pwr/btpower.ko
 LOCAL_MODULE_KO_DIRS += slimbus/bt_fm_slim.ko
-LOCAL_MODULE_KO_DIRS += rtc6226/radio-i2c-rtc6226-qca.ko
+#LOCAL_MODULE_KO_DIRS += rtc6226/radio-i2c-rtc6226-qca.ko
 
 
 # This makefile is only for DLKM
@@ -96,14 +96,14 @@ LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 ################################ rtc6226 ################################
-include $(CLEAR_VARS)
-LOCAL_SRC_FILES           := $(BT_SRC_FILES)
-LOCAL_MODULE              := radio-i2c-rtc6226-qca.ko
-LOCAL_MODULE_KBUILD_NAME  := rtc6226/radio-i2c-rtc6226-qca.ko
-LOCAL_MODULE_TAGS         := optional
-LOCAL_MODULE_DEBUG_ENABLE := true
-LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
-include $(DLKM_DIR)/Build_external_kernelmodule.mk
+#include $(CLEAR_VARS)
+#LOCAL_SRC_FILES           := $(BT_SRC_FILES)
+#LOCAL_MODULE              := radio-i2c-rtc6226-qca.ko
+#LOCAL_MODULE_KBUILD_NAME  := rtc6226/radio-i2c-rtc6226-qca.ko
+#LOCAL_MODULE_TAGS         := optional
+#LOCAL_MODULE_DEBUG_ENABLE := true
+#LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
+#include $(DLKM_DIR)/Build_external_kernelmodule.mk
 ###########################################################
 
 endif # DLKM check
