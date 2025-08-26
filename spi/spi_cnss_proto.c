@@ -717,8 +717,8 @@ static int spi_cnss_read_len(struct spi_cnss_priv *spi_drv)
 								(clen_rx_buf[index + 5]) << 8 |
 								clen_rx_buf[index+4]);
 	SPI_CNSS_DBG(spi_drv,"%s: CLEN = %d, HLEN = %d\n",__func__, spi_drv->client.CBUF_LEN, spi_drv->client.HBUF_LEN);
-	if ((spi_drv->client.CBUF_LEN >= CONTEXT_BUF_SIZE) ||
-		(spi_drv->client.HBUF_LEN >= CONTEXT_BUF_SIZE)) {
+	if ((spi_drv->client.CBUF_LEN > CONTEXT_BUF_SIZE) ||
+		(spi_drv->client.HBUF_LEN > CONTEXT_BUF_SIZE)) {
 		SPI_CNSS_ERR(spi_drv,"%s: Incorrect clen or hlen from controller \n",__func__);
 		ret = -EINVAL;
 	}
