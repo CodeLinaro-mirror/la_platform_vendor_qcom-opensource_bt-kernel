@@ -3,6 +3,8 @@ load("//build/kernel/kleaf:kernel.bzl", "ddk_headers")
 
 bt_modules("sa510m", "debug")
 bt_modules("sa510m", "perf")
+bt_modules("sa510m.1g", "debug")
+bt_modules("sa510m.1g", "perf")
 
 package(
     default_visibility = [
