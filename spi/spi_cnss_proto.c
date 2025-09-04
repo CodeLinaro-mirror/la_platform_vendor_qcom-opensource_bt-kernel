@@ -1237,6 +1237,7 @@ static int spi_cnss_read_context_info(struct spi_cnss_priv *spi_drv, bool is_irq
 			if (ret < 0) {
 				SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError read len failed\n",__func__);
 				spi_drv->ipc_log_enable = false;
+				mutex_unlock(&spi_drv->read_lock);
 				return ret;
 			}
 			spi_drv->state_transition = false;
