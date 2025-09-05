@@ -2384,9 +2384,6 @@ static int spi_cnss_resume(struct device *dev)
 		SPI_CNSS_ERR(spi_drv, "%s client not suspended\n", __func__);
 		return 0;
 	}
-	SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError calling runtime resume\n", __func__);
-	spi_cnss_runtime_resume(dev);
-	SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError Setting complete of resume\n", __func__);
 	complete(&spi_drv->resume_wait);
 	return 0;
 #endif
