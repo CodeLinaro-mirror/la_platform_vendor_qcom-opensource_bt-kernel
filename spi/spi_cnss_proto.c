@@ -919,6 +919,10 @@ loop_back:
 			} else {
 				usr = get_usr(rx_buf[index]);
 			}
+			if (usr < 0 ||  usr >= MAX_DEV || !spi_drv->user[usr].is_active) {
+				SPI_CNSS_ERR(spi_drv,"%s: Invalid or inactive user:%d. ignore the message\n", __func__, usr);
+				return -EINVAL;
+			}
 			SPI_CNSS_INFO(spi_drv,"%s: data valid, usr = %d\n", __func__, usr);
 			if ((0 <= usr) && (usr < MAX_DEV) && spi_drv->user[usr].fifo_full) {
 				SPI_CNSS_INFO(spi_drv,"%s: host buffer full, dont clear CBUF LEN\n", __func__);
