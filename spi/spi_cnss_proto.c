@@ -1350,7 +1350,12 @@ static int spi_cnss_read_context_info(struct spi_cnss_priv *spi_drv, bool is_irq
 #ifdef CONFIG_AGGRESSIVE_SLEEP
 void spi_cnss_sleep_timeout_handler(struct timer_list *t)
 {
-	struct spi_cnss_priv *spi_drv = from_timer(spi_drv, t, client_sleep_timer);
+#if (KERNEL_VERSION(6, 16, 0) > LINUX_VERSION_CODE)
+        struct spi_cnss_priv *spi_drv = from_timer(spi_drv, t, client_sleep_timer);
+#else
+        struct spi_cnss_priv *spi_drv = timer_container_of(spi_drv, t, client_sleep_timer);
+#endif
+
 	SPI_CNSS_DBG(spi_drv, "%s\n",__func__);
 	if (spi_drv->context_read_pending || spi_drv->read_pending || gpio_get_value(spi_drv->gpio) ||
 		spi_drv->client_state == ASLEEP || spi_drv->write_pending ||
