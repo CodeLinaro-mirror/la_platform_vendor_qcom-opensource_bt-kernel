@@ -797,13 +797,14 @@ static int spi_cnss_clear_irq(struct spi_cnss_priv *spi_drv)
 int spi_cnss_wakeup_client(struct spi_cnss_priv *spi_drv, int retry)
 {
 	int i, ret = 0;
+	int sanity_checker = retry/2;
 	SPI_CNSS_INFO(spi_drv, "%s\n",__func__);
 	if (spi_drv->client_init && spi_drv->client_state != ASLEEP) {
 		SPI_CNSS_ERR(spi_drv,"%s: client is not asleep, bailing\n",__func__);
 		return -EIO;
 	}
 	spi_drv->client_state = AWAKE_PENDING;
-	for (i = 0; i < retry; i++) {
+	for (i = 1; i <= retry; i++) {
 	//Write NOP and wait for interrupt
 		SPI_CNSS_DBG(spi_drv, "%s: writing NOP cmd: try = %d",__func__, i);
 		reinit_completion(&spi_drv->wake_wait);
@@ -821,8 +822,8 @@ int spi_cnss_wakeup_client(struct spi_cnss_priv *spi_drv, int retry)
 			ret = spi_cnss_nop_cmd(spi_drv);
 			break;
 		}
-		if (!spi_drv->client_init && ((i + 1) % SANITY_CHECK_ITERATION == 0) &&
-			spi_drv->client_state != AWAKE) {
+		if ((i % sanity_checker == 0) && spi_drv->client_state != AWAKE) {
+			SPI_CNSS_DBG(spi_drv, "%s: No ack for NOP, reading sanity reg\n",__func__);
 			ret = spi_cnss_register_xfer(spi_drv, SPI_SLAVE_SANITY_REG, SPI_REGISTER_READ);
 			if (ret == 0) {
 				spi_drv->client_state = AWAKE;
