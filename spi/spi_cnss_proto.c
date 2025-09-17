@@ -695,6 +695,7 @@ static int spi_cnss_read_len(struct spi_cnss_priv *spi_drv)
 	u32 addr;
 	SPI_CNSS_DBG(spi_drv,"%s\n",__func__);
 	u8 *clen_rx_buf, *clen_tx_buf;
+	u32 clen, hlen;
 
 	if (spi_drv->mem_mngr.len_tx_buf == NULL ||
 		spi_drv->mem_mngr.len_rx_buf == NULL) {
@@ -724,21 +725,22 @@ static int spi_cnss_read_len(struct spi_cnss_priv *spi_drv)
 		goto err;
 	}
 	index = FREAD_TX_SIZE;
-	spi_drv->client.CBUF_LEN = ((clen_rx_buf[index + 3]) << 24 |
-								(clen_rx_buf[index + 2]) << 16 |
-								(clen_rx_buf[index + 1]) << 8 |
-								clen_rx_buf[index]);
-	spi_drv->client.HBUF_LEN = ((clen_rx_buf[index + 7]) << 24 |
-								(clen_rx_buf[index + 6]) << 16 |
-								(clen_rx_buf[index + 5]) << 8 |
-								clen_rx_buf[index+4]);
-	SPI_CNSS_DBG(spi_drv,"%s: CLEN = %d, HLEN = %d\n",__func__, spi_drv->client.CBUF_LEN, spi_drv->client.HBUF_LEN);
-	if ((spi_drv->client.CBUF_LEN > CONTEXT_BUF_SIZE) ||
-		(spi_drv->client.HBUF_LEN > CONTEXT_BUF_SIZE)) {
-		SPI_CNSS_ERR(spi_drv,"%s: Incorrect clen or hlen from controller \n",__func__);
-		spi_drv->ipc_log_enable = false;
-		ret = -EINVAL;
+	clen = ((clen_rx_buf[index + 3]) << 24 |
+					(clen_rx_buf[index + 2]) << 16 |
+					(clen_rx_buf[index + 1]) << 8 |
+					clen_rx_buf[index]);
+	hlen = ((clen_rx_buf[index + 7]) << 24 |
+					(clen_rx_buf[index + 6]) << 16 |
+					(clen_rx_buf[index + 5]) << 8 |
+					clen_rx_buf[index+4]);
+	SPI_CNSS_DBG(spi_drv,"%s: CLEN = %d, HLEN = %d\n",__func__, clen, hlen);
+	if (clen > spi_drv->client.CBUF_SIZE ||
+		hlen > spi_drv->client.HBUF_SIZE) {
+		SPI_CNSS_ERR(spi_drv,"%s: Incorrect clen/hlen from controller \n",__func__);
+		return -EINVAL;
 	}
+	spi_drv->client.CBUF_LEN = clen;
+	spi_drv->client.HBUF_LEN = hlen;
 err:
 	return ret;
 }
@@ -1229,13 +1231,24 @@ static int spi_cnss_read_context_info(struct spi_cnss_priv *spi_drv, bool is_irq
 		}
 		spi_cnss_clear_irq(spi_drv);
 		ret = spi_cnss_read_len(spi_drv);
-		if ((ret >= 0) && spi_drv->state_transition &&
-			gpio_get_value(spi_drv->gpio)) {
-			SPI_CNSS_ERR(spi_drv,"%s: IRQ failed to clear after wakeup, retrying",__func__);
-			spi_cnss_clear_irq(spi_drv);//if Peri waking up from sleep misses first clear irq
+		if (ret < 0) {
+			SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError read len failed, retrying\n",__func__);
 			ret = spi_cnss_read_len(spi_drv);
 			if (ret < 0) {
-				SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError read len failed\n",__func__);
+				SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError read len retry failed\n",__func__);
+				spi_drv->ipc_log_enable = false;
+				mutex_unlock(&spi_drv->read_lock);
+				return ret;
+			}
+
+		}
+		if ((ret >= 0) && spi_drv->state_transition && gpio_get_value(spi_drv->gpio)) {
+			SPI_CNSS_ERR(spi_drv,"%s: IRQ not cleared, retrying",__func__);
+			spi_cnss_clear_irq(spi_drv);//if Peri waking up from sleep will misses first clear irq
+			ret = spi_cnss_read_len(spi_drv);
+			if (ret < 0) {
+				SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError read len retry failed\n",__func__);
+				spi_drv->state_transition = false;
 				spi_drv->ipc_log_enable = false;
 				mutex_unlock(&spi_drv->read_lock);
 				return ret;
