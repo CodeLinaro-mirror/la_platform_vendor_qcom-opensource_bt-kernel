@@ -552,7 +552,7 @@ static int spi_cnss_prepare_xfer(struct spi_cnss_priv *spi_drv,
 					DATA_WORD_LEN - (alloc_size % DATA_WORD_LEN) : 0);
 		alloc_size += ADDR_BYTES + CMD_SIZE;
 		tx_buf = spi_drv->mem_mngr.tx_payload;
-		memset(tx_buf, 0, spi_drv->client.HBUF_SIZE);
+		memset(tx_buf, 0, spi_drv->client.HBUF_SIZE + FREAD_TX_SIZE);
 		cmnd = SPI_WRITE_OPCODE;
 
 		memcpy(tx_buf + offset, &cmnd, sizeof(cmnd));
@@ -1103,7 +1103,7 @@ static int spi_cnss_allocate_memory(struct spi_cnss_priv *spi_drv)
 {
 	int ret = 0;
 	SPI_CNSS_DBG(spi_drv, "%s\n",__func__);
-	spi_drv->mem_mngr.tx_payload = spi_cnss_kzalloc(spi_drv, CONTEXT_BUF_SIZE);
+	spi_drv->mem_mngr.tx_payload = spi_cnss_kzalloc(spi_drv, CONTEXT_BUF_SIZE + FREAD_TX_SIZE);
 	if (!spi_drv->mem_mngr.tx_payload) {
 		SPI_CNSS_ERR(spi_drv, "%s:SpiCnssErrortx_payload failed\n",__func__);
 		ret = -ENOMEM;
