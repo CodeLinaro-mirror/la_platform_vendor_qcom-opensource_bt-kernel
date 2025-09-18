@@ -40,8 +40,8 @@ enum {
 
 
 enum {
-	EVROS_EA = 0x0108170220,
-	GANGES_EA = 0x0208170220,
+	EVROS_EA = 0x0108170220ULL,
+	GANGES_EA = 0x0208170220ULL,
 };
 
 /* Specific defines for slave slimbus device */
