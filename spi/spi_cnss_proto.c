@@ -2460,11 +2460,6 @@ static int spi_cnss_resume(struct device *dev)
 		pr_err("%s: no active clients\n",__func__);
 		return 0;
 	}
-
-	if (!pm_runtime_status_suspended(spi_drv->dev)) {
-		SPI_CNSS_ERR(spi_drv, "%s client not suspended\n", __func__);
-		return 0;
-	}
 	complete(&spi_drv->resume_wait);
 	return 0;
 #endif
