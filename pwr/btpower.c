@@ -1511,7 +1511,7 @@ static int get_gpio_dt_pinfo(struct platform_device *pdev)
 		pr_warn("sw_cntrl-gpio not provided in devicetree\n");
 	}
 #ifdef CONFIG_FMD_ENABLE
-	if (pinctrl1) {
+	if (!IS_ERR(pinctrl1)) {
 		sw_ctrl = pinctrl_lookup_state(pinctrl1, "sw_ctrl");
 		if (IS_ERR_OR_NULL(sw_ctrl)) {
 			ret = PTR_ERR(sw_ctrl);
