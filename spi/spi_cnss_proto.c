@@ -551,6 +551,8 @@ static int spi_cnss_prepare_xfer(struct spi_cnss_priv *spi_drv,
 		alloc_size += ((alloc_size % DATA_WORD_LEN)?
 					DATA_WORD_LEN - (alloc_size % DATA_WORD_LEN) : 0);
 		alloc_size += ADDR_BYTES + CMD_SIZE;
+		alloc_size += ((alloc_size % DATA_WORD_LEN)?
+					DATA_WORD_LEN - (alloc_size % DATA_WORD_LEN) : 0);
 		tx_buf = spi_drv->mem_mngr.tx_payload;
 		memset(tx_buf, 0, spi_drv->client.HBUF_SIZE + FREAD_TX_SIZE);
 		cmnd = SPI_WRITE_OPCODE;
