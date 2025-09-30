@@ -107,7 +107,7 @@ if (print) { \
 
 #define SPI_CNSS_INFO(spi_ptr, x...) do { \
 if (spi_ptr) { \
-	if (spi_ptr->ipc) \
+	if (spi_ptr->ipc && spi_ptr->ipc_log_enable) \
 		ipc_log_string(spi_ptr->ipc, x);\
 	if (spi_ptr->dev) \
 		spi_cnss_trace_log(spi_ptr->dev, x); \
@@ -118,7 +118,7 @@ if (spi_ptr) { \
 #define SPI_CNSS_DBG(spi_ptr, x...) do { \
 if (spi_ptr) { \
 	SPI_LOG_DBG_MSG (true, spi_ptr->dev, x); \
-	if (spi_ptr->ipc) \
+	if (spi_ptr->ipc && spi_ptr->ipc_log_enable) \
 		ipc_log_string(spi_ptr->ipc, x); \
 	if (spi_ptr->dev) \
 		spi_cnss_trace_log(spi_ptr->dev, x); \
@@ -305,6 +305,7 @@ struct spi_cnss_priv {
 	struct memory_manager mem_mngr;
 	void *ipc;
 	bool sleep_enabled;
+	volatile bool ipc_log_enable;
 	atomic_t write_err_code;
 };
 #endif //__LINUX_SPI_CNSS_PROTO_H
