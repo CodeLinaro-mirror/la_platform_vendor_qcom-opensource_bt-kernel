@@ -125,6 +125,7 @@ static bool is_rx_data_valid(u8 *rx_buf)
 		case PERI_CMD:
 		case PERI_DATA:
 		case PERI_EVT:
+		case FW_CRASH_EVT:
 			return true;
 		default:
 			return false;
@@ -165,7 +166,8 @@ void spi_cnss_notify_data_avail(struct spi_cnss_user *usr)
  * return: void
  */
 
-static void spi_cnss_parse_and_enqueue(struct spi_cnss_priv *spi_drv, u8 *rx_buf, int data_len)
+static void spi_cnss_parse_and_enqueue(struct spi_cnss_priv *spi_drv,
+					u8 *rx_buf, int data_len, bool crash_pkt)
 {
 	struct spi_client_request cp;
 	struct spi_cnss_user *usr;
@@ -174,20 +176,24 @@ static void spi_cnss_parse_and_enqueue(struct spi_cnss_priv *spi_drv, u8 *rx_buf
 #ifdef CONFIG_SPI_LOOPBACK_ENABLED
 	index = 0;
 #endif
-	cp.proto_ind = rx_buf[index];
-	ret++;
-	if (is_peri_cmd(cp.proto_ind)) {
-		cp.end_point = rx_buf[index+1];
-		ret++;
+	if (crash_pkt) {
+		cp.proto_ind = PERI_EVT;
+		cp.end_point = UWB;
 	} else {
-		cp.end_point = get_usr(cp.proto_ind);
+		cp.proto_ind = rx_buf[index];
+		ret++;
+		if (is_peri_cmd(cp.proto_ind)) {
+			cp.end_point = rx_buf[index+1];
+			ret++;
+		} else {
+			cp.end_point = get_usr(cp.proto_ind);
+		}
 	}
-
-	cp.flow_id = (index+ret);//repurposed for offset.
+	cp.flow_id = ret;//repurposed for offset.
 	cp.data_len = (data_len - ret);
-	cp.data_buf = spi_cnss_kzalloc(spi_drv, data_len+index);
+	cp.data_buf = spi_cnss_kzalloc(spi_drv, data_len);
 	if (cp.data_buf) {
-		memcpy((u8*)cp.data_buf, rx_buf, data_len+index);
+		memcpy((u8*)cp.data_buf, rx_buf+index, data_len);
 	} else {
 		SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError failed to alloc memory\n",__func__);
 		spi_drv->ipc_log_enable = false;
@@ -918,7 +924,11 @@ loop_back:
 		SPI_CNSS_INFO(spi_drv,"%s: data valid, 1st = %x, 2nd = %x\n", __func__, rx_buf[index], rx_buf[index+1]);
 		if(is_rx_data_valid(&rx_buf[index])) {
 			int usr;
-			if (is_peri_cmd(rx_buf[index])) {
+			bool crash_pkt = false;
+			if (rx_buf[index] == 0xFF) {
+				crash_pkt = true;
+				usr = UWB;
+			} else if (is_peri_cmd(rx_buf[index])) {
 				usr = rx_buf[index + 1];
 			} else {
 				usr = get_usr(rx_buf[index]);
@@ -933,10 +943,10 @@ loop_back:
 				spi_drv->user[usr].read_pending = true;
 			} else {
 #ifdef CONFIG_SPI_LOOPBACK_ENABLED
-				spi_cnss_parse_and_enqueue(spi_drv, rx_buf, length);
+				spi_cnss_parse_and_enqueue(spi_drv, rx_buf, length, false);
 				spi_drv->client.CBUF_LEN = 0;
 #else
-				spi_cnss_parse_and_enqueue(spi_drv, rx_buf, spi_drv->client.CBUF_LEN);
+				spi_cnss_parse_and_enqueue(spi_drv, rx_buf, spi_drv->client.CBUF_LEN, crash_pkt);
 				ret = spi_cnss_clear_clen(spi_drv);
 				if(ret < 0) {
 					SPI_CNSS_ERR(spi_drv,"%s: spi xfer to clear clen failed\n",__func__);
