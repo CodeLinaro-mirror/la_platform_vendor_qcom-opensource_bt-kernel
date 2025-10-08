@@ -860,9 +860,8 @@ static int __spi_cnss_read_msg(struct spi_cnss_priv *spi_drv)
 #ifdef CONFIG_SPI_LOOPBACK_ENABLED
 	u8 length = 0;
 #endif
-	if (spi_drv == NULL) {
-		SPI_CNSS_ERR(spi_drv,"%s: spi_drv is null or released\n",__func__);
-		spi_drv->ipc_log_enable = false;
+	if (!spi_drv) {
+		pr_err("%s: spi_drv is null or released\n",__func__);
 		return -EINVAL;
 	}
 	read = spi_drv->usr_cnt;
@@ -1069,9 +1068,13 @@ static void spi_cnss_send_msg(struct kthread_work *work)
 	struct spi_cnss_priv *spi_drv = container_of(work, struct spi_cnss_priv, send_msg);
 	int ret = 0;
 	struct spi_cnss_user *usr = NULL;
+	if (!spi_drv) {
+		pr_err("%s:SpiCnssError spi_drv is null\n",__func__);
+		return;
+	}
 	SPI_CNSS_DBG(spi_drv, "%s: Enter \n",__func__);
-	if (spi_drv == NULL || !spi_drv->client_init) {
-		SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError spi_drv is null or released\n",__func__);
+	if (!spi_drv->client_init) {
+		SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError spi_drv released\n",__func__);
 		spi_drv->ipc_log_enable = false;
 		return;
 	}
@@ -1083,7 +1086,8 @@ static void spi_cnss_send_msg(struct kthread_work *work)
 		atomic_set(&spi_drv->write_err_code, ret);
 		spi_drv->ipc_log_enable = false;
 	}
-	complete(&usr->sync_wait);
+	if (usr)
+		complete(&usr->sync_wait);
 	SPI_CNSS_DBG(spi_drv, "%s: Exit\n",__func__);
 }
 
@@ -2363,11 +2367,11 @@ static int spi_cnss_runtime_suspend(struct device *dev)
 	int ret = 0;
 	struct spi_device *spi = to_spi_device(dev);
 	struct spi_cnss_priv *spi_drv = spi_get_drvdata(spi);
-	SPI_CNSS_DBG(spi_drv,"%s\n",__func__);
-	if (spi_drv == NULL) {
-		SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError spi_drv is null\n",__func__);
+	if (!spi_drv) {
+		pr_err("%s: spi_drv is null\n",__func__);
 		return 0;
 	}
+	SPI_CNSS_DBG(spi_drv,"%s\n",__func__);
 	if (spi_cnss_client_sleep(spi_drv)) {
 		SPI_CNSS_ERR(spi_drv,"%s: putting client to sleep\n",__func__);
 		ret = spi_cnss_send_byte_cmd(spi_drv, SLEEP_CMD_BYTE);
@@ -2393,11 +2397,11 @@ static int spi_cnss_runtime_resume(struct device *dev)
 	struct spi_device *spi = to_spi_device(dev);
 	struct spi_cnss_priv *spi_drv = spi_get_drvdata(spi);
 
-	pr_err("%s\n", __func__);
-	if (spi_drv == NULL) {
+	if (!spi_drv) {
 		pr_err("%s: spi_drv is null\n",__func__);
 		return 0;
 	}
+	SPI_CNSS_ERR(spi_drv, "%s \n", __func__);
 	if (spi_drv->usr_cnt == 0) {
 		pr_err("%s: no active clients\n",__func__);
 		return 0;
@@ -2428,7 +2432,7 @@ static int spi_cnss_suspend(struct device *dev)
 	struct spi_device *spi = to_spi_device(dev);
 	struct spi_cnss_priv *spi_drv = spi_get_drvdata(spi);
 
-	if (spi_drv == NULL) {
+	if (!spi_drv) {
 		pr_err("%s: spi_drv is null\n",__func__);
 		return 0;
 	}
@@ -2453,12 +2457,12 @@ static int spi_cnss_resume(struct device *dev)
 	struct spi_device *spi = to_spi_device(dev);
 	struct spi_cnss_priv *spi_drv = spi_get_drvdata(spi);
 
-	pr_err("%s\n", __func__);
 
-	if (spi_drv == NULL) {
+	if (!spi_drv) {
 		pr_err("%s: spi_drv is null\n",__func__);
 		return 0;
 	}
+	SPI_CNSS_ERR(spi_drv, "%s \n", __func__);
 	if (spi_drv->usr_cnt == 0) {
 		pr_err("%s: no active clients\n",__func__);
 		return 0;
