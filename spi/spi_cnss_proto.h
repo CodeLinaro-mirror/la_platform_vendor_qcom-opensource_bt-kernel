@@ -47,6 +47,7 @@
 #define PERI_CMD  0x31
 #define PERI_DATA 0x32
 #define PERI_EVT  0x34
+#define FW_CRASH_EVT  0xFF
 
 
 #define CMD_SIZE                  1
