@@ -4,6 +4,10 @@ M ?= $(shell pwd)
 M=$(PWD)
 BT_ROOT=$(KERNEL_SRC)/$(M)
 
+ifeq ($(TARGET_PLATFORM), sa535m)
+BT_ROOT=$(M)
+endif
+
 KBUILD_OPTIONS += BT_ROOT=$(BT_ROOT)
 KBUILD_OPTIONS += MODNAME=$(MODNAME)
 
