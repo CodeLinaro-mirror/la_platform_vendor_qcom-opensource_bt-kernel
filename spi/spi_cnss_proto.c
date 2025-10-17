@@ -184,6 +184,9 @@ static void spi_cnss_parse_and_enqueue(struct spi_cnss_priv *spi_drv,
 		ret++;
 		if (is_peri_cmd(cp.proto_ind)) {
 			cp.end_point = rx_buf[index+1];
+			if (cp.end_point != UWB) {
+				cp.end_point = UWB;
+			}
 			ret++;
 		} else {
 			cp.end_point = get_usr(cp.proto_ind);
@@ -934,8 +937,11 @@ loop_back:
 				usr = get_usr(rx_buf[index]);
 			}
 			if (usr < 0 ||  usr >= MAX_DEV || !spi_drv->user[usr].is_active) {
-				SPI_CNSS_ERR(spi_drv,"%s: Invalid or inactive user:%d. ignore the message\n", __func__, usr);
-				return -EINVAL;
+				SPI_CNSS_ERR(spi_drv,"%s: Invalid or inactive user:%d. change host id to uwb\n", __func__, usr);
+				usr = UWB;
+				spi_cnss_prepare_data_log(spi_drv,"read msg", (char *)&rx_buf[FREAD_TX_SIZE],
+						spi_drv->client.CBUF_LEN, 0, spi_drv->client.CBUF_LEN);
+//				return -EINVAL;
 			}
 			SPI_CNSS_INFO(spi_drv,"%s: data valid, usr = %d\n", __func__, usr);
 			if ((0 <= usr) && (usr < MAX_DEV) && spi_drv->user[usr].fifo_full) {
