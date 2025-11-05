@@ -1,10 +1,13 @@
 load(":bt_modules.bzl", "bt_modules")
+load(":bt_modules_lv.bzl", "bt_modules_lv")
 load("//build/kernel/kleaf:kernel.bzl", "ddk_headers")
 
 bt_modules("sa510m", "debug")
 bt_modules("sa510m", "perf")
 bt_modules("sa510m.1g", "debug")
 bt_modules("sa510m.1g", "perf")
+bt_modules_lv("autogvm", "debug")
+bt_modules_lv("autogvm", "")
 
 package(
     default_visibility = [
