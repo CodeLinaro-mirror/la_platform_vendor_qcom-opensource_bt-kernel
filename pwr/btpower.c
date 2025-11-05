@@ -1266,7 +1266,11 @@ free_pdata:
 	return ret;
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0))
 static void bt_power_remove(struct platform_device *pdev)
+#else
+static int bt_power_remove(struct platform_device *pdev)
+#endif
 {
 	dev_dbg(&pdev->dev, "%s\n", __func__);
 
@@ -1283,6 +1287,10 @@ static void bt_power_remove(struct platform_device *pdev)
 #endif
 
 	kfree(bt_power_pdata);
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 12, 0))
+	return 0;
+#endif
 }
 
 static void  set_pwr_srcs_status(struct bt_power_vreg_data *handle)
