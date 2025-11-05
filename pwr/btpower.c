@@ -199,6 +199,28 @@ static struct vreg_data bt_vregs_info_qca6xx0[] = {
 		{BT_VDD_IPA_2p2, BT_VDD_IPA_2p2_CURRENT}},
 };
 
+// Regulator structure for WCN6450 BT SoC series
+static struct vreg_data bt_vregs_info_wcn6450[] = {
+	{NULL, "qcom,bt-vdd-io",	  1256000, 1408000, 0, false, true,
+		{BT_VDD_IO_LDO, BT_VDD_IO_LDO_CURRENT}},
+	{NULL, "qcom,bt-vdd-aon",	  920000,  1040000,	0, false, true,
+		{BT_VDD_AON_LDO, BT_VDD_AON_LDO_CURRENT}},
+
+	/* BT_CX_MX */
+	{NULL, "qcom,bt-vdd-dig",	   920000,	1040000,  0, false, true,
+		{BT_VDD_DIG_LDO, BT_VDD_DIG_LDO_CURRENT}},
+	{NULL, "qcom,bt-vdd-rfa-0p8",  950000,  952000,  0, false, true,
+		{BT_VDD_RFA_0p8, BT_VDD_RFA_0p8_CURRENT}},
+	{NULL, "qcom,bt-vdd-rfa1",	   1856000, 2040000, 0, false, true,
+		{BT_VDD_RFA1_LDO, BT_VDD_RFA1_LDO_CURRENT}},
+	{NULL, "qcom,bt-vdd-rfa2",	   1256000, 1408000, 0, false, true,
+		{BT_VDD_RFA2_LDO, BT_VDD_RFA2_LDO_CURRENT}},
+	{NULL, "qcom,bt-vdd-pa",	   3300000, 3300000, 0, false, true,
+		{BT_VDD_PA_LDO, BT_VDD_PA_LDO_CURRENT}},
+	{NULL, "qcom,bt-vdd-pa-5g",	   3300000, 3300000, 0, false, true,
+		{BT_VDD_ASD_LDO, BT_VDD_ASD_LDO_CURRENT}},//temp mapping of ASD_LDO index
+};
+
 // Regulator structure for kiwi BT SoC series
 static struct vreg_data bt_vregs_info_kiwi[] = {
 	{NULL, "qcom,bt-vdd18-aon",      1800000, 1800000, 0, false, true,
@@ -369,6 +391,12 @@ static struct pwr_data vreg_info_wcn6750 = {
 	.bt_num_vregs = ARRAY_SIZE(bt_vregs_info_qca6xx0),
 };
 
+static struct pwr_data vreg_info_wcn6450 = {
+	.compatible = "qcom,wcn6450-bt",
+	.bt_vregs = bt_vregs_info_wcn6450,
+	.bt_num_vregs = ARRAY_SIZE(bt_vregs_info_wcn6450),
+};
+
 /* Peach supports both BT & UWB SS. For now it requires
  * only platform regulators to be powered ON.
  */
@@ -405,6 +433,7 @@ static const struct of_device_id bt_power_match_table[] = {
 	{	.compatible = "qcom,kiwi-no-share-ant-power",
 			.data = &vreg_info_kiwi_no_share_ant_power},
 	{	.compatible = "qcom,wcn6750-bt", .data = &vreg_info_wcn6750},
+	{       .compatible = "qcom,wcn6450-bt", .data = &vreg_info_wcn6450},
 	{	.compatible = "qcom,bt-qca-converged", .data = &vreg_info_converged},
 	{	.compatible = "qcom,peach-bt", .data = &vreg_info_peach},
 	{	.compatible = "qcom,wcn786x", .data = &vreg_info_wcn786x},
@@ -818,7 +847,7 @@ static int bt_resetb_operation(int resetb)
 	rc = bt_pull_resetb(resetb, RESETB_GPIO_LOW);
 	if (rc)
 		return rc;
-	msleep(20);
+	usleep_range(20000, 22000);
 	/* making resetb to high after delay */
 	pr_info("BTON: Turn bt_resetb_gpio to High\n");
 	rc = bt_pull_resetb(resetb, RESETB_GPIO_HIGH);
@@ -861,7 +890,7 @@ static int bt_configure_gpios(int on)
 		}
 		power_src.platform_state[BT_RESET_GPIO] =
 			gpio_get_value(bt_reset_gpio);
-		msleep(50);
+		usleep_range(50000, 55000);
 		pr_info("BTON:Turn Bt OFF post asserting BT_EN to low\n");
 		pr_info("bt-reset-gpio(%d) value(%d)\n", bt_reset_gpio,
 			gpio_get_value(bt_reset_gpio));
@@ -919,7 +948,7 @@ static int bt_configure_gpios(int on)
 			}
 			pr_info("BTON: WLAN OFF waiting for 100ms delay\n");
 			pr_info("for AON output to fully discharge\n");
-			msleep(100);
+			usleep_range(100000, 110000);
 			pr_info("BTON: WLAN OFF Asserting BT_EN to high\n");
 			btpower_set_xo_clk_gpio_state(true);
 			if (bt_resetb_gpio  >=  0)
@@ -950,7 +979,7 @@ static int bt_configure_gpios(int on)
 				gpio_get_value(bt_reset_gpio);
 			btpower_set_xo_clk_gpio_state(false);
 		}
-		msleep(50);
+		usleep_range(50000, 55000);
 #ifdef CONFIG_MSM_BT_OOBS
 		bt_configure_wakeup_gpios(on);
 #endif
@@ -991,7 +1020,7 @@ static int bt_configure_gpios(int on)
 		bt_configure_wakeup_gpios(on);
 #endif
 		gpio_set_value(bt_reset_gpio, 0);
-		msleep(100);
+		usleep_range(100000, 110000);
 		pr_info("BT-OFF:bt-reset-gpio(%d) value(%d)\n",
 			bt_reset_gpio, gpio_get_value(bt_reset_gpio));
 		if (bt_sw_ctrl_gpio >= 0) {
@@ -1579,7 +1608,7 @@ static int get_gpio_dt_pinfo(struct platform_device *pdev)
 		pr_warn("sw_cntrl-gpio not provided in devicetree\n");
 	}
 
-	if (pinctrl1) {
+	if (!IS_ERR(pinctrl1)) {
 		sw_ctrl = pinctrl_lookup_state(pinctrl1, "sw_ctrl");
 		if (IS_ERR_OR_NULL(sw_ctrl)) {
 			ret = PTR_ERR(sw_ctrl);

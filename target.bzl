@@ -99,3 +99,28 @@ def define_canoe():
              "CONFIG_THQSPI_PROTO",
         ]
     )
+
+def define_chora():
+    define_bt_modules(
+        target = "chora",
+        modules = [
+            "btpower",
+            "radio-i2c-rtc6226-qca",
+            "btfm_slim_codec",
+            "btfmcodec",
+            "bt_fm_swr",
+            "spi_cnss_proto",
+            "thqspi_proto",
+         ],
+         config_options = [
+             "CONFIG_MSM_BT_POWER",
+             "CONFIG_I2C_RTC6226_QCA",
+             "CONFIG_SLIM_BTFM_CODEC",
+             "CONFIG_BTFM_CODEC",
+           #  "CONFIG_BT_HW_SECURE_DISABLE",
+             "CONFIG_BTFM_SWR",
+             "CONFIG_FMD_ENABLE",
+             "CONFIG_SPI_CNSS_PROTO",
+             "CONFIG_THQSPI_PROTO",
+        ]
+    )
