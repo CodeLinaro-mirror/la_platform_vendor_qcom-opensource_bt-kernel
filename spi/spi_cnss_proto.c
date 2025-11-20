@@ -1832,6 +1832,7 @@ static ssize_t spi_cnss_write(struct file *filp, const char __user *buf, size_t 
 	void *data_buf = NULL;
 	int ret,rc;
 	int err_code = 0;
+	int length_check = 0;
 
 	if (!filp || !buf || !len | !filp->private_data) {
 		pr_err("%s: Null pointer\n", __func__);
@@ -1864,7 +1865,8 @@ static ssize_t spi_cnss_write(struct file *filp, const char __user *buf, size_t 
 		spi_drv->ipc_log_enable = false;
 		return -EFAULT;
 	}
-	if (user_req->data_len > (spi_drv->client.HBUF_SIZE - 2)) {//2 bytes for proto byte and host id
+	length_check = is_peri_cmd(user_req->proto_ind)?2:1;//2 bytes  for peri and 1 for uci
+	if (user_req->data_len > (spi_drv->client.HBUF_SIZE - length_check)) {
 		SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError invalid payload length: %d\n",__func__, user_req->data_len);
 		return -EINVAL;
 	}
