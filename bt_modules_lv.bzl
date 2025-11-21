@@ -1,11 +1,8 @@
 load("//build/bazel_common_rules/dist:dist.bzl", "copy_to_dist_dir")
 load("//build/kernel/kleaf:kernel.bzl", "ddk_module")
 
-def bt_modules(target, variant):
+def bt_modules_lv(target, variant):
     kernel_build_variant = "{}_{}".format(target, variant)
-    include_base = "../../../{}".format(native.package_name())
-
-    include_defconfig = ":{}_defconfig".format(variant)
 
     mod_list = []
 
@@ -18,12 +15,18 @@ def bt_modules(target, variant):
         hdrs = [
             "include/btpower.h",
         ],
-		includes = ["include"],
-    kernel_build = "//msm-kernel:{}-defconfig".format(kernel_build_variant),
-        deps = [
-            "//msm-kernel:all_headers_arm",
-        ],
+        includes = ["include"],
+        kernel_build = select({
+            "//build/kernel/kleaf:socrepo_true": "//soc-repo:{}-defconfig_base_kernel".format(kernel_build_variant),
+            "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}-defconfig".format(kernel_build_variant),
+        }),
+
+        deps = select({
+            "//build/kernel/kleaf:socrepo_true": ["//soc-repo:all_headers"],
+            "//build/kernel/kleaf:socrepo_false": ["//msm-kernel:all_headers_arm"],
+        }),
     )
+
     mod_list.append("{}-defconfig_btpower".format(kernel_build_variant))
 
     copy_to_dist_dir(
