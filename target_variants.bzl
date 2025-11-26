@@ -8,7 +8,8 @@ targets = [
     "chora",
     "bengal",
     "malabar",
-    "seraph"
+    "seraph",
+    "hamoa",
 ]
 
 la_variants = [
@@ -38,7 +39,8 @@ vm_target_bases = [
     "chora",
     "bengal",
     "malabar",
-    "seraph"
+    "seraph",
+    "hamoa",
 ]
 
 vm_targets = ["{}-{}".format(t, vt) for t in vm_target_bases for vt in vm_types]

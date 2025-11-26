@@ -179,3 +179,17 @@ def define_bengal():
              "CONFIG_BTFM_CODEC",
         ]
     )
+
+def define_hamoa():
+    define_bt_modules(
+       target = "hamoa",
+       modules = [
+           "btpower",
+           "radio-i2c-rtc6226-qca",
+        ],
+    config_options = [
+        "CONFIG_MSM_BT_POWER",
+        "CONFIG_I2C_RTC6226_QCA",
+        "CONFIG_FMD_ENABLE",
+    ]
+  )
