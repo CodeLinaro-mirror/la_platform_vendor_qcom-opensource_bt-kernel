@@ -16,7 +16,7 @@ ifeq ($(BT_DLKM_ENABLE),  true)
 LOCAL_PATH := $(call my-dir)
 
 # Build/Package only in case of supported target
-ifeq ($(call is-board-platform-in-list, taro kalama pineapple blair sun parrot canoe chora malabar seraph), true)
+ifeq ($(call is-board-platform-in-list, taro kalama pineapple blair bengal sun parrot canoe chora malabar seraph), true)
 BT_SELECT := CONFIG_MSM_BT_POWER=m
 ifneq ($(call is-board-platform-in-list, seraph), true)
 BT_SELECT += CONFIG_I2C_RTC6226_QCA=m

@@ -124,8 +124,6 @@ def define_chora():
              "CONFIG_THQSPI_PROTO",
         ]
     )
-
-
 def define_malabar():
     define_bt_modules(
         target = "malabar",
@@ -164,5 +162,20 @@ def define_seraph():
              "CONFIG_SLIM_BTFM_CODEC",
              "CONFIG_BTFM_CODEC",
              "CONFIG_BTFM_SWR",
+        ]
+    )
+
+def define_bengal():
+    define_bt_modules(
+        target = "bengal",
+        modules = [
+            "btpower",
+            "radio-i2c-rtc6226-qca",
+            "btfmcodec",
+         ],
+         config_options = [
+             "CONFIG_MSM_BT_POWER",
+             "CONFIG_I2C_RTC6226_QCA",
+             "CONFIG_BTFM_CODEC",
         ]
     )
