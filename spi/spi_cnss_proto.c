@@ -1859,7 +1859,10 @@ static ssize_t spi_cnss_write(struct file *filp, const char __user *buf, size_t 
 		spi_drv->ipc_log_enable = false;
 		return -EFAULT;
 	}
-
+	if (user_req->data_len > (spi_drv->client.HBUF_SIZE - 2)) {//2 bytes for proto byte and host id
+		SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError invalid payload length: %d\n",__func__, user_req->data_len);
+		return -EINVAL;
+	}
 	SPI_CNSS_DBG(spi_drv,"%s command = %d, len = %d, user bit = %d \n",
 				__func__, user_req->cmd, user_req->data_len, user_req->reserved[0]);
 	spi_drv->sleep_enabled = (user_req->reserved[0] & SPI_SLEEP_CMD_BIT);
@@ -1870,12 +1873,13 @@ static ssize_t spi_cnss_write(struct file *filp, const char __user *buf, size_t 
 		data_buf = spi_cnss_kzalloc(spi_drv, user_req->data_len);
 		if (!data_buf) {
 			SPI_CNSS_ERR(spi_drv,"%s: buffer alloc failed\n",__func__);
-		spi_drv->ipc_log_enable = false;
+			spi_drv->ipc_log_enable = false;
 			return -ENOMEM;
 		}
 		if (copy_from_user(data_buf, user_req->data_buf, user_req->data_len)) {
 			SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError data buffer copy failed\n",__func__);
-		spi_drv->ipc_log_enable = false;
+			spi_drv->ipc_log_enable = false;
+			spi_cnss_kfree(spi_drv,(void**)&data_buf);
 			return -EFAULT;
 		}
 		user_req->data_buf = data_buf;
