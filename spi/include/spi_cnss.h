@@ -12,6 +12,8 @@
 
 #define SPI_SOFT_RESET_BIT  BIT(0)
 #define SPI_SLEEP_CMD_BIT  BIT(1)
+#define SPI_CNSS_IPC_LOG_BIT  BIT(2)
+
 /*
 * Protocol Indicator
 */
