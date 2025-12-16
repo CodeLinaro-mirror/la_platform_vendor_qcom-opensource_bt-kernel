@@ -711,6 +711,10 @@ struct platform_pwr_data {
 	struct nvmem_cell *nvmem_cell_fmd_set;
 	struct nvmem_cell *nvmem_cell_fmd_chg_pon;
 	struct nvmem_cell *nvmem_cell_fmd_cnt2_stop;
+#ifdef CONFIG_EXT_BUCK
+	struct nvmem_cell *nvmem_cell_ext_bk;
+	bool is_ext_bk_enabled;
+#endif
 	u32 fmd_clk_gpio_id;
 };
 

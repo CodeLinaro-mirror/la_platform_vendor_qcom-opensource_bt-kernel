@@ -122,6 +122,7 @@ def define_chora():
              "CONFIG_FMD_ENABLE",
              "CONFIG_SPI_CNSS_PROTO",
              "CONFIG_THQSPI_PROTO",
+             "CONFIG_EXT_BUCK",
         ]
     )
 
