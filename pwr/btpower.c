@@ -2527,6 +2527,8 @@ static void bt_power_vote(struct work_struct *work)
 			ret = btpower_off((enum plt_pwr_state)request);
 		else if (request == POWER_ON_BT_RETENION || request == POWER_ON_UWB_RETENION)
 			ret = btpower_retenion(request);
+		else if (request == BT_GET_PWR_STATE)
+			ret = get_pwr_state();
 		else if (request >= BT_ACCESS_REQ && request <= UWB_RELEASE_ACCESS) {
 			ret = btpower_access_ctrl(request);
 			pr_info("%s: grant status %s", __func__, ConvertGrantRetToString((int)ret));
@@ -2588,10 +2590,12 @@ int btpower_handle_client_request(unsigned int cmd, int arg)
 
 	pr_info("%s: Start of %s cmd request to %s.\n",
 		__func__,
-		(cmd == BT_CMD_PWR_CTRL ? "BT_CMD_PWR_CTRL" : "UWB_CMD_PWR_CTRL"),
+		(cmd == BT_CMD_PWR_CTRL ? "BT_CMD_PWR_CTRL" : (cmd == UWB_CMD_PWR_CTRL ? "UWB_CMD_PWR_CTRL" : "BT_CMD_GET_PWR_STATE")),
 		ConvertClientReqToString(arg));
 
-	if (cmd == BT_CMD_PWR_CTRL) {
+	if (cmd == BT_CMD_GET_PWR_STATE) {
+		ret = schedule_client_voting(BT_GET_PWR_STATE);
+	} else if (cmd == BT_CMD_PWR_CTRL) {
 		switch ((int)arg) {
 		case POWER_DISABLE:
 			ret = schedule_client_voting(POWER_OFF_BT);
@@ -3008,6 +3012,7 @@ static long bt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		);
 #endif
 		break;
+	case BT_CMD_GET_PWR_STATE:
 	case BT_CMD_PWR_CTRL:
 	case UWB_CMD_PWR_CTRL: {
 		ret = btpower_handle_client_request(cmd, (int)arg);
