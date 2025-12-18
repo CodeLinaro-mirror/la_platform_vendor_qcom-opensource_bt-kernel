@@ -61,11 +61,11 @@ register_bt_modules(
     config_deps = {
 		    "CONFIG_BT_HW_SECURE_DISABLE": [ ":smcinvoke_kernel_headers",
             "//vendor/qcom/opensource/securemsm-kernel:%b_smcinvoke_dlkm",
-        ]
+        ],
+        "CONFIG_FMD_ENABLE": ["//vendor/qcom/opensource/wlan/platform:%b_cnss_utils"],
     },
     deps = [
-        "//vendor/qcom/opensource/wlan/platform:all-wlan-platform-headers",
-        "//vendor/qcom/opensource/wlan/platform:%b_cnss_utils",
+        "//vendor/qcom/opensource/wlan/platform:all-wlan-platform-headers"
     ],
 )
 

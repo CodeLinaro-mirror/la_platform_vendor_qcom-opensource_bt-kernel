@@ -7,7 +7,7 @@ ifeq ($(TARGET_KERNEL_DLKM_DISABLE), true)
         endif
 endif
 
-ifeq ($(call is-board-platform-in-list, chora), true)
+ifeq ($(call is-board-platform-in-list, chora malabar), true)
 	BT_DLKM_ENABLE := true
 endif
 
@@ -16,9 +16,11 @@ ifeq ($(BT_DLKM_ENABLE),  true)
 LOCAL_PATH := $(call my-dir)
 
 # Build/Package only in case of supported target
-ifeq ($(call is-board-platform-in-list, taro kalama pineapple blair sun parrot canoe chora), true)
+ifeq ($(call is-board-platform-in-list, taro kalama pineapple blair sun parrot canoe chora malabar seraph), true)
 BT_SELECT := CONFIG_MSM_BT_POWER=m
+ifneq ($(call is-board-platform-in-list, seraph), true)
 BT_SELECT += CONFIG_I2C_RTC6226_QCA=m
+endif
 
 ifneq ($(call is-board-platform-in-list, parrot canoe chora), true)
 BT_SELECT += CONFIG_FMD_ENABLE=y
@@ -33,10 +35,12 @@ endif
 LOCAL_PATH := $(call my-dir)
 LOCAL_MODULE_DDK_BUILD := true
 LOCAL_MODULE_KO_DIRS := pwr/btpower.ko
+ifneq ($(call is-board-platform-in-list, seraph), true)
 LOCAL_MODULE_KO_DIRS += rtc6226/radio-i2c-rtc6226-qca.ko
+endif
 
 ifeq ($(TARGET_USES_QMAA_OVERRIDE_BLUETOOTH_AUDIO), true)
-ifeq ($(call is-board-platform-in-list, sun canoe chora), true)
+ifeq ($(call is-board-platform-in-list, sun canoe chora seraph), true)
 BT_SELECT += CONFIG_BTFM_CODEC=m
 BT_SELECT += CONFIG_BTFM_SWR=m
 BT_SELECT += CONFIG_SLIM_BTFM_CODEC=m
@@ -113,7 +117,7 @@ LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 
 ifeq ($(TARGET_USES_QMAA_OVERRIDE_BLUETOOTH_AUDIO), true)
-ifeq ($(call is-board-platform-in-list, sun canoe chora), true)
+ifeq ($(call is-board-platform-in-list, sun canoe chora seraph), true)
 ################################ BTFM CODEC Driver #########################
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(BT_SRC_FILES)
