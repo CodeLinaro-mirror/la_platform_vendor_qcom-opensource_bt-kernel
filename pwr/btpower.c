@@ -14,7 +14,7 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
-#include <linux/rfkill.h>
+//#include <linux/rfkill.h>
 #include <linux/skbuff.h>
 #include <linux/gpio.h>
 #include <linux/of_gpio.h>
@@ -346,7 +346,7 @@ static const struct of_device_id bt_power_match_table[] = {
 };
 
 static struct platform_pwr_data *pwr_data;
-static bool previous;
+//static bool previous;
 static struct class *bt_class;
 static int bt_major;
 static int soc_id;
@@ -1220,7 +1220,7 @@ static int power_regulators(int core_type, int mode)
 	}
 	return ret;
 }
-
+/*
 static int btpower_toggle_radio(void *data, bool blocked)
 {
 	int ret = 0;
@@ -1262,12 +1262,12 @@ static int btpower_rfkill_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
-	/* add file into rfkill0 to handle LDO27 */
+
 	ret = device_create_file(&pdev->dev, &dev_attr_extldo);
 	if (ret < 0)
 		pr_err("%s: device create file error\n", __func__);
 
-	/* force Bluetooth off during init to allow for user control */
+	
 	rfkill_init_sw_state(rfkill, 1);
 	previous = true;
 
@@ -1295,7 +1295,7 @@ static void btpower_rfkill_remove(struct platform_device *pdev)
 	rfkill_destroy(rfkill);
 	platform_set_drvdata(pdev, NULL);
 }
-
+*/
 static int dt_parse_vreg_info(struct device *dev, struct device_node *child,
 		struct vreg_data *vreg_data)
 {
@@ -1676,10 +1676,11 @@ static int bt_power_probe(struct platform_device *pdev)
 
 	pwr_data->pdev = pdev;
 
+	/*
 	struct device *devi = &pwr_data->pdev->dev;
 	int rc = 0;
 	pr_info("%s: Get FMD nvmem-cells\n", __func__);
-/* Get fmd_set NVMEM  Cell Handler */
+
 	pwr_data->nvmem_cell_fmd_set =
 		devm_nvmem_cell_get(devi, "fmd_set");
 	if (IS_ERR(pwr_data->nvmem_cell_fmd_set)) {
@@ -1694,7 +1695,7 @@ static int bt_power_probe(struct platform_device *pdev)
 			pwr_data->nvmem_cell_fmd_set;
 	} else {
 		pr_info("%s: Got fmd_set nvmem-cells\n", __func__);
-/* Get fmd_chg_pon NVMEM Cell Handler */
+
 		pwr_data->nvmem_cell_fmd_chg_pon =
 			devm_nvmem_cell_get(devi, "fmd_chg_pon");
 		if (IS_ERR(pwr_data->nvmem_cell_fmd_chg_pon)) {
@@ -1704,7 +1705,7 @@ static int bt_power_probe(struct platform_device *pdev)
 		} else {
 			pr_info("%s: Got fmd_chg_pon nvmem-cells\n", __func__);
 		}
-/* Get fmd_cnt2_stop NVMEM Cell Handler */
+
 		pwr_data->nvmem_cell_fmd_cnt2_stop =
 			devm_nvmem_cell_get(devi, "fmd_cnt2_stop");
 		if (IS_ERR(pwr_data->nvmem_cell_fmd_cnt2_stop)) {
@@ -1716,7 +1717,7 @@ static int bt_power_probe(struct platform_device *pdev)
 		}
 	}
 	pr_info("%s: FMD nvmem-cells read completed\n", __func__);
-
+*/
 	pwr_data->is_ganges_dt = of_property_read_bool(pdev->dev.of_node,
 							"qcom,peach-bt") ||
 							of_property_read_bool(pdev->dev.of_node,
@@ -1776,8 +1777,8 @@ static int bt_power_probe(struct platform_device *pdev)
 		goto free_pdata;
 	}
 
-	if (btpower_rfkill_probe(pdev) < 0)
-		goto free_pdata;
+	//if (btpower_rfkill_probe(pdev) < 0)
+	//	goto free_pdata;
 
 	bt_power_pdc_init_params(pwr_data);
 	btpower_aop_mbox_init(pwr_data);
@@ -1798,7 +1799,7 @@ static int bt_power_remove(struct platform_device *pdev)
 {
 	dev_dbg(&pdev->dev, "%s\n", __func__);
 	probe_finished = false;
-	btpower_rfkill_remove(pdev);
+	//btpower_rfkill_remove(pdev);
 	bt_power_vreg_put();
 	if (pwr_data->is_ganges_dt)
 		destroy_workqueue(pwr_data->workq);
