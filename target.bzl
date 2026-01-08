@@ -153,13 +153,11 @@ def define_seraph():
         target = "seraph",
         modules = [
             "btpower",
-            "btfm_slim_codec",
             "btfmcodec",
             "bt_fm_swr",
          ],
          config_options = [
              "CONFIG_MSM_BT_POWER",
-             "CONFIG_SLIM_BTFM_CODEC",
              "CONFIG_BTFM_CODEC",
              "CONFIG_BTFM_SWR",
         ]
