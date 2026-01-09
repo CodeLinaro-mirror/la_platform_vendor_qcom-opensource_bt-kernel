@@ -193,3 +193,15 @@ def define_hamoa():
         "CONFIG_BTFM_SLIM",
     ]
   )
+def define_lahaina():
+    define_bt_modules(
+       target = "lahaina",
+       modules = [
+           "btpower",
+           "radio-i2c-rtc6226-qca",
+        ],
+    config_options = [
+       "CONFIG_MSM_BT_POWER",
+       "CONFIG_I2C_RTC6226_QCA",
+    ]
+  )
