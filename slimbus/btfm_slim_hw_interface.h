@@ -12,6 +12,7 @@ void btfm_slim_unregister_hwep(void);
 
 /* Codec driver defines */
 enum {
+	FMAUDIO_TX = 0,
 	BTAUDIO_TX = 1,
 	BTAUDIO_RX = 2,
 	BTAUDIO_NUM_CODEC_DAIS
