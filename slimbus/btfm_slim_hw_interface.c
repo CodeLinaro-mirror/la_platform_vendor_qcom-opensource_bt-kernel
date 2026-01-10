@@ -464,6 +464,20 @@ static struct hwep_dai_ops  btfmslim_hw_dai_ops = {
 };
 
 static struct hwep_dai_driver btfmslim_dai_driver[] = {
+	{	/* FM audio: fm -> lpass */
+		.dai_name = "btaudio_fm_tx",
+		.id = FMAUDIO_TX,
+		.capture = {
+			.stream_name = "FM TX Capture",
+			.rates = SNDRV_PCM_RATE_48000,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE, /* 16 bits */
+			.rate_max = 48000,
+			.rate_min = 48000,
+			.channels_min = 1,
+			.channels_max = 2,
+		},
+		.dai_ops = &btfmslim_hw_dai_ops,
+	},
 	{	/* Bluetooth SCO voice uplink: bt -> lpass */
 		.dai_name = "btaudio_tx",
 		.id = BTAUDIO_TX,
@@ -532,7 +546,6 @@ int btfm_slim_register_hw_ep(struct btfmslim *btfm_slim)
 	hwep_info->drv = &btfmslim_hw_driver;
 	hwep_info->dai_drv = btfmslim_dai_driver;
 	hwep_info->num_dai = ARRAY_SIZE(btfmslim_dai_driver);
-	hwep_info->num_dai = 2;
 	hwep_info->num_mixer_ctrl = ARRAY_SIZE(status_controls);
 	hwep_info->mixer_ctrl = status_controls;
 	/* Register to hardware endpoint */
