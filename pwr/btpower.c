@@ -451,6 +451,8 @@ static int soc_id;
 static bool probe_finished;
 static struct fmdOperationStruct fmdStruct;
 char *default_crash_reason = "Crash reason not found";
+static DEFINE_MUTEX(bt_client_task_lock);
+static DEFINE_MUTEX(uwb_client_task_lock);
 
 static int btpower_enable_ipa_vreg(struct platform_pwr_data *pdata);
 static inline int btpower_get_retenion_mode_state(void);
@@ -1794,9 +1796,18 @@ static void bt_signal_handler(struct work_struct *w_arg)
 	siginfo.si_code = SI_QUEUE;
 	siginfo.si_int = pwr_data->wrkq_signal_state;
 
+	mutex_lock(&bt_client_task_lock);
+
+	if (pwr_data->reftask_bt == NULL) {
+		pr_err("%s: BT HAL task is NULL, not sending signal\n", __func__);
+		mutex_unlock(&bt_client_task_lock);
+		return;
+	}
+
 	if (!pid_alive(pwr_data->reftask_bt)) {
 		pr_err("%s: HAL(%d) is dead, failed to send signal\n", __func__,
 			pwr_data->reftask_bt->pid);
+		mutex_unlock(&bt_client_task_lock);
 		return;
 	}
 
@@ -1807,6 +1818,8 @@ static void bt_signal_handler(struct work_struct *w_arg)
 	else
 		pr_err("%s: Signal to BT HAL (PID-%d) succesfull\n", __func__,
 				pwr_data->reftask_bt->pid);
+
+	mutex_unlock(&bt_client_task_lock);
 }
 
 static void uwb_signal_handler(struct work_struct *w_arg)
@@ -1819,9 +1832,18 @@ static void uwb_signal_handler(struct work_struct *w_arg)
 	siginfo.si_code = SI_QUEUE;
 	siginfo.si_int = pwr_data->wrkq_signal_state;
 
+	mutex_lock(&uwb_client_task_lock);
+
+	if (pwr_data->reftask_uwb == NULL) {
+		pr_err("%s: UWB HAL task is NULL, not sending signal\n", __func__);
+		mutex_unlock(&uwb_client_task_lock);
+		return;
+	}
+
 	if (!pid_alive(pwr_data->reftask_uwb)) {
 		pr_err("%s: HAL(%d) is dead, failed to send signal\n", __func__,
 			pwr_data->reftask_uwb->pid);
+		mutex_unlock(&uwb_client_task_lock);
 		return;
 	}
 
@@ -1832,6 +1854,8 @@ static void uwb_signal_handler(struct work_struct *w_arg)
 	else
 		pr_err("%s: Signal to UWB HAL (PID-%d) succesfull\n", __func__,
 				pwr_data->reftask_uwb->pid);
+
+	mutex_unlock(&uwb_client_task_lock);
 }
 
 static int bt_power_probe(struct platform_device *pdev)
@@ -2309,14 +2333,14 @@ static int client_state_notified(int SubSystemType)
 void btpower_register_client(int client, int cmd)
 {
 	if (cmd == REG_BT_PID) {
-		pwr_data->reftask_bt = get_current();
+		pwr_data->reftask_bt = get_current()->group_leader;
 		pr_info("%s: Registering BT Service(PID-%d) with Power driver\n",
-			__func__, pwr_data->reftask_bt->tgid);
+			__func__, get_current()->group_leader->pid);
 		return;
 	} else if (cmd == REG_UWB_PID) {
-		pwr_data->reftask_uwb = get_current();
+		pwr_data->reftask_uwb =  get_current()->group_leader;
 		pr_info("%s: Registering UWB Service(PID-%d) with Power driver\n",
-			__func__, pwr_data->reftask_uwb->tgid);
+			__func__, get_current()->group_leader->pid);
 		return;
 	}
 
@@ -3122,6 +3146,7 @@ static long bt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	}
 	return ret;
 }
+
 static struct platform_driver bt_power_driver = {
 	.probe = bt_power_probe,
 	.remove = bt_power_remove,
@@ -3131,9 +3156,45 @@ static struct platform_driver bt_power_driver = {
 	},
 };
 
+static int bt_pwr_release(struct inode *inode, struct file *file)
+{
+	if (!pwr_data || !probe_finished) {
+		pr_err("%s: BTPower Probing Pending.Try Again\n", __func__);
+		return 0;
+	}
+
+	if (pwr_data->reftask_bt && (current->group_leader == pwr_data->reftask_bt)) {
+		pr_info("%s: BT client (PID-%d) released device\n", __func__, current->tgid);
+
+		/* Unregister BT client under lock to synchronize with signal handler */
+		mutex_lock(&bt_client_task_lock);
+		pwr_data->reftask_bt = NULL;
+		mutex_unlock(&bt_client_task_lock);
+
+	} else if  (pwr_data->reftask_uwb && (current->group_leader == pwr_data->reftask_uwb)) {
+		pr_info("%s: UWB client (PID-%d) released device\n", __func__, current->tgid);
+
+		/* Unregister UWB client under lock to synchronize with signal handler */
+		mutex_lock(&uwb_client_task_lock);
+		pwr_data->reftask_uwb = NULL;
+		mutex_unlock(&uwb_client_task_lock);
+
+	} else {
+		/*
+		 * A non-registered client closed the device; no state-machine
+		 * movement is required.
+		 */
+		pr_debug("%s: Non-registered client (PID-%d) closed device\n",
+			 __func__, current->tgid);
+	}
+
+	return 0;
+}
+
 static const struct file_operations bt_dev_fops = {
 	.unlocked_ioctl = bt_ioctl,
 	.compat_ioctl = bt_ioctl,
+	.release = bt_pwr_release,
 };
 
 static int __init btpower_init(void)
