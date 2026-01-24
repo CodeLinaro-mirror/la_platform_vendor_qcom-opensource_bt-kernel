@@ -72,7 +72,7 @@ register_bt_modules(
 register_bt_modules(
     name = "bt_fm_slim",
     path = SLIMBUS_PATH,
-    # config_opt = "CONFIG_BTFM_SLIM",
+    config_opt = "CONFIG_BTFM_SLIM",
     srcs = [
         "btfm_slim.c",
         "btfm_slim.h",
