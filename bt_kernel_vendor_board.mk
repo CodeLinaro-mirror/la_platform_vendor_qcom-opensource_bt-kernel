@@ -8,10 +8,12 @@ ifeq ($(TARGET_USES_QMAA),true)
              BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/radio-i2c-rtc6226-qca.ko
            endif
            ifeq ($(TARGET_USES_QMAA_OVERRIDE_BLUETOOTH_AUDIO), true)
-             ifeq ($(call is-board-platform-in-list, sun canoe chora seraph), true)
+             ifeq ($(call is-board-platform-in-list, sun canoe chora seraph malabar), true)
                BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/btfmcodec.ko
                BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/btfm_slim_codec.ko
-               BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/bt_fm_swr.ko
+               ifneq ($(call is-board-platform-in-list, malabar), true)
+                 BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/bt_fm_swr.ko
+               endif
              else
                BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/bt_fm_slim.ko
              endif
@@ -32,10 +34,12 @@ else
        BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/radio-i2c-rtc6226-qca.ko
      endif
      ifeq ($(TARGET_USES_QMAA_OVERRIDE_BLUETOOTH_AUDIO), true)
-       ifeq ($(call is-board-platform-in-list, sun canoe chora seraph), true)
+       ifeq ($(call is-board-platform-in-list, sun canoe chora seraph malabar), true)
          BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/btfmcodec.ko
          BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/btfm_slim_codec.ko
-         BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/bt_fm_swr.ko
+         ifneq ($(call is-board-platform-in-list, malabar), true)
+           BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/bt_fm_swr.ko
+         endif
        else
          BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/bt_fm_slim.ko
        endif

@@ -41,13 +41,15 @@ LOCAL_MODULE_KO_DIRS += rtc6226/radio-i2c-rtc6226-qca.ko
 endif
 
 ifeq ($(TARGET_USES_QMAA_OVERRIDE_BLUETOOTH_AUDIO), true)
-ifeq ($(call is-board-platform-in-list, sun canoe chora seraph), true)
+ifeq ($(call is-board-platform-in-list, sun canoe chora seraph malabar), true)
 BT_SELECT += CONFIG_BTFM_CODEC=m
-BT_SELECT += CONFIG_BTFM_SWR=m
 BT_SELECT += CONFIG_SLIM_BTFM_CODEC=m
 LOCAL_MODULE_KO_DIRS += btfmcodec/btfmcodec.ko
 LOCAL_MODULE_KO_DIRS += slimbus/btfm_slim_codec.ko
+ifneq ($(call is-board-platform-in-list, malabar), true)
+BT_SELECT += CONFIG_BTFM_SWR=m
 LOCAL_MODULE_KO_DIRS += soundwire/bt_fm_swr.ko
+endif
 else
 BT_SELECT += CONFIG_BTFM_SLIM=m
 LOCAL_MODULE_KO_DIRS += slimbus/bt_fm_slim.ko
@@ -118,7 +120,7 @@ LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 
 ifeq ($(TARGET_USES_QMAA_OVERRIDE_BLUETOOTH_AUDIO), true)
-ifeq ($(call is-board-platform-in-list, sun canoe chora seraph), true)
+ifeq ($(call is-board-platform-in-list, sun canoe chora seraph malabar), true)
 ################################ BTFM CODEC Driver #########################
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(BT_SRC_FILES)
@@ -138,6 +140,7 @@ LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 ################################ soundwire ################################
+ifneq ($(call is-board-platform-in-list, malabar), true)
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(BT_SRC_FILES)
 LOCAL_MODULE              := bt_fm_swr.ko
@@ -150,6 +153,7 @@ KBUILD_REQUIRED_KOS += swr_dlkm.ko
 #LOCAL_ADDITIONAL_DEPENDENCIES += $(call intermediates-dir-for,DLKM,swr_dlkm)/Module.symvers
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
+endif
 else
 ################################ slimbus ################################
 include $(CLEAR_VARS)

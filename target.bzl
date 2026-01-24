@@ -130,8 +130,8 @@ def define_malabar():
         modules = [
             "btpower",
             "radio-i2c-rtc6226-qca",
-        #    "btfm_slim_codec",
-        #    "btfmcodec",
+            "btfm_slim_codec",
+            "btfmcodec",
         #    "bt_fm_swr",
             "spi_cnss_proto",
             "thqspi_proto",
@@ -139,8 +139,8 @@ def define_malabar():
          config_options = [
              "CONFIG_MSM_BT_POWER",
              "CONFIG_I2C_RTC6226_QCA",
-           #  "CONFIG_SLIM_BTFM_CODEC",
-           #  "CONFIG_BTFM_CODEC",
+             "CONFIG_SLIM_BTFM_CODEC",
+             "CONFIG_BTFM_CODEC",
            #  "CONFIG_BT_HW_SECURE_DISABLE",
            #  "CONFIG_BTFM_SWR",
              "CONFIG_SPI_CNSS_PROTO",
