@@ -6,8 +6,8 @@ bt_modules("sa510m", "debug")
 bt_modules("sa510m", "perf")
 bt_modules("sa510m.1g", "debug")
 bt_modules("sa510m.1g", "perf")
-bt_modules_lv("autogvm", "debug")
-bt_modules_lv("autogvm", "")
+bt_modules_lv("autogvm", "debug-defconfig")
+bt_modules_lv("autogvm", "defconfig")
 
 package(
     default_visibility = [

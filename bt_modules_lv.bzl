@@ -7,7 +7,7 @@ def bt_modules_lv(target, variant):
     mod_list = []
 
     ddk_module(
-        name = "{}-defconfig_btpower".format(kernel_build_variant),
+        name = "{}_btpower".format(kernel_build_variant),
         out = "btpower.ko",
         srcs = [
             "pwr/btpower.c",
@@ -17,8 +17,8 @@ def bt_modules_lv(target, variant):
         ],
         includes = ["include"],
         kernel_build = select({
-            "//build/kernel/kleaf:socrepo_true": "//soc-repo:{}-defconfig_base_kernel".format(kernel_build_variant),
-            "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}-defconfig".format(kernel_build_variant),
+            "//build/kernel/kleaf:socrepo_true": "//soc-repo:{}_base_kernel".format(kernel_build_variant),
+            "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(kernel_build_variant),
         }),
 
         deps = select({
@@ -27,10 +27,10 @@ def bt_modules_lv(target, variant):
         }),
     )
 
-    mod_list.append("{}-defconfig_btpower".format(kernel_build_variant))
+    mod_list.append("{}_btpower".format(kernel_build_variant))
 
     copy_to_dist_dir(
-        name = "{}-defconfig_btpower_dist".format(kernel_build_variant),
+        name = "{}_btpower_dist".format(kernel_build_variant),
         data = mod_list,
         dist_dir = "out/target/product/{}/dlkm/lib/modules/".format(target),
         flat = True,
