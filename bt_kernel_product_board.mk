@@ -10,6 +10,9 @@ ifeq ($(TARGET_BOARD_PLATFORM), sun canoe chora)
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/btfmcodec.ko
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/btfm_slim_codec.ko
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/bt_fm_swr.ko
+else ifeq ($(TARGET_BOARD_PLATFORM),seraph)
+PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/btfmcodec.ko
+PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/bt_fm_swr.ko
 else
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/bt_fm_slim.ko
 endif
