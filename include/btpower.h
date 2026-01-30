@@ -138,6 +138,7 @@ enum plt_pwr_state {
 	UWB_ACCESS_REQ,
 	BT_RELEASE_ACCESS,
 	UWB_RELEASE_ACCESS,
+	BT_GET_PWR_STATE,
 	BT_MAX_PWR_STATE,
 };
 
@@ -740,6 +741,7 @@ int bt_aop_pdc_reconfig(struct platform_pwr_data *pdata);
 #define UWB_CMD_ACCESS_CTRL         0xbfe5
 #define UWB_GET_SSR_STATE           0xbfe6
 #define BT_CMD_FMD_OPERATION        0xbfb2
+#define BT_CMD_GET_PWR_STATE        0xbfb4
 
 #ifdef CONFIG_MSM_BT_OOBS
 #define BT_CMD_OBS_VOTE_CLOCK		0xbfd1

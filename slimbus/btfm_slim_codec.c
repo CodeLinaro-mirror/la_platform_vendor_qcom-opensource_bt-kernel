@@ -15,6 +15,7 @@
 #include <linux/ratelimit.h>
 #include <linux/slab.h>
 #include <linux/errno.h>
+#include <linux/version.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
