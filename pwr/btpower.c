@@ -467,12 +467,6 @@ static struct {
 	int uwb_state[BT_POWER_SRC_SIZE];
 } power_src;
 
-struct Crash_struct {
-//	char SubSystem[10];
-	char PrimaryReason[50];
-	char SecondaryReason[100];
-} CrashInfo;
-
 #ifdef CONFIG_BT_HW_SECURE_DISABLE
 int perisec_cnss_bt_hw_disable_check(struct platform_pwr_data *plat_priv)
 {
@@ -2670,47 +2664,6 @@ int btpower_process_access_req(unsigned int cmd, int req)
 	return ret;
 }
 
-char* GetUwbTransportCrashReason(int8_t reason)
-{
-  for(int i =0; i < (int)(sizeof(UwbTransErrCodeMap)/sizeof(UwbTransportErrorCodeMap)); i++)
-    if (UwbTransErrCodeMap[i].reason == reason)
-      return UwbTransErrCodeMap[i].reasonstr;
-
-  return CRASH_REASON_NOT_FOUND;
-}
-
-char* GetUwbSecondaryCrashReason(enum UwbSecondaryReasonCode reason)
-{
-  for(int i =0; i < (int)(sizeof(uwbSecReasonMap)/sizeof(UwbSecondaryReasonMap)); i++)
-    if (uwbSecReasonMap[i].reason == reason)
-      return uwbSecReasonMap[i].reasonstr;
-
-  return CRASH_REASON_NOT_FOUND;
-}
-
-char* GetUwbPrimaryCrashReason(enum UwbPrimaryReasonCode reason)
-{
-  for(int i =0; i < (int)(sizeof(uwbPriReasonMap)/sizeof(UwbPrimaryReasonMap)); i++)
-    if (uwbPriReasonMap[i].reason == reason)
-      return uwbPriReasonMap[i].reasonstr;
-
-  return CRASH_REASON_NOT_FOUND;
-}
-
-const char *GetSourceSubsystemString(uint32_t source_subsystem)
-{
-	switch (source_subsystem) {
-	case PERI_SS:
-		return "Peri SS";
-	case BT_SS:
-		return "BT SS";
-	case UWB_SS:
-		return "UWB SS";
-	default:
-		return "Unknown Subsystem";
-	}
-}
-
 void fmd_set_sdam_bit(unsigned char arg)
 {
 	int rc = 0;
@@ -2920,6 +2873,11 @@ int perform_fmd_operation(void)
 
 int bt_kernel_panic(char *arg) {
 	int ret = 0;
+	struct Crash_struct {
+	//	char SubSystem[10];
+		char PrimaryReason[50];
+		char SecondaryReason[100];
+	} CrashInfo;
 
 	pr_info("%s\n", __func__);
 
@@ -2943,34 +2901,37 @@ int bt_kernel_panic(char *arg) {
 	return ret;
 }
 
-static void __noreturn uwb_kernel_panic(unsigned long arg)
-{
-	unsigned long panic_reason = 0;
-	unsigned short primary_reason, sec_reason, source_subsystem;
-	int8_t  transport_err_code;
+int uwb_kernel_panic(unsigned long arg) {
+	int ret = 0;
+	struct Crash_struct {
+		char PrimaryReason[50];
+		char SecondaryReason[100];
+		char SubsystemString[25];
+		int TransportErrCode;
+	} CrashInfo;
 
-	pr_err("%s: UWB_CMD_KERNEL_PANIC\n", __func__);
-	panic_reason = arg;
-	primary_reason = panic_reason & 0xFFFF;
-	sec_reason = (panic_reason >> 16) & 0xFFFF;
-	/*Source subsystem is stored in 2 bytes. 1 byte is free for future usage.
-	 * Last byte is used for transport error code.*/
-	source_subsystem = (panic_reason >> 32) & 0xFFFF;
-	transport_err_code = (int8_t)((panic_reason >> 56) & 0xFF);
+	if (copy_from_user(&CrashInfo, (char *)arg, sizeof(CrashInfo))) {
+		pr_err("%s: failed copy to panic reason from BT-Transport\n",
+			__func__);
+		memset(&CrashInfo, 0, sizeof(CrashInfo));
+		strscpy(CrashInfo.PrimaryReason,
+			default_crash_reason, strlen(default_crash_reason));
+		strscpy(CrashInfo.SecondaryReason,
+			default_crash_reason, strlen(default_crash_reason));
+		strscpy(CrashInfo.SubsystemString,
+			default_crash_reason, strlen(default_crash_reason));
+		CrashInfo.TransportErrCode = 0;
+		ret = -EFAULT;
+	}
 
-	pr_err("%s: UWB kernel panic PrimaryReason = (0x%02x)[%s] | SecondaryReason = (0x%02x)[%s] |"
-		"SourceSubsystem = (0x%02x)[%s] |  UwbTransportCrashReason = (0x%02x)[%s]\n",
-		__func__, primary_reason, GetUwbPrimaryCrashReason(primary_reason),
-		sec_reason, GetUwbSecondaryCrashReason(sec_reason),
-		source_subsystem, GetSourceSubsystemString(source_subsystem),
-		transport_err_code, GetUwbTransportCrashReason(transport_err_code));
+	pr_err("%s: UWB kernel panic SourceSubsystem:%s, PrimaryReason:%s, SecondaryReason:%s, TransportErrCode:%s\n",
+		__func__, CrashInfo.SubsystemString, CrashInfo.PrimaryReason,
+		CrashInfo.SecondaryReason, ConvertErrorCodeToString(CrashInfo.TransportErrCode));
 
-	panic("%s: UWB kernel panic PrimaryReason = (0x%02x)[%s] | SecondaryReason = (0x%02x)[%s] |"
-		"SourceSubsystem = (0x%02x)[%s] | UwbTransportCrashReason = (0x%02x)[%s]\n",
-		__func__, primary_reason, GetUwbPrimaryCrashReason(primary_reason),
-		sec_reason, GetUwbSecondaryCrashReason(sec_reason),
-		source_subsystem, GetSourceSubsystemString(source_subsystem),
-		transport_err_code, GetUwbTransportCrashReason(transport_err_code));
+	panic("%s: UWB kernel panic SourceSubsystem:%s, PrimaryReason:%s, SecondaryReason:%s, TransportErrCode:%s\n",
+		__func__, CrashInfo.SubsystemString, CrashInfo.PrimaryReason,
+		CrashInfo.SecondaryReason, ConvertErrorCodeToString(CrashInfo.TransportErrCode));
+	return ret;
 }
 
 #ifdef CONFIG_MSM_BT_OOBS
@@ -3128,7 +3089,10 @@ static long bt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 		break;
 	case UWB_CMD_KERNEL_PANIC:
-		uwb_kernel_panic(arg);
+
+		pr_err("%s: UWB_CMD_KERNEL_PANIC\n", __func__);
+
+		ret = uwb_kernel_panic(arg);
 		break;
 	case UWB_GET_SSR_STATE:
 		current_ssr_state = get_sub_state();
@@ -3140,7 +3104,6 @@ static long bt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			ret = -EFAULT;
 		}
 		break;
-
 	default:
 		return -ENOIOCTLCMD;
 	}
