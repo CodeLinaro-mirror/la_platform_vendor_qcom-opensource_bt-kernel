@@ -27,10 +27,6 @@ ifneq ($(call is-board-platform-in-list, parrot canoe chora hamoa), true)
 BT_SELECT += CONFIG_FMD_ENABLE=y
 endif
 
-ifeq ($(call is-board-platform-in-list, chora), true)
-BT_SELECT += CONFIG_EXT_BUCK=y
-endif
-
 ifeq ($(TARGET_KERNEL_DLKM_SECUREMSM_QTEE_OVERRIDE), true)
 ifeq ($(ENABLE_PERIPHERAL_STATE_UTILS), true)
 BT_SELECT += CONFIG_BT_HW_SECURE_DISABLE=y

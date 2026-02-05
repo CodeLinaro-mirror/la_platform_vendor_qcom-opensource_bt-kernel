@@ -93,10 +93,6 @@
 #define PEACH_SOC_VERSION_2_0       0x02
 #define OTHER_FMD_SUPPORTED_BT_SOC  0x03
 
-#ifdef CONFIG_EXT_BUCK
-#define WCN_KTB_EXT_RAIL 3
-#endif
-
 /**
  * enum btpower_vreg_param: Voltage regulator TCS param
  * @BTPOWER_VREG_VOLTAGE: Provides voltage level to be configured in TCS
@@ -615,14 +611,6 @@ static int vreg_enable(struct vreg_data *vreg)
 
 	pr_debug("%s: vreg_en for : %s\n", __func__, vreg->name);
 
-#ifdef CONFIG_EXT_BUCK
-	/* Log EXT_BUCK usage during runtime operations */
-	if (pwr_data->is_ext_bk_enabled && !strcmp(vreg->name, "qcom,bt-vdd-ipa-2p2-ext")) {
-		pr_info("%s: For EXT_BUCK regulator: %s \n",
-			__func__, vreg->name);
-	}
-#endif
-
 	if (!vreg->is_enabled) {
 		if (vreg_configure(vreg, false) < 0) {
 			return rc;
@@ -678,14 +666,6 @@ static int vreg_disable(struct vreg_data *vreg)
 		return rc;
 
 	pr_debug("%s for : %s\n", __func__, vreg->name);
-
-#ifdef CONFIG_EXT_BUCK
-	/* Log EXT_BUCK usage during runtime operations */
-	if (pwr_data->is_ext_bk_enabled && !strcmp(vreg->name, "qcom,bt-vdd-ipa-2p2-ext")) {
-		pr_info("%s: For EXT_BUCK regulator: %s \n",
-			__func__, vreg->name);
-	}
-#endif
 
 	if (vreg->is_enabled) {
 		rc = regulator_disable(vreg->reg);
@@ -1708,12 +1688,6 @@ static int get_power_dt_pinfo(struct platform_device *pdev)
 	}
 
 	for (i = 0; i < pwr_data->bt_num_vregs; i++) {
-#ifdef CONFIG_EXT_BUCK
-		if (pwr_data->is_ext_bk_enabled && !strcmp(pwr_data->bt_vregs[i].name, "qcom,bt-vdd-ipa-2p2")) {
-			pr_info("%s: *** EXT_BUCK: Replacing qcom,bt-vdd-ipa-2p2 with qcom,bt-vdd-ipa-2p2-ext ***\n", __func__);
-			pwr_data->bt_vregs[i].name = "qcom,bt-vdd-ipa-2p2-ext";
-		}
-#endif
 		rc = dt_parse_vreg_info(&(pdev->dev), pwr_data->bt_of_node,
 			&pwr_data->bt_vregs[i]);
 		/* No point to go further if failed to get regulator handler */
@@ -1899,10 +1873,6 @@ static int bt_power_probe(struct platform_device *pdev)
 			pwr_data->nvmem_cell_fmd_set;
 		pwr_data->nvmem_cell_fmd_cnt2_stop =
 			pwr_data->nvmem_cell_fmd_set;
-#ifdef CONFIG_EXT_BUCK
-		pwr_data->nvmem_cell_ext_bk =
-			pwr_data->nvmem_cell_fmd_set;
-#endif
 	} else {
 		pr_info("%s: Got fmd_set nvmem-cells\n", __func__);
 /* Get fmd_chg_pon NVMEM Cell Handler */
@@ -1939,38 +1909,6 @@ static int bt_power_probe(struct platform_device *pdev)
 							of_property_read_bool(pdev->dev.of_node,
 							"qcom,wcn8850-bt");
 	pr_info("%s: is_multi_tech_soc_dt = %d\n", __func__, pwr_data->is_multi_tech_soc_dt);
-
-#ifdef CONFIG_EXT_BUCK
-	pwr_data->is_ext_bk_enabled = false;
-	if (of_property_read_bool(pdev->dev.of_node, "qcom,wcn7750-bt")) {
-	/* Get wcn_info_reg NVMEM Cell Handler */
-		pwr_data->nvmem_cell_ext_bk =
-			devm_nvmem_cell_get(devi, "wcn_info_reg");
-		if (IS_ERR(pwr_data->nvmem_cell_ext_bk)) {
-			rc = PTR_ERR(pwr_data->nvmem_cell_ext_bk);
-			pr_err("%s:Failed to get wcn_info_reg nvmem-cells for EXT_BUCK determination: %d\n",
-				__func__, rc);
-		} else {
-			u8 *buf;
-			size_t len;
-			pr_info("%s: Got wcn_info_reg nvmem-cells\n", __func__);
-			buf = nvmem_cell_read(pwr_data->nvmem_cell_ext_bk, &len);
-			if (IS_ERR(buf)) {
-				pr_err("%s: Failed to read wcn_info_reg: %ld\n",
-					__func__, PTR_ERR(buf));
-			} else {
-				if (len > 0) {
-					pwr_data->is_ext_bk_enabled = (buf[0] == WCN_KTB_EXT_RAIL);
-					pr_info("%s: wcn_info_reg value: %u, EXT_BUCK enabled: %d\n",
-						__func__, buf[0], pwr_data->is_ext_bk_enabled);
-				} else {
-					pr_err("%s: Invalid wcn_info_reg length: %zu\n", __func__, len);
-				}
-			}
-			kfree(buf);
-		}
-	}
-#endif
 
 	pwr_data->workq = alloc_workqueue("workq", WQ_HIGHPRI, WQ_DFL_ACTIVE);
 	if (!pwr_data->workq) {
