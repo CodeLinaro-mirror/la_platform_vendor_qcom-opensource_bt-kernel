@@ -249,6 +249,7 @@ static struct vreg_data platform_vregs_info_peach[] = {
 };
 
 // Regulator structure for WCN399x BT SoC series
+// The same regulator structure can be reused for wcn39xx series.
 static struct pwr_data vreg_info_wcn399x = {
 	.compatible = "qcom,wcn3990",
 	.bt_vregs = (struct vreg_data []) {
