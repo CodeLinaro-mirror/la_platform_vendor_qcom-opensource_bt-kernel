@@ -611,6 +611,11 @@ int btfmcodec_hwep_prepare(struct btfmcodec_data *btfmcodec, uint32_t sampling_r
 						      direction, id);
 		BTFMCODEC_ERR("%s: hwep info %ld", __func__, hwep_info->flags);
 		if (ret == 0 && test_bit(BTADV_AUDIO_MASTER_CONFIG, &hwep_info->flags)) {
+			/* Don't send request to cp for fm as it is non cp */
+			if (id == 0) {
+				btfmcodec_set_current_state(state, BT_Connected);
+				return  ret;
+			}
 			ret = btfmcodec_configure_master(btfmcodec, (uint8_t)id);
 			if (ret < 0) {
 				BTFMCODEC_ERR("failed to configure master error %d", ret);
@@ -620,8 +625,10 @@ int btfmcodec_hwep_prepare(struct btfmcodec_data *btfmcodec, uint32_t sampling_r
 			}
 		} else if (ret == 0 && test_bit(BTADV_CONFIGURE_DMA, &hwep_info->flags)) {
                         /* Don't send request to cp for fm as it is non cp */
-			if (id == 0)
+			if (id == 0) {
+				btfmcodec_set_current_state(state, BT_Connected);
 				return  ret;
+			}
 			ret  = btfmcodec_configure_dma(btfmcodec, (uint8_t)id);
 			if (ret < 0) {
 				BTFMCODEC_ERR("failed to configure Codec DMA %d", ret);
