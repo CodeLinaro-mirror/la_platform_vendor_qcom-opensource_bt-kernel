@@ -12,6 +12,10 @@ PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/btfm_slim_codec.ko
 ifneq ($(TARGET_BOARD_PLATFORM), malabar)
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/bt_fm_swr.ko
 endif
+else ifeq ($(TARGET_BOARD_PLATFORM),seraph)
+PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/btfmcodec.ko
+PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/bt_fm_swr.ko
+endif
 else
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/bt_fm_slim.ko
 endif
