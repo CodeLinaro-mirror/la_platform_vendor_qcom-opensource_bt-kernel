@@ -55,7 +55,6 @@ BT_SELECT += CONFIG_BTFM_CODEC=m
 BT_SELECT += CONFIG_BTFM_SWR=m
 LOCAL_MODULE_KO_DIRS += btfmcodec/btfmcodec.ko
 LOCAL_MODULE_KO_DIRS += soundwire/bt_fm_swr.ko
-endif
 else
 BT_SELECT += CONFIG_BTFM_SLIM=m
 LOCAL_MODULE_KO_DIRS += slimbus/bt_fm_slim.ko
@@ -184,7 +183,6 @@ KBUILD_REQUIRED_KOS += swr_dlkm.ko
 #LOCAL_ADDITIONAL_DEPENDENCIES += $(call intermediates-dir-for,DLKM,swr_dlkm)/Module.symvers
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
-endif
 else
 ################################ slimbus ################################
 include $(CLEAR_VARS)
