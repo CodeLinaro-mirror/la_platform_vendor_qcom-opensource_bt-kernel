@@ -6,9 +6,14 @@ endif
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/radio-i2c-rtc6226-qca.ko
 
 ifeq ($(TARGET_USES_QMAA_OVERRIDE_BLUETOOTH_AUDIO), true)
-ifeq ($(TARGET_BOARD_PLATFORM), sun canoe chora)
+ifeq ($(TARGET_BOARD_PLATFORM), sun canoe chora malabar)
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/btfmcodec.ko
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/btfm_slim_codec.ko
+ifneq ($(TARGET_BOARD_PLATFORM), malabar)
+PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/bt_fm_swr.ko
+endif
+else ifeq ($(TARGET_BOARD_PLATFORM),seraph)
+PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/btfmcodec.ko
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/bt_fm_swr.ko
 else
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/bt_fm_slim.ko

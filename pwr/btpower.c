@@ -451,6 +451,8 @@ static int soc_id;
 static bool probe_finished;
 static struct fmdOperationStruct fmdStruct;
 char *default_crash_reason = "Crash reason not found";
+static DEFINE_MUTEX(bt_client_task_lock);
+static DEFINE_MUTEX(uwb_client_task_lock);
 
 static int btpower_enable_ipa_vreg(struct platform_pwr_data *pdata);
 static inline int btpower_get_retenion_mode_state(void);
@@ -464,12 +466,6 @@ static struct {
 	int bt_state[BT_POWER_SRC_SIZE];
 	int uwb_state[BT_POWER_SRC_SIZE];
 } power_src;
-
-struct Crash_struct {
-//	char SubSystem[10];
-	char PrimaryReason[50];
-	char SecondaryReason[100];
-} CrashInfo;
 
 #ifdef CONFIG_BT_HW_SECURE_DISABLE
 int perisec_cnss_bt_hw_disable_check(struct platform_pwr_data *plat_priv)
@@ -1794,9 +1790,18 @@ static void bt_signal_handler(struct work_struct *w_arg)
 	siginfo.si_code = SI_QUEUE;
 	siginfo.si_int = pwr_data->wrkq_signal_state;
 
+	mutex_lock(&bt_client_task_lock);
+
+	if (pwr_data->reftask_bt == NULL) {
+		pr_err("%s: BT HAL task is NULL, not sending signal\n", __func__);
+		mutex_unlock(&bt_client_task_lock);
+		return;
+	}
+
 	if (!pid_alive(pwr_data->reftask_bt)) {
 		pr_err("%s: HAL(%d) is dead, failed to send signal\n", __func__,
 			pwr_data->reftask_bt->pid);
+		mutex_unlock(&bt_client_task_lock);
 		return;
 	}
 
@@ -1807,6 +1812,8 @@ static void bt_signal_handler(struct work_struct *w_arg)
 	else
 		pr_err("%s: Signal to BT HAL (PID-%d) succesfull\n", __func__,
 				pwr_data->reftask_bt->pid);
+
+	mutex_unlock(&bt_client_task_lock);
 }
 
 static void uwb_signal_handler(struct work_struct *w_arg)
@@ -1819,9 +1826,18 @@ static void uwb_signal_handler(struct work_struct *w_arg)
 	siginfo.si_code = SI_QUEUE;
 	siginfo.si_int = pwr_data->wrkq_signal_state;
 
+	mutex_lock(&uwb_client_task_lock);
+
+	if (pwr_data->reftask_uwb == NULL) {
+		pr_err("%s: UWB HAL task is NULL, not sending signal\n", __func__);
+		mutex_unlock(&uwb_client_task_lock);
+		return;
+	}
+
 	if (!pid_alive(pwr_data->reftask_uwb)) {
 		pr_err("%s: HAL(%d) is dead, failed to send signal\n", __func__,
 			pwr_data->reftask_uwb->pid);
+		mutex_unlock(&uwb_client_task_lock);
 		return;
 	}
 
@@ -1832,6 +1848,8 @@ static void uwb_signal_handler(struct work_struct *w_arg)
 	else
 		pr_err("%s: Signal to UWB HAL (PID-%d) succesfull\n", __func__,
 				pwr_data->reftask_uwb->pid);
+
+	mutex_unlock(&uwb_client_task_lock);
 }
 
 static int bt_power_probe(struct platform_device *pdev)
@@ -2309,14 +2327,14 @@ static int client_state_notified(int SubSystemType)
 void btpower_register_client(int client, int cmd)
 {
 	if (cmd == REG_BT_PID) {
-		pwr_data->reftask_bt = get_current();
+		pwr_data->reftask_bt = get_current()->group_leader;
 		pr_info("%s: Registering BT Service(PID-%d) with Power driver\n",
-			__func__, pwr_data->reftask_bt->tgid);
+			__func__, get_current()->group_leader->pid);
 		return;
 	} else if (cmd == REG_UWB_PID) {
-		pwr_data->reftask_uwb = get_current();
+		pwr_data->reftask_uwb =  get_current()->group_leader;
 		pr_info("%s: Registering UWB Service(PID-%d) with Power driver\n",
-			__func__, pwr_data->reftask_uwb->tgid);
+			__func__, get_current()->group_leader->pid);
 		return;
 	}
 
@@ -2646,47 +2664,6 @@ int btpower_process_access_req(unsigned int cmd, int req)
 	return ret;
 }
 
-char* GetUwbTransportCrashReason(int8_t reason)
-{
-  for(int i =0; i < (int)(sizeof(UwbTransErrCodeMap)/sizeof(UwbTransportErrorCodeMap)); i++)
-    if (UwbTransErrCodeMap[i].reason == reason)
-      return UwbTransErrCodeMap[i].reasonstr;
-
-  return CRASH_REASON_NOT_FOUND;
-}
-
-char* GetUwbSecondaryCrashReason(enum UwbSecondaryReasonCode reason)
-{
-  for(int i =0; i < (int)(sizeof(uwbSecReasonMap)/sizeof(UwbSecondaryReasonMap)); i++)
-    if (uwbSecReasonMap[i].reason == reason)
-      return uwbSecReasonMap[i].reasonstr;
-
-  return CRASH_REASON_NOT_FOUND;
-}
-
-char* GetUwbPrimaryCrashReason(enum UwbPrimaryReasonCode reason)
-{
-  for(int i =0; i < (int)(sizeof(uwbPriReasonMap)/sizeof(UwbPrimaryReasonMap)); i++)
-    if (uwbPriReasonMap[i].reason == reason)
-      return uwbPriReasonMap[i].reasonstr;
-
-  return CRASH_REASON_NOT_FOUND;
-}
-
-const char *GetSourceSubsystemString(uint32_t source_subsystem)
-{
-	switch (source_subsystem) {
-	case PERI_SS:
-		return "Peri SS";
-	case BT_SS:
-		return "BT SS";
-	case UWB_SS:
-		return "UWB SS";
-	default:
-		return "Unknown Subsystem";
-	}
-}
-
 void fmd_set_sdam_bit(unsigned char arg)
 {
 	int rc = 0;
@@ -2896,6 +2873,11 @@ int perform_fmd_operation(void)
 
 int bt_kernel_panic(char *arg) {
 	int ret = 0;
+	struct Crash_struct {
+	//	char SubSystem[10];
+		char PrimaryReason[50];
+		char SecondaryReason[100];
+	} CrashInfo;
 
 	pr_info("%s\n", __func__);
 
@@ -2919,34 +2901,37 @@ int bt_kernel_panic(char *arg) {
 	return ret;
 }
 
-static void __noreturn uwb_kernel_panic(unsigned long arg)
-{
-	unsigned long panic_reason = 0;
-	unsigned short primary_reason, sec_reason, source_subsystem;
-	int8_t  transport_err_code;
+int uwb_kernel_panic(unsigned long arg) {
+	int ret = 0;
+	struct Crash_struct {
+		char PrimaryReason[50];
+		char SecondaryReason[100];
+		char SubsystemString[25];
+		int TransportErrCode;
+	} CrashInfo;
 
-	pr_err("%s: UWB_CMD_KERNEL_PANIC\n", __func__);
-	panic_reason = arg;
-	primary_reason = panic_reason & 0xFFFF;
-	sec_reason = (panic_reason >> 16) & 0xFFFF;
-	/*Source subsystem is stored in 2 bytes. 1 byte is free for future usage.
-	 * Last byte is used for transport error code.*/
-	source_subsystem = (panic_reason >> 32) & 0xFFFF;
-	transport_err_code = (int8_t)((panic_reason >> 56) & 0xFF);
+	if (copy_from_user(&CrashInfo, (char *)arg, sizeof(CrashInfo))) {
+		pr_err("%s: failed copy to panic reason from BT-Transport\n",
+			__func__);
+		memset(&CrashInfo, 0, sizeof(CrashInfo));
+		strscpy(CrashInfo.PrimaryReason,
+			default_crash_reason, strlen(default_crash_reason));
+		strscpy(CrashInfo.SecondaryReason,
+			default_crash_reason, strlen(default_crash_reason));
+		strscpy(CrashInfo.SubsystemString,
+			default_crash_reason, strlen(default_crash_reason));
+		CrashInfo.TransportErrCode = 0;
+		ret = -EFAULT;
+	}
 
-	pr_err("%s: UWB kernel panic PrimaryReason = (0x%02x)[%s] | SecondaryReason = (0x%02x)[%s] |"
-		"SourceSubsystem = (0x%02x)[%s] |  UwbTransportCrashReason = (0x%02x)[%s]\n",
-		__func__, primary_reason, GetUwbPrimaryCrashReason(primary_reason),
-		sec_reason, GetUwbSecondaryCrashReason(sec_reason),
-		source_subsystem, GetSourceSubsystemString(source_subsystem),
-		transport_err_code, GetUwbTransportCrashReason(transport_err_code));
+	pr_err("%s: UWB kernel panic SourceSubsystem:%s, PrimaryReason:%s, SecondaryReason:%s, TransportErrCode:%s\n",
+		__func__, CrashInfo.SubsystemString, CrashInfo.PrimaryReason,
+		CrashInfo.SecondaryReason, ConvertErrorCodeToString(CrashInfo.TransportErrCode));
 
-	panic("%s: UWB kernel panic PrimaryReason = (0x%02x)[%s] | SecondaryReason = (0x%02x)[%s] |"
-		"SourceSubsystem = (0x%02x)[%s] | UwbTransportCrashReason = (0x%02x)[%s]\n",
-		__func__, primary_reason, GetUwbPrimaryCrashReason(primary_reason),
-		sec_reason, GetUwbSecondaryCrashReason(sec_reason),
-		source_subsystem, GetSourceSubsystemString(source_subsystem),
-		transport_err_code, GetUwbTransportCrashReason(transport_err_code));
+	panic("%s: UWB kernel panic SourceSubsystem:%s, PrimaryReason:%s, SecondaryReason:%s, TransportErrCode:%s\n",
+		__func__, CrashInfo.SubsystemString, CrashInfo.PrimaryReason,
+		CrashInfo.SecondaryReason, ConvertErrorCodeToString(CrashInfo.TransportErrCode));
+	return ret;
 }
 
 #ifdef CONFIG_MSM_BT_OOBS
@@ -3104,7 +3089,10 @@ static long bt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 		break;
 	case UWB_CMD_KERNEL_PANIC:
-		uwb_kernel_panic(arg);
+
+		pr_err("%s: UWB_CMD_KERNEL_PANIC\n", __func__);
+
+		ret = uwb_kernel_panic(arg);
 		break;
 	case UWB_GET_SSR_STATE:
 		current_ssr_state = get_sub_state();
@@ -3116,12 +3104,12 @@ static long bt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			ret = -EFAULT;
 		}
 		break;
-
 	default:
 		return -ENOIOCTLCMD;
 	}
 	return ret;
 }
+
 static struct platform_driver bt_power_driver = {
 	.probe = bt_power_probe,
 	.remove = bt_power_remove,
@@ -3131,9 +3119,45 @@ static struct platform_driver bt_power_driver = {
 	},
 };
 
+static int bt_pwr_release(struct inode *inode, struct file *file)
+{
+	if (!pwr_data || !probe_finished) {
+		pr_err("%s: BTPower Probing Pending.Try Again\n", __func__);
+		return 0;
+	}
+
+	if (pwr_data->reftask_bt && (current->group_leader == pwr_data->reftask_bt)) {
+		pr_info("%s: BT client (PID-%d) released device\n", __func__, current->tgid);
+
+		/* Unregister BT client under lock to synchronize with signal handler */
+		mutex_lock(&bt_client_task_lock);
+		pwr_data->reftask_bt = NULL;
+		mutex_unlock(&bt_client_task_lock);
+
+	} else if  (pwr_data->reftask_uwb && (current->group_leader == pwr_data->reftask_uwb)) {
+		pr_info("%s: UWB client (PID-%d) released device\n", __func__, current->tgid);
+
+		/* Unregister UWB client under lock to synchronize with signal handler */
+		mutex_lock(&uwb_client_task_lock);
+		pwr_data->reftask_uwb = NULL;
+		mutex_unlock(&uwb_client_task_lock);
+
+	} else {
+		/*
+		 * A non-registered client closed the device; no state-machine
+		 * movement is required.
+		 */
+		pr_debug("%s: Non-registered client (PID-%d) closed device\n",
+			 __func__, current->tgid);
+	}
+
+	return 0;
+}
+
 static const struct file_operations bt_dev_fops = {
 	.unlocked_ioctl = bt_ioctl,
 	.compat_ioctl = bt_ioctl,
+	.release = bt_pwr_release,
 };
 
 static int __init btpower_init(void)

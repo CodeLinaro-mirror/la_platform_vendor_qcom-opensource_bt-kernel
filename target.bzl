@@ -130,8 +130,8 @@ def define_malabar():
         modules = [
             "btpower",
             "radio-i2c-rtc6226-qca",
-        #    "btfm_slim_codec",
-        #    "btfmcodec",
+            "btfm_slim_codec",
+            "btfmcodec",
         #    "bt_fm_swr",
             "spi_cnss_proto",
             "thqspi_proto",
@@ -139,8 +139,8 @@ def define_malabar():
          config_options = [
              "CONFIG_MSM_BT_POWER",
              "CONFIG_I2C_RTC6226_QCA",
-           #  "CONFIG_SLIM_BTFM_CODEC",
-           #  "CONFIG_BTFM_CODEC",
+             "CONFIG_SLIM_BTFM_CODEC",
+             "CONFIG_BTFM_CODEC",
            #  "CONFIG_BT_HW_SECURE_DISABLE",
            #  "CONFIG_BTFM_SWR",
              "CONFIG_SPI_CNSS_PROTO",
@@ -168,11 +168,13 @@ def define_bengal():
         target = "bengal",
         modules = [
             "btpower",
+            "bt_fm_slim",
             "radio-i2c-rtc6226-qca",
             "btfmcodec",
          ],
          config_options = [
              "CONFIG_MSM_BT_POWER",
+             "CONFIG_BTFM_SLIM",
              "CONFIG_I2C_RTC6226_QCA",
              "CONFIG_BTFM_CODEC",
         ]
@@ -191,5 +193,19 @@ def define_hamoa():
         "CONFIG_I2C_RTC6226_QCA",
         "CONFIG_FMD_ENABLE",
         "CONFIG_BTFM_SLIM",
+    ]
+  )
+def define_lahaina():
+    define_bt_modules(
+       target = "lahaina",
+       modules = [
+           "btpower",
+           "bt_fm_slim",
+           "radio-i2c-rtc6226-qca",
+        ],
+    config_options = [
+       "CONFIG_MSM_BT_POWER",
+       "CONFIG_BTFM_SLIM",
+       "CONFIG_I2C_RTC6226_QCA",
     ]
   )
