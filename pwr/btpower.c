@@ -1546,6 +1546,7 @@ driver_err:
 	return ret;
 }
 
+#if IS_ENABLED(CONFIG_MSM_QMP)
 /**
  * bt_aop_send_msg: Sends json message to AOP using QMP
  * @plat_priv: Pointer to cnss platform data
@@ -1574,6 +1575,50 @@ driver_err:
 	return ret;
 
  }
+static int btpower_aop_set_vreg_param(struct btpower_platform_data *pdata,
+				   const char *vreg_name,
+				   enum btpower_vreg_param param,
+				   enum btpower_tcs_seq seq, int val)
+{
+	struct qmp_pkt pkt;
+	char mbox_msg[BTPOWER_MBOX_MSG_MAX_LEN];
+	static const char * const vreg_param_str[] = {"v", "m", "e"};
+	static const char *const tcs_seq_str[] = {"upval", "dwnval", "enable"};
+	int ret = 0;
+
+	if (param > BTPOWER_VREG_ENABLE || seq > BTPOWER_TCS_ALL_SEQ || !vreg_name)
+		return -EINVAL;
+
+	snprintf(mbox_msg, BTPOWER_MBOX_MSG_MAX_LEN,
+		 "{class: wlan_pdc, res: %s.%s, %s: %d}", vreg_name,
+		 vreg_param_str[param], tcs_seq_str[seq], val);
+
+	pr_info("%s: sending AOP Mbox msg: %s\n", __func__, mbox_msg);
+	pkt.size = BTPOWER_MBOX_MSG_MAX_LEN;
+	pkt.data = mbox_msg;
+
+	ret = mbox_send_message(pdata->mbox_chan, &pkt);
+	if (ret < 0)
+		pr_err("%s:Failed to send AOP mbox msg(%s), err(%d)\n",
+					__func__, mbox_msg, ret);
+
+	return ret;
+}
+
+#else
+int bt_aop_send_msg(struct btpower_platform_data *plat_priv, char *mbox_msg)
+{
+	return -EOPNOTSUPP;
+}
+static int btpower_aop_set_vreg_param(struct btpower_platform_data *pdata,
+                                   const char *vreg_name,
+                                   enum btpower_vreg_param param,
+                                   enum btpower_tcs_seq seq, int val)
+{
+	return -EOPNOTSUPP;
+}
+#endif
+
 int bt_aop_pdc_reconfig(struct btpower_platform_data *pdata)
 {
 
@@ -1589,7 +1634,6 @@ int bt_aop_pdc_reconfig(struct btpower_platform_data *pdata)
 	}
 	return ret;
 }
-
 
 int btpower_aop_mbox_init(struct btpower_platform_data *pdata)
 {
@@ -1623,36 +1667,6 @@ int btpower_aop_mbox_init(struct btpower_platform_data *pdata)
 		pr_err("Failed to reconfig BT WLAN PDC, err = %d\n", ret);
 
 	return 0;
-}
-
-static int btpower_aop_set_vreg_param(struct btpower_platform_data *pdata,
-				   const char *vreg_name,
-				   enum btpower_vreg_param param,
-				   enum btpower_tcs_seq seq, int val)
-{
-	struct qmp_pkt pkt;
-	char mbox_msg[BTPOWER_MBOX_MSG_MAX_LEN];
-	static const char * const vreg_param_str[] = {"v", "m", "e"};
-	static const char *const tcs_seq_str[] = {"upval", "dwnval", "enable"};
-	int ret = 0;
-
-	if (param > BTPOWER_VREG_ENABLE || seq > BTPOWER_TCS_ALL_SEQ || !vreg_name)
-		return -EINVAL;
-
-	snprintf(mbox_msg, BTPOWER_MBOX_MSG_MAX_LEN,
-		 "{class: wlan_pdc, res: %s.%s, %s: %d}", vreg_name,
-		 vreg_param_str[param], tcs_seq_str[seq], val);
-
-	pr_info("%s: sending AOP Mbox msg: %s\n", __func__, mbox_msg);
-	pkt.size = BTPOWER_MBOX_MSG_MAX_LEN;
-	pkt.data = mbox_msg;
-
-	ret = mbox_send_message(pdata->mbox_chan, &pkt);
-	if (ret < 0)
-		pr_err("%s:Failed to send AOP mbox msg(%s), err(%d)\n",
-					__func__, mbox_msg, ret);
-
-	return ret;
 }
 
 static int btpower_enable_ipa_vreg(struct btpower_platform_data *pdata)
