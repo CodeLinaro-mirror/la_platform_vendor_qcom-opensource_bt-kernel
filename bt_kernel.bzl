@@ -137,6 +137,22 @@ def _define_platform_config_rule(module, target, variant):
         cmd = "cat $(SRCS) > $@",
     )
     native.genrule(
+        name = "{}/{}_defconfig_generate_defconfig".format(module, tv),
+        outs = ["{}/{}_defconfig.generated_defconfig".format(module, tv)],
+        srcs = [
+            "{}/{}_gki_defconfig".format(module, target),
+        ],
+        cmd = "cat $(SRCS) > $@",
+    )
+    native.genrule(
+        name = "{}/{}_defconfig_generate_debug-defconfig".format(module, tv),
+        outs = ["{}/{}_defconfig.generated_debug-defconfig".format(module, tv)],
+        srcs = [
+            "{}/{}_consolidate_defconfig".format(module, target),
+        ],
+        cmd = "cat $(SRCS) > $@",
+    )
+    native.genrule(
         name = "{}/{}_defconfig_generate_consolidate".format(module, tv),
         outs = ["{}/{}_defconfig.generated_consolidate".format(module, tv)],
         srcs = [
