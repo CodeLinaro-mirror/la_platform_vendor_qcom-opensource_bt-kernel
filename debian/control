@@ -1,0 +1,14 @@
+Source: bt-dlkm
+Section: kernel
+Priority: optional
+Maintainer: Xiaoning Ma <mxiaonin@qti.qualcomm.com>
+Build-Depends: debhelper-compat (= 13), linux-qcom-source
+Standards-Version: 4.6.0
+Homepage: https://git.codelinaro.org/
+Rules-Requires-Root: no
+
+Package: bt-dlkm
+Architecture: arm64
+Depends: ${misc:Depends}
+Description: QTI Bluetooth kernel modules
+ The btpower driver powers on/off Qualcomm Bluetooth chips.

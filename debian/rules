@@ -1,0 +1,17 @@
+#!/usr/bin/make -f
+
+export KERNEL_SRC = /usr/src/kernel
+export M = $(CURDIR)
+export KBUILD_OPTIONS = CONFIG_MSM_BT_POWER=m
+
+%:
+	dh $@
+
+override_dh_auto_clean:
+	[ -d $(KERNEL_SRC) ] && $(MAKE) -C $(KERNEL_SRC) M=$(M) clean || true
+
+override_dh_auto_install:
+	$(MAKE) -C $(KERNEL_SRC) M=$(M) INSTALL_MOD_PATH=$(CURDIR)/debian/tmp INSTALL_MOD_DIR=updates DEPMOD=/bin/true modules_install
+
+override_dh_strip:
+	@echo "Skipping strip for kernel modules"

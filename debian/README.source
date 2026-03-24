@@ -1,0 +1,8 @@
+This package provides QTI Bluetooth kernel modules for
+Qualcomm platform.
+
+The btpower.ko module is built from source against the installed kernel
+headers and installed to /usr/lib/modules/<kernel-version>/update/.
+
+To build the .deb package:
+  dpkg-buildpackage -us -uc -b -aarm64
