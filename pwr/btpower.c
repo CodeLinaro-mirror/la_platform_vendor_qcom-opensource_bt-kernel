@@ -1161,7 +1161,6 @@ int btpower_fw_managed_power_enable(struct btpower_platform_data *pdata, bool en
 
 			pr_info("%s: power on GPIO\n", __func__);
 			if (pdata->pd_devs[POWER_GPIO]) {
-				ret = pm_runtime_put_sync(pdata->pd_devs[POWER_GPIO]);
 				msleep(5);
 				ret = pm_runtime_resume_and_get(pdata->pd_devs[POWER_GPIO]);
 			}
