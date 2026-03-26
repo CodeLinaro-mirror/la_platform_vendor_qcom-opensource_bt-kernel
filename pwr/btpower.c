@@ -765,8 +765,8 @@ retry_gpio_req:
 	rc = gpio_request(xo_clk_gpio, "bt_xo_clk_gpio");
 	if (rc) {
 		if (retry++ < XO_CLK_RETRY_COUNT_MAX) {
-			/* wait for ~(10 - 20) ms */
-			usleep_range(10000, 20000);
+			/* wait ~15 ms before retrying */
+			msleep(15);
 			goto retry_gpio_req;
 		}
 	}
@@ -859,7 +859,7 @@ static int bt_resetb_operation(int resetb)
 	rc = bt_pull_resetb(resetb, RESETB_GPIO_LOW);
 	if (rc)
 		return rc;
-	usleep_range(20000, 22000);
+	msleep(20);
 	/* making resetb to high after delay */
 	pr_info("BTON: Turn bt_resetb_gpio to High\n");
 	rc = bt_pull_resetb(resetb, RESETB_GPIO_HIGH);
@@ -902,7 +902,7 @@ static int bt_configure_gpios(int on)
 		}
 		power_src.platform_state[BT_RESET_GPIO] =
 			gpio_get_value(bt_reset_gpio);
-		usleep_range(50000, 55000);
+		msleep(50);
 		pr_info("BTON:Turn Bt OFF post asserting BT_EN to low\n");
 		pr_info("bt-reset-gpio(%d) value(%d)\n", bt_reset_gpio,
 			gpio_get_value(bt_reset_gpio));
@@ -960,7 +960,7 @@ static int bt_configure_gpios(int on)
 			}
 			pr_info("BTON: WLAN OFF waiting for 100ms delay\n");
 			pr_info("for AON output to fully discharge\n");
-			usleep_range(100000, 110000);
+			msleep(100);
 			pr_info("BTON: WLAN OFF Asserting BT_EN to high\n");
 			btpower_set_xo_clk_gpio_state(true);
 			if (bt_resetb_gpio  >=  0)
@@ -991,7 +991,7 @@ static int bt_configure_gpios(int on)
 				gpio_get_value(bt_reset_gpio);
 			btpower_set_xo_clk_gpio_state(false);
 		}
-		usleep_range(50000, 55000);
+		msleep(50);
 #ifdef CONFIG_MSM_BT_OOBS
 		bt_configure_wakeup_gpios(on);
 #endif
@@ -1032,7 +1032,7 @@ static int bt_configure_gpios(int on)
 		bt_configure_wakeup_gpios(on);
 #endif
 		gpio_set_value(bt_reset_gpio, 0);
-		usleep_range(100000, 110000);
+		msleep(100);
 		pr_info("BT-OFF:bt-reset-gpio(%d) value(%d)\n",
 			bt_reset_gpio, gpio_get_value(bt_reset_gpio));
 		if (bt_sw_ctrl_gpio >= 0) {
@@ -2002,6 +2002,20 @@ static int bt_power_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
+	/*
+	 * Dedicated unbound high-priority workqueue for power-state voting.
+	 * WQ_UNBOUND lets the scheduler pick any available CPU, reducing
+	 * wake-up latency after the msleep() calls inside bt_power_vote().
+	 */
+	pwr_data->pwr_vote_wq = alloc_workqueue("btpower_pwr_vote_wq",
+						 WQ_HIGHPRI | WQ_UNBOUND, 0);
+	if (!pwr_data->pwr_vote_wq) {
+		pr_err("%s: Failed to create power voting workqueue\n",
+			__func__);
+		destroy_workqueue(pwr_data->workq);
+		return -ENOMEM;
+	}
+
 	INIT_WORK(&pwr_data->uwb_wq, uwb_signal_handler);
 	INIT_WORK(&pwr_data->bt_wq, bt_signal_handler);
 	INIT_WORK(&pwr_data->wq_pwr_voting, bt_power_vote);
@@ -2074,6 +2088,7 @@ static int bt_power_remove(struct platform_device *pdev)
 	bt_power_vreg_put();
 	if (pwr_data->is_multi_tech_soc_dt)
 		destroy_workqueue(pwr_data->workq);
+	destroy_workqueue(pwr_data->pwr_vote_wq);
 	kfree(pwr_data);
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
 	return 0;
@@ -2654,7 +2669,7 @@ int schedule_client_voting(enum plt_pwr_state request)
 	*status = PWR_WAITING_RSP;
 	skb_put_data(skb, &req, sizeof(uint32_t));
 	skb_queue_tail(&pwr_data->rxq, skb);
-	queue_work(system_highpri_wq, &pwr_data->wq_pwr_voting);
+	queue_work(pwr_data->pwr_vote_wq, &pwr_data->wq_pwr_voting);
 	mutex_unlock(&pwr_data->pwr_mtx);
 	ret = wait_event_interruptible_timeout(*rsp_wait_q, (*status) != PWR_WAITING_RSP,
 					       msecs_to_jiffies(BTPOWER_CONFIG_MAX_TIMEOUT));
