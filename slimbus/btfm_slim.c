@@ -588,8 +588,28 @@ static int btfm_slim_status(struct slim_device *sdev,
 	}
 #else
 	if (!is_registered) {
-		btfm_slim_get_hwep_details(sdev, btfm_slim);
-		ret = btfm_slim_register_hw_ep(btfm_slim);
+		/* Check DT property to decide registration path:
+		 * if qcom,btfm-register-with-alsa-in-cp-arch is present/true
+		 * register_with_alsa_in_cp_arch = true, use ASoC codec registration
+		 * (btfm_slim_register_codec_via_hwep)
+		 * if qcom,btfm-register-with-alsa-in-cp-arch is absent/false
+		 * register_with_alsa_in_cp_arch = false, use HWEP registration
+		 * (btfm_slim_register_hw_ep)
+		 */
+		if (btfm_slim_is_reg_with_alsa_in_cp_enabled_in_dt(sdev, btfm_slim)) {
+			/* register_with_alsa_in_cp_arch = true:
+			 * use ASoC codec registration path
+			 */
+			BTFMSLIM_INFO("using ASoC codec registration path");
+			ret = btfm_slim_register_codec_via_hwep(btfm_slim);
+		} else {
+			/* register_with_alsa_in_cp_arch = false:
+			 * read DT channel details and register with HWEP interface
+			 */
+			BTFMSLIM_INFO("using HWEP registration path");
+			btfm_slim_get_hwep_details(sdev, btfm_slim);
+			ret = btfm_slim_register_hw_ep(btfm_slim);
+		}
 	}
 #endif
 	if (!ret)
@@ -659,11 +679,12 @@ static int btfm_slim_probe(struct slim_device *slim)
 	btfm_slim->dev = &slim->dev;
 	ret = btpower_register_slimdev(&slim->dev);
 	if (ret < 0) {
-#if IS_ENABLED(CONFIG_BTFM_SLIM)
-		btfm_slim_unregister_codec(&slim->dev);
-#else
-		btfm_slim_unregister_hwep();
-#endif
+		/* Registration has not happened yet at this point in probe
+		 * (btfm_slim_status has not been called), so
+		 * register_with_alsa_in_cp_arch is still false/default.
+		 * No unregister action needed here, just defer probe.
+		 */
+		BTFMSLIM_INFO("btpower_register_slimdev failed, deferring probe");
 		ret = -EPROBE_DEFER;
 		goto dealloc;
 	}
@@ -699,7 +720,10 @@ register_err:
 #if IS_ENABLED(CONFIG_BTFM_SLIM)
 	btfm_slim_unregister_codec(&slim->dev);
 #else
-	btfm_slim_unregister_hwep();
+	if (btfm_slim->register_with_alsa_in_cp_arch)
+		btfm_slim_unregister_codec_via_hwep(&slim->dev);
+	else
+		btfm_slim_unregister_hwep();
 #endif
 dealloc:
 	mutex_destroy(&btfm_slim->io_lock);
@@ -712,10 +736,18 @@ static void btfm_slim_remove(struct slim_device *slim)
 {
 	struct device *dev = &slim->dev;
 	struct btfmslim *btfm_slim = dev_get_drvdata(dev);
+
 	BTFMSLIM_DBG("");
 	mutex_destroy(&btfm_slim->io_lock);
 	mutex_destroy(&btfm_slim->xfer_lock);
+#if IS_ENABLED(CONFIG_BTFM_SLIM)
 	snd_soc_unregister_component(&slim->dev);
+#else
+	if (btfm_slim->register_with_alsa_in_cp_arch)
+		btfm_slim_unregister_codec_via_hwep(&slim->dev);
+	else
+		btfm_slim_unregister_hwep();
+#endif
 	kfree(btfm_slim);
 }
 
