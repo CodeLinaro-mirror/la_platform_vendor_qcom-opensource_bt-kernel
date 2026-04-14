@@ -97,3 +97,14 @@ def define_lahaina():
         ]
     )
 
+def define_shikra():
+    define_bt_modules(
+        target = "shikra",
+        modules = [
+            "btpower",
+         ],
+         config_options = [
+             "CONFIG_MSM_BT_POWER",
+        ]
+    )
+
