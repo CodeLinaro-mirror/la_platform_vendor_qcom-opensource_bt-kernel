@@ -88,6 +88,16 @@
 #define UWB_SS	(0x02)
 #define TME_SS	(0x03)
 
+/* GPIO Types for handler */
+enum GPIO_TYPE {
+	XO_CLK_GPIO = 0,
+	BT_RESET_GPIO_TYPE,
+	WL_RESET_GPIO_TYPE,
+	BT_RESETB_GPIO_TYPE,
+	BT_DEBUG_GPIO_TYPE,
+	GPIO_TYPE_MAX
+};
+
 #define INVALID_SOC                 0x00
 #define PEACH_SOC_VERSION_1_0       0x01
 #define PEACH_SOC_VERSION_2_0       0x02
@@ -454,6 +464,145 @@ char *default_crash_reason = "Crash reason not found";
 static DEFINE_MUTEX(bt_client_task_lock);
 static DEFINE_MUTEX(uwb_client_task_lock);
 
+/* GPIO request tracking variables */
+static bool is_xo_clk_gpio_requested;
+static bool is_bt_reset_gpio_requested;
+static bool is_wl_reset_gpio_requested;
+static bool is_bt_resetb_gpio_requested;
+static bool is_bt_debug_gpio_requested;
+
+/* GPIO handler functions */
+static int gpio_request_handler(enum GPIO_TYPE gpio_type)
+{
+	int rc = 0;
+	switch (gpio_type) {
+	case XO_CLK_GPIO:
+		if (is_xo_clk_gpio_requested) {
+			pr_err("%s: xo_clk_gpio already requested, return from here\n", __func__);
+			return 0;
+		}
+		rc = gpio_request(pwr_data->xo_gpio_clk, "bt_xo_clk_gpio");
+		if (rc) {
+			pr_err("%s: unable to request gpio %d (%d)\n", __func__, pwr_data->xo_gpio_clk, rc);
+			return rc;
+		}
+		is_xo_clk_gpio_requested = true;
+		break;
+
+	case BT_RESET_GPIO_TYPE:
+		if (is_bt_reset_gpio_requested) {
+			pr_err("%s: bt_reset_gpio already requested, return from here\n", __func__);
+			return 0;
+		}
+		rc = gpio_request(pwr_data->bt_gpio_sys_rst, "bt_sys_rst_n");
+		if (rc) {
+			pr_err("%s: unable to request gpio %d (%d)\n", __func__, pwr_data->bt_gpio_sys_rst, rc);
+			return rc;
+		}
+		is_bt_reset_gpio_requested = true;
+		break;
+
+	case WL_RESET_GPIO_TYPE:
+		if (is_wl_reset_gpio_requested) {
+			pr_err("%s: wl_reset_gpio already requested, return from here\n", __func__);
+			return 0;
+		}
+		rc = gpio_request(pwr_data->wl_gpio_sys_rst, "wl_sys_rst_n");
+		if (rc) {
+			pr_err("%s: unable to request gpio %d (%d)\n", __func__, pwr_data->wl_gpio_sys_rst, rc);
+			return rc;
+		}
+		is_wl_reset_gpio_requested = true;
+		break;
+
+	case BT_RESETB_GPIO_TYPE:
+		if (is_bt_resetb_gpio_requested) {
+			pr_err("%s: bt_resetb_gpio already requested, return from here\n", __func__);
+			return 0;
+		}
+		rc = gpio_request(pwr_data->bt_gpio_resetb, "bt_resetb_gpio_n");
+		if (rc) {
+			pr_err("%s: unable to request gpio %d (%d)\n", __func__, pwr_data->bt_gpio_resetb, rc);
+			return rc;
+		}
+		is_bt_resetb_gpio_requested = true;
+		break;
+
+	case BT_DEBUG_GPIO_TYPE:
+		if (is_bt_debug_gpio_requested) {
+			pr_err("%s: bt_debug_gpio already requested, return from here\n", __func__);
+			return 0;
+		}
+		rc = gpio_request(pwr_data->bt_gpio_debug, "bt_debug_n");
+		if (rc) {
+			pr_err("%s: unable to request gpio %d (%d)\n", __func__, pwr_data->bt_gpio_debug, rc);
+			return rc;
+		}
+		is_bt_debug_gpio_requested = true;
+		break;
+
+	default:
+		pr_err("%s: invalid GPIO type %d\n", __func__, gpio_type);
+		return -EINVAL;
+	}
+
+	return rc;
+}
+
+static void gpio_free_handler(enum GPIO_TYPE gpio_type)
+{
+	switch (gpio_type) {
+	case XO_CLK_GPIO:
+		if (!is_xo_clk_gpio_requested) {
+			pr_err("%s: xo_clk_gpio not requested, return from here\n", __func__);
+			return;
+		}
+		gpio_free(pwr_data->xo_gpio_clk);
+		is_xo_clk_gpio_requested = false;
+		break;
+
+	case BT_RESET_GPIO_TYPE:
+		if (!is_bt_reset_gpio_requested) {
+			pr_err("%s: bt_reset_gpio not requested, return from here\n", __func__);
+			return;
+		}
+		gpio_free(pwr_data->bt_gpio_sys_rst);
+		is_bt_reset_gpio_requested = false;
+		break;
+
+	case WL_RESET_GPIO_TYPE:
+		if (!is_wl_reset_gpio_requested) {
+			pr_err("%s: wl_reset_gpio not requested, return from here\n", __func__);
+			return;
+		}
+		gpio_free(pwr_data->wl_gpio_sys_rst);
+		is_wl_reset_gpio_requested = false;
+		break;
+
+	case BT_RESETB_GPIO_TYPE:
+		if (!is_bt_resetb_gpio_requested) {
+			pr_err("%s: bt_resetb_gpio not requested, return from here\n", __func__);
+			return;
+		}
+		gpio_free(pwr_data->bt_gpio_resetb);
+		is_bt_resetb_gpio_requested = false;
+		break;
+
+	case BT_DEBUG_GPIO_TYPE:
+		if (!is_bt_debug_gpio_requested) {
+			pr_err("%s: bt_debug_gpio not requested, return from here\n", __func__);
+			return;
+		}
+		gpio_free(pwr_data->bt_gpio_debug);
+		is_bt_debug_gpio_requested = false;
+		break;
+
+	default:
+		pr_err("%s: invalid GPIO type %d\n", __func__, gpio_type);
+		break;
+	}
+}
+
 static int btpower_enable_ipa_vreg(struct platform_pwr_data *pdata);
 static inline int btpower_get_retenion_mode_state(void);
 static void bt_power_vote(struct work_struct *work);
@@ -746,7 +895,7 @@ static void btpower_set_xo_clk_gpio_state(bool enable)
 		return;
 
 retry_gpio_req:
-	rc = gpio_request(xo_clk_gpio, "bt_xo_clk_gpio");
+	rc = gpio_request_handler(XO_CLK_GPIO);
 	if (rc) {
 		if (retry++ < XO_CLK_RETRY_COUNT_MAX) {
 			/* wait for ~(10 - 20) ms */
@@ -773,7 +922,7 @@ retry_gpio_req:
 
 	pr_info("%s:gpio(%d) success\n", __func__, xo_clk_gpio);
 
-	gpio_free(xo_clk_gpio);
+	gpio_free_handler(XO_CLK_GPIO);
 }
 
 #ifdef CONFIG_MSM_BT_OOBS
@@ -861,14 +1010,14 @@ static int bt_configure_gpios(int on)
 	int assert_dbg_gpio = 0;
 
 	if (on) {
-		rc = gpio_request(bt_reset_gpio, "bt_sys_rst_n");
+		rc = gpio_request_handler(BT_RESET_GPIO_TYPE);
 		if (rc) {
 			pr_err("%s: unable to request gpio %d (%d)\n",
 					__func__, bt_reset_gpio, rc);
 			return rc;
 		}
 		if (bt_resetb_gpio  >=  0) {
-			rc = gpio_request(bt_resetb_gpio, "bt_resetb_gpio_n");
+			rc = gpio_request_handler(BT_RESETB_GPIO_TYPE);
 			if (rc) {
 				pr_err("%s: unable to request gpio %d (%d)\n",
 						__func__, bt_resetb_gpio, rc);
@@ -992,7 +1141,7 @@ static int bt_configure_gpios(int on)
 			}
 		}
 		if (assert_dbg_gpio) {
-			rc  =  gpio_request(bt_debug_gpio, "bt_debug_n");
+			rc  =  gpio_request_handler(BT_DEBUG_GPIO_TYPE);
 			if  (rc)  {
 				pr_err("unable to request Debug Gpio\n");
 			}  else  {
@@ -1125,13 +1274,13 @@ static int bt_regulators_pwr(int pwr_state)
 gpio_fail:
 		if (!get_fmd_mode()) {
 			if (pwr_data->bt_gpio_sys_rst > 0)
-				gpio_free(pwr_data->bt_gpio_sys_rst);
+				gpio_free_handler(BT_RESET_GPIO_TYPE);
 			if (pwr_data->bt_gpio_debug  >  0)
-				gpio_free(pwr_data->bt_gpio_debug);
+				gpio_free_handler(BT_DEBUG_GPIO_TYPE);
 			if (pwr_data->bt_chip_clk)
 				bt_clk_disable(pwr_data->bt_chip_clk);
 			if (pwr_data->bt_gpio_resetb  >  0)
-				gpio_free(pwr_data->bt_gpio_resetb);
+				gpio_free_handler(BT_RESETB_GPIO_TYPE);
 		}
 regulator_fail:
 		rc = handle_pwr_disable_req(BT_CORE,
@@ -1298,9 +1447,9 @@ static int platform_regulators_pwr(int pwr_state)
 gpio_failed:
 		if (!get_fmd_mode()) {
 			if (pwr_data->bt_gpio_sys_rst > 0)
-				gpio_free(pwr_data->bt_gpio_sys_rst);
+				gpio_free_handler(BT_RESET_GPIO_TYPE);
 			if (pwr_data->bt_gpio_debug  >  0)
-				gpio_free(pwr_data->bt_gpio_debug);
+				gpio_free_handler(BT_DEBUG_GPIO_TYPE);
 		}
 regulator_failed:
 		rc = handle_pwr_disable_req(PLATFORM_CORE,
