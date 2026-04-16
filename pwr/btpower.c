@@ -453,6 +453,7 @@ static struct fmdOperationStruct fmdStruct;
 char *default_crash_reason = "Crash reason not found";
 static DEFINE_MUTEX(bt_client_task_lock);
 static DEFINE_MUTEX(uwb_client_task_lock);
+static int bt_cp_disable = 0;
 
 static int btpower_enable_ipa_vreg(struct platform_pwr_data *pdata);
 static inline int btpower_get_retenion_mode_state(void);
@@ -1681,6 +1682,14 @@ static int get_power_dt_pinfo(struct platform_device *pdev)
 		pwr_data->platform_vregs = data->platform_vregs;
 		pwr_data->uwb_num_vregs = data->uwb_num_vregs;
 		pwr_data->platform_num_vregs = data->platform_num_vregs;
+	}
+	/* Parse bt-cp-disable property */
+	rc = of_property_read_u32(pdev->dev.of_node, "qcom,bt-cp-disable", &bt_cp_disable);
+	if (rc) {
+		pr_info("%s: qcom,bt-cp-disable not configured, defaulting to 0\n", __func__);
+		bt_cp_disable = 0;
+	} else {
+		pr_info("get_power_dt_pinfo: CP Disable mode %d\n", bt_cp_disable);
 	}
 
 	for (i = 0; i < pwr_data->bt_num_vregs; i++) {
@@ -3104,6 +3113,15 @@ static long bt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			ret = -EFAULT;
 		}
 		break;
+    case BT_CMD_CP_ENABLE_CHECK: {
+        u32 cp_disable_val = (u32)bt_cp_disable;
+        pr_info("%s: BT_CMD_CP_ENABLE_CHECK bt_cp_disable=%d\n", __func__, bt_cp_disable);
+        if (copy_to_user((void __user *)arg, &cp_disable_val,sizeof(cp_disable_val))) {
+        pr_err("%s: copy to user failed\n", __func__);
+        ret = -EFAULT;
+    }
+    break;
+	}
 	default:
 		return -ENOIOCTLCMD;
 	}

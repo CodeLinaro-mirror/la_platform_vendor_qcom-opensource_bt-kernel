@@ -426,6 +426,7 @@ int bt_aop_pdc_reconfig(struct platform_pwr_data *pdata);
 #define UWB_GET_SSR_STATE           0xbfe6
 #define BT_CMD_FMD_OPERATION        0xbfb2
 #define BT_CMD_GET_PWR_STATE        0xbfb4
+#define BT_CMD_CP_ENABLE_CHECK      0xbfe7
 
 #ifdef CONFIG_MSM_BT_OOBS
 #define BT_CMD_OBS_VOTE_CLOCK		0xbfd1
