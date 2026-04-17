@@ -973,6 +973,25 @@ static int bt_regulators_pwr(int pwr_state)
 				goto gpio_fail;
 			}
 		}
+
+		if (gpio_is_valid(pwr_data->bt_gpio_sw_ctrl)) {
+			int val = gpio_get_value(pwr_data->bt_gpio_sw_ctrl);
+			power_src.platform_state[BT_SW_CTRL_GPIO] = val;
+			u32 mpm_gpio = 0;
+			if (!of_property_read_u32_index(pwr_data->pdev->dev.of_node,"qcom,bt-sw-ctrl-gpio", 1, &mpm_gpio)) {
+				rc = msm_gpio_mpm_wake_set(mpm_gpio, 1);
+				if (rc < 0) {
+					pr_err("msm_gpio_mpm_wake_set(%d) failed: %d\n",
+						pwr_data->bt_gpio_sw_ctrl, rc);
+					return rc;
+				}
+				pr_info("msm_gpio_mpm_wake_set(%d) enabled\n", mpm_gpio);
+			}
+		} else {
+			pr_err("bt sw-ctrl gpio invalid (%d) — skipping\n",
+					 pwr_data->bt_gpio_sw_ctrl);
+		}
+
 	} else if (pwr_state == POWER_DISABLE) {
 		/* Power Off */
 		if (pwr_data->bt_gpio_sys_rst > 0) {
