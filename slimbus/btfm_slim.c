@@ -582,6 +582,7 @@ static int btfm_slim_status(struct slim_device *sdev,
 
 #if IS_ENABLED(CONFIG_BTFM_SLIM)
 	if (!is_registered) {
+		btfm_slim_get_hwep_details(sdev, btfm_slim);
 		ret = btfm_slim_register_codec(btfm_slim);
 	}
 #else
