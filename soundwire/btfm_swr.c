@@ -30,6 +30,7 @@ struct btfmswr *pbtfmswr;
 static int btfm_num_ports_open;
 
 #define BT_CMD_SWR_TEST	0xbfac
+#define SWRS_SCP_STATUS 0x00000044
 
 static int btfm_swr_probe(struct swr_device *pdev);
 
@@ -108,6 +109,7 @@ int btfm_swr_enable_port(u8 port_num, u8 ch_count, u32 sample_rate, u8 usecase)
 	u32 ch_rate[MAX_BT_PORTS];
 	u8 port_type[MAX_BT_PORTS];
 	u8 num_port = 1;
+	int reg_val = 0;
 
 	// master expects port num -1 to be sent
 	port_id[0] = port_num-1;
@@ -116,7 +118,15 @@ int btfm_swr_enable_port(u8 port_num, u8 ch_count, u32 sample_rate, u8 usecase)
 	ch_rate[0] = sample_rate;
 	port_type[0] = usecase;
 
-	BTFMSWR_INFO("enabling port : %d\n", port_num);
+	BTFMSWR_INFO("enabling port : %d, with num channels %d\n", port_num, ch_count);
+
+	if (btfm_num_ports_open == 0) {
+		BTFMSWR_INFO("reading SWRS_SCP_STATUS");
+		swr_read(pbtfmswr->swr_slave, pbtfmswr->swr_slave->dev_num,
+				 SWRS_SCP_STATUS, &reg_val, 1);
+		BTFMSWR_INFO("read %d from SWRS_SCP_STATUS", reg_val);
+	}
+
 	ret = swr_connect_port(pbtfmswr->swr_slave, &port_id[0], num_port,
 							&ch_mask[0], &ch_rate[0], &num_ch[0],
 							&port_type[0]);
