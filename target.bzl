@@ -193,7 +193,6 @@ def define_hamoa():
     config_options = [
         "CONFIG_MSM_BT_POWER",
         "CONFIG_I2C_RTC6226_QCA",
-        "CONFIG_FMD_ENABLE",
         "CONFIG_BTFM_SLIM",
     ]
   )
