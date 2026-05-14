@@ -209,3 +209,17 @@ def define_lahaina():
        "CONFIG_I2C_RTC6226_QCA",
     ]
   )
+
+def define_hamoa_la():
+    define_bt_modules(
+        target = "hamoa_la",
+        modules = [
+            "btpower",
+            "radio-i2c-rtc6226-qca",
+         ],
+         config_options = [
+             "CONFIG_MSM_BT_POWER",
+             "CONFIG_I2C_RTC6226_QCA",
+             # "CONFIG_FMD_ENABLE",  # Commented out - cnss_utils dependency not available for hamoa_la
+        ]
+    )
