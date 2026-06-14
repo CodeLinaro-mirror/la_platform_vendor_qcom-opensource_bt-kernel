@@ -10,6 +10,7 @@ targets = [
     "malabar",
     "seraph",
     "hamoa",
+    "hamoa_la",
     "lahaina"
 ]
 
@@ -42,6 +43,7 @@ vm_target_bases = [
     "malabar",
     "seraph",
     "hamoa",
+    "hamoa_la",
     "lahaina"
 ]
 
