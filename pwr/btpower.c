@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 /*
@@ -102,6 +102,10 @@ enum GPIO_TYPE {
 #define PEACH_SOC_VERSION_1_0       0x01
 #define PEACH_SOC_VERSION_2_0       0x02
 #define OTHER_FMD_SUPPORTED_BT_SOC  0x03
+
+#ifdef CONFIG_EXT_BUCK
+#define WCN_KTB_EXT_RAIL 3
+#endif
 
 /**
  * enum btpower_vreg_param: Voltage regulator TCS param
@@ -277,6 +281,11 @@ static struct vreg_data bt_vregs_info_cologne[] = {
 		{BT_VDD_ANT_LDO, BT_VDD_ANT_LDO_CURRENT}},
 };
 
+// Regulator structure for WCN M2 BT SoC series
+static struct vreg_data bt_vregs_info_wcn_m2[] = {
+	{},
+};
+
 static struct vreg_data platform_vregs_info_peach[] = {
 	/* VDD1P8_AON */
 	{NULL, "qcom,bt-vdd18-aon",      1620000, 1980000, 0, false, true,
@@ -383,6 +392,12 @@ static struct pwr_data vreg_info_cologne = {
 	.bt_num_vregs = ARRAY_SIZE(bt_vregs_info_cologne),
 };
 
+static struct pwr_data vreg_info_wcn_m2 = {
+	.compatible = "qcom,wcn-m2",
+	.bt_vregs = bt_vregs_info_wcn_m2,
+	.bt_num_vregs = ARRAY_SIZE(bt_vregs_info_wcn_m2),
+};
+
 static struct pwr_data vreg_info_kiwi_no_share_ant_power = {
 	.compatible = "qcom,kiwi-no-share-ant-power",
 	.bt_vregs = bt_vregs_info_kiwi,
@@ -450,6 +465,7 @@ static const struct of_device_id bt_power_match_table[] = {
 	{	.compatible = "qcom,wcn7750-bt", .data = &bt_vreg_info_wcn7750},
 	{	.compatible = "qcom,wcn8850-bt", .data = &vreg_info_wcn8850},
 	{	.compatible = "qcom,wcn7760-bt", .data = &vreg_info_cologne},
+	{	.compatible = "qcom,wcn-m2", .data = &vreg_info_wcn_m2},
 	{},
 };
 
@@ -1833,6 +1849,12 @@ static int get_power_dt_pinfo(struct platform_device *pdev)
 	}
 
 	for (i = 0; i < pwr_data->bt_num_vregs; i++) {
+#ifdef CONFIG_EXT_BUCK
+		if (pwr_data->is_ext_bk_enabled && !strcmp(pwr_data->bt_vregs[i].name, "qcom,bt-vdd-ipa-2p2")) {
+			pr_info("%s: *** EXT_BUCK: Replacing qcom,bt-vdd-ipa-2p2 with qcom,bt-vdd-ipa-2p2-ext ***\n", __func__);
+			pwr_data->bt_vregs[i].name = "qcom,bt-vdd-ipa-2p2-ext";
+		}
+#endif
 		rc = dt_parse_vreg_info(&(pdev->dev), pwr_data->bt_of_node,
 			&pwr_data->bt_vregs[i]);
 		/* No point to go further if failed to get regulator handler */
@@ -1913,12 +1935,23 @@ static void bt_power_pdc_init_params(struct platform_pwr_data *pdata)
 {
 	int ret;
 	struct device *dev = &pdata->pdev->dev;
+	const char *prop_name;
+
+#ifdef CONFIG_EXT_BUCK
+	if(pwr_data->is_ext_bk_enabled) {
+		prop_name = "qcom,pdc_init_table_v1";
+	} else
+#endif
+	{
+		prop_name = "qcom,pdc_init_table";
+	}
+
 	pdata->pdc_init_table_len = of_property_count_strings(dev->of_node,
-				"qcom,pdc_init_table");
+					prop_name);
 	if (pdata->pdc_init_table_len > 0) {
 		pdata->pdc_init_table = kcalloc(pdata->pdc_init_table_len,
 				sizeof(char *), GFP_KERNEL);
-		ret = of_property_read_string_array(dev->of_node, "qcom,pdc_init_table",
+		ret = of_property_read_string_array(dev->of_node, prop_name,
 			pdata->pdc_init_table, pdata->pdc_init_table_len);
 		if (ret < 0)
 			pr_err("Failed to get PDC Init Table\n");
@@ -2076,6 +2109,40 @@ static int bt_power_probe(struct platform_device *pdev)
 							of_property_read_bool(pdev->dev.of_node,
 							"qcom,wcn8850-bt");
 	pr_info("%s: is_multi_tech_soc_dt = %d\n", __func__, pwr_data->is_multi_tech_soc_dt);
+
+#ifdef CONFIG_EXT_BUCK
+	pwr_data->is_ext_bk_enabled = false;
+	if (of_property_read_bool(pdev->dev.of_node, "qcom,wcn7750-bt")) {
+	/* Get wcn_info_reg NVMEM Cell Handler */
+		pwr_data->nvmem_cell_ext_bk =
+			devm_nvmem_cell_get(devi, "wcn_info_reg");
+		if (IS_ERR(pwr_data->nvmem_cell_ext_bk)) {
+			rc = PTR_ERR(pwr_data->nvmem_cell_ext_bk);
+			pr_info("%s:wcn_info_reg nvmem-cells not available; EXT_BUCK determination could not be performed: %d\n",
+				__func__, rc);
+		} else {
+			u8 *buf;
+			size_t len;
+			pr_info("%s: Got wcn_info_reg nvmem-cells\n", __func__);
+			buf = nvmem_cell_read(pwr_data->nvmem_cell_ext_bk, &len);
+			if (IS_ERR(buf)) {
+				pr_err("%s: Failed to read wcn_info_reg: %ld\n",
+					__func__, PTR_ERR(buf));
+			} else {
+				if (len > 0) {
+					pwr_data->is_ext_bk_enabled = (buf[0] == WCN_KTB_EXT_RAIL);
+					pr_info("%s: wcn_info_reg value: %u, EXT_BUCK enabled: %d\n",
+						__func__, buf[0], pwr_data->is_ext_bk_enabled);
+				} else {
+					pr_err("%s: Invalid wcn_info_reg length: %zu\n", __func__, len);
+				}
+			}
+			kfree(buf);
+		}
+	}else{
+		pr_info("%s: Ext Buck not enabled", __func__);
+	}
+#endif
 
 	pwr_data->workq = alloc_workqueue("workq", WQ_HIGHPRI, WQ_DFL_ACTIVE);
 	if (!pwr_data->workq) {

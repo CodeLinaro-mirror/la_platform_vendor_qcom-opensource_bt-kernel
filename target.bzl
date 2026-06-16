@@ -97,6 +97,7 @@ def define_canoe():
              "CONFIG_FMD_ENABLE",
              "CONFIG_SPI_CNSS_PROTO",
              "CONFIG_THQSPI_PROTO",
+             "CONFIG_EXT_BUCK",
         ]
     )
 
@@ -122,6 +123,7 @@ def define_chora():
              "CONFIG_FMD_ENABLE",
              "CONFIG_SPI_CNSS_PROTO",
              "CONFIG_THQSPI_PROTO",
+             "CONFIG_EXT_BUCK",
         ]
     )
 def define_malabar():
@@ -191,7 +193,6 @@ def define_hamoa():
     config_options = [
         "CONFIG_MSM_BT_POWER",
         "CONFIG_I2C_RTC6226_QCA",
-        "CONFIG_FMD_ENABLE",
         "CONFIG_BTFM_SLIM",
     ]
   )
