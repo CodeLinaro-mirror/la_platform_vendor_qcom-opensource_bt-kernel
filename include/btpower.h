@@ -429,6 +429,35 @@ int bt_aop_pdc_reconfig(struct platform_pwr_data *pdata);
 #define BT_CMD_ACCESS_CTRL          0xbfe4
 #define UWB_CMD_ACCESS_CTRL         0xbfe5
 #define UWB_GET_SSR_STATE           0xbfe6
+#define BT_CMD_GET_DT_PROPERTIES    0xbfe8    /* Batch ioctl: query multiple DT properties in one call */
+
+/* Max DT property name length including null terminator */
+#define BT_DT_PROP_NAME_MAX_LEN         64
+/* Max raw DT property data bytes — covers all BT DT property types */
+#define BT_DT_PROP_DATA_MAX_LEN         256
+/* Max properties per batch query */
+#define BT_DT_PROP_BATCH_MAX            8
+
+/* status codes for bt_dt_property.status */
+enum bt_dt_prop_status {
+	BT_DT_PROP_FOUND        = 0,  /* property found in DT */
+	BT_DT_PROP_NOT_FOUND    = 1,  /* property not present in DT */
+	BT_DT_PROP_INVALID_NAME = 2,  /* name failed prefix/safety check */
+};
+
+/* holds DT property name and raw bytes returned by kernel */
+struct bt_dt_property {
+	char     name[BT_DT_PROP_NAME_MAX_LEN];
+	uint32_t length;                          /* bytes populated in data[] */
+	uint8_t  data[BT_DT_PROP_DATA_MAX_LEN];  /* raw big-endian bytes from DT */
+	uint32_t status;                          /* see enum bt_dt_prop_status */
+};
+
+/* holds a batch of DT property queries — one ioctl replaces N individual ioctls */
+struct bt_dt_property_batch {
+	uint32_t              count;                           /* IN: number of properties to query */
+	struct bt_dt_property props[BT_DT_PROP_BATCH_MAX];    /* IN: names; OUT: length+data */
+};
 #define BT_CMD_FMD_OPERATION        0xbfb2
 #define BT_CMD_GET_PWR_STATE        0xbfb4
 

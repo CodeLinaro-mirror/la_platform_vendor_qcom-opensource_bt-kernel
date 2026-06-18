@@ -3186,6 +3186,82 @@ static long bt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			ret = -EFAULT;
 		}
 		break;
+	/* Batch DT property query — N properties in one ioctl crossing */
+	case BT_CMD_GET_DT_PROPERTIES: {
+		struct bt_dt_property_batch *batch;
+		uint32_t i;
+
+		pr_err("%s: BT_CMD_GET_DT_PROPERTIES triggered\n", __func__);
+
+		batch = kzalloc(sizeof(*batch), GFP_KERNEL);
+		if (!batch) {
+			pr_err("%s: failed to alloc batch\n", __func__);
+			ret = -ENOMEM;
+			break;
+		}
+		if (copy_from_user(batch, (void __user *)arg, sizeof(*batch))) {
+			pr_err("%s: copy from user failed\n", __func__);
+			kfree(batch);
+			ret = -EFAULT;
+			break;
+		}
+		if (batch->count == 0 || batch->count > BT_DT_PROP_BATCH_MAX) {
+			pr_err("%s: invalid count %u\n", __func__, batch->count);
+			kfree(batch);
+			ret = -EINVAL;
+			break;
+		}
+		if (!pwr_data->pdev->dev.of_node) {
+			pr_err("%s: of_node is NULL\n", __func__);
+			kfree(batch);
+			ret = -ENODEV;
+			break;
+		}
+		for (i = 0; i < batch->count; i++) {
+			struct bt_dt_property *bt_prop = &batch->props[i];
+			struct property *prop_node;
+			int dt_prop_data_len;
+			char prop_name[BT_DT_PROP_NAME_MAX_LEN];
+
+			memset(bt_prop->data, 0, sizeof(bt_prop->data));
+			bt_prop->length = 0;
+			bt_prop->status = BT_DT_PROP_NOT_FOUND;
+
+			bt_prop->name[BT_DT_PROP_NAME_MAX_LEN - 1] = '\0';
+			/* validate: must start with "qcom,bt-" and contain only safe chars */
+			if (strncmp(bt_prop->name, "qcom,bt-", 8) != 0 ||
+			    bt_prop->name[8] == '\0' ||
+			    strpbrk(bt_prop->name + 8, "/ \t\n") != NULL) {
+				pr_err("%s: batch[%u] '%s' not permitted\n",
+					__func__, i, bt_prop->name);
+				bt_prop->status = BT_DT_PROP_INVALID_NAME;
+				continue;
+			}
+			/* copy name to local variable — pass only clean minimal string */
+			strscpy(prop_name, bt_prop->name, sizeof(prop_name));
+			prop_node = of_find_property(pwr_data->pdev->dev.of_node,
+						     prop_name, NULL);
+			if (!prop_node) {
+				pr_err("%s: batch[%u] %s not found in DT\n",
+					__func__, i, prop_name);
+				/* status stays 1 (not found) */
+				continue;
+			}
+			dt_prop_data_len = min_t(int, prop_node->length,
+					 BT_DT_PROP_DATA_MAX_LEN);
+			bt_prop->length = dt_prop_data_len;
+			memcpy(bt_prop->data, prop_node->value, dt_prop_data_len);
+			bt_prop->status = BT_DT_PROP_FOUND;
+			pr_info("%s: batch[%u] %s length=%u\n",
+				__func__, i, prop_name, bt_prop->length);
+		}
+		if (copy_to_user((void __user *)arg, batch, sizeof(*batch))) {
+			pr_err("%s: copy to user failed\n", __func__);
+			ret = -EFAULT;
+		}
+		kfree(batch);
+		break;
+	}
 	default:
 		return -ENOIOCTLCMD;
 	}
