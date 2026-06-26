@@ -3,7 +3,7 @@
 LOCAL_PATH := $(call my-dir)
 
 # Build/Package only in case of supported target
-ifeq ($(call is-board-platform-in-list,taro kalama pineapple msmnile sm6150 gen4 gen5), true)
+ifeq ($(call is-board-platform-in-list,taro kalama pineapple msmnile sm6150 gen4 gen5 auto_gen), true)
 
 BT_SELECT := CONFIG_MSM_BT_POWER=m
 LOCAL_PATH := $(call my-dir)
