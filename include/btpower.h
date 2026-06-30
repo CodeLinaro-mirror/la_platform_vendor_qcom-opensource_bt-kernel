@@ -350,6 +350,9 @@ struct platform_pwr_data {
 	int bt_gpio_debug;                     /* Bluetooth debug gpio */
 	unsigned int wlan_sw_ctrl_gpio;        /* Wlan switch control gpio*/
 	int bt_gpio_resetb;                    /* BT RESETB GPIO */
+	bool bt_gpio_sys_rst_requested;        /* tracks if bt_gpio_sys_rst is currently requested */
+	bool bt_gpio_debug_requested;          /* tracks if bt_gpio_debug is currently requested */
+	bool bt_gpio_resetb_requested;         /* tracks if bt_gpio_resetb is currently requested */
 #ifdef CONFIG_MSM_BT_OOBS
 	int bt_gpio_dev_wake;                  /* Bluetooth bt_wake */
 	int bt_gpio_host_wake;                 /* Bluetooth bt_host_wake */
