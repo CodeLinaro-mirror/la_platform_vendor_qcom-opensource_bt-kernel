@@ -149,5 +149,8 @@ register_bt_modules(
         "btfm_i2s_hw_interface.c",
         "btfm_i2s_hw_interface.h",
     ],
-    deps = [":%b_btfmcodec", ":btfmcodec_headers"],
+    deps = [
+        ":%b_btpower", ":%b_btfmcodec", ":btfmcodec_headers",
+        "//vendor/qcom/opensource/audio-kernel:audio_headers",
+    ],
 )
