@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef __LINUX_SPI_CNSS_PROTO_H
@@ -20,9 +20,9 @@
 #define MAX_INIT_RETRY 2
 #define DEVICE_NAME_MAX_LEN 64
 #define DATA_WORD_LEN 4
-#define XFER_TIMEOUT 500
+#define XFER_TIMEOUT 5000
 #define MAX_CLIENT_PKTS 32
-#define SPI_IRQ_TIMEOUT 200
+#define SPI_IRQ_TIMEOUT 300
 #define NOP_XFER_TIMEOUT 150
 #define SPI_AUTOSUSPEND_DELAY 300 //XFER_TIMEOUT + 50
 #define CLIENT_WAKE_TIME_OUT 350 //NOP_XFER_TIMEOUT*2 + 50
@@ -47,6 +47,7 @@
 #define PERI_CMD  0x31
 #define PERI_DATA 0x32
 #define PERI_EVT  0x34
+#define FW_CRASH_EVT  0xFF
 
 
 #define CMD_SIZE                  1
@@ -68,9 +69,10 @@
 #define BT                        0
 #define HOST_IRQ                  0x00000001
 #define SOFT_RESET_IRQ            0x00008000
-#define SLEEP_BYTE                0xFE
-#define SLEEP_BYTE_OFFSET         5
-#define REG_TX_SIZE               8
+#define SLEEP_CMD_BYTE            0xFE
+#define RESET_CMD_BYTE            0xF0
+#define CMD_BYTE_OFFSET           5
+#define REG_TX_SIZE               16
 #define REG_RX_SIZE               16
 //static u8 *client_irq_buf;
 
@@ -106,22 +108,22 @@ if (print) { \
 
 #define SPI_CNSS_INFO(spi_ptr, x...) do { \
 if (spi_ptr) { \
-	if (spi_ptr->ipc) \
+	if (spi_ptr->ipc && spi_ptr->ipc_log_enable) \
 		ipc_log_string(spi_ptr->ipc, x);\
 	if (spi_ptr->dev) \
 		spi_cnss_trace_log(spi_ptr->dev, x); \
-	pr_info(x); \
+	/*pr_info(x);*/ \
 } \
 } while (0)
 
 #define SPI_CNSS_DBG(spi_ptr, x...) do { \
 if (spi_ptr) { \
 	SPI_LOG_DBG_MSG (true, spi_ptr->dev, x); \
-	if (spi_ptr->ipc) \
+	if (spi_ptr->ipc && spi_ptr->ipc_log_enable) \
 		ipc_log_string(spi_ptr->ipc, x); \
 	if (spi_ptr->dev) \
 		spi_cnss_trace_log(spi_ptr->dev, x); \
-	pr_info(x); \
+	/*pr_info(x);*/ \
 } \
 } while (0)
 
@@ -141,6 +143,7 @@ enum sleep_state {
 	AWAKE_PENDING,
 	CLIENT_WAKEUP,
 	AWAKE,
+	RESET,
 };
 
 struct memory_manager {
@@ -156,7 +159,7 @@ struct memory_manager {
 	u8 *len_rx_buf;
 	u8 *soft_reset_buf;
 	u8 *nop_cmd_buf;
-	u8 *sleep_cmd_buf;
+	u8 *single_byte_cmd_buf;
 	u8* register_tx_buf;
 	u8* register_rx_buf;
 	u8* clen_notifier_one;
@@ -292,6 +295,8 @@ struct spi_cnss_priv {
 	bool state_transition;
 	struct completion wake_wait;
 	struct completion buff_wait;
+	struct completion resume_wait;
+	atomic_t check_resume_wait;
 	bool wait_to_notify;
 	struct mutex state_lock;
 	struct mutex mem_lock;
@@ -301,5 +306,7 @@ struct spi_cnss_priv {
 	struct memory_manager mem_mngr;
 	void *ipc;
 	bool sleep_enabled;
+	volatile bool ipc_log_enable;
+	atomic_t write_err_code;
 };
 #endif //__LINUX_SPI_CNSS_PROTO_H

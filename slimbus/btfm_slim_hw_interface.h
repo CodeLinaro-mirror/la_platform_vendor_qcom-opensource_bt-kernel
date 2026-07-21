@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef __LINUX_BTFM_SLIM_HW_INTERFACE_H
@@ -12,6 +12,7 @@ void btfm_slim_unregister_hwep(void);
 
 /* Codec driver defines */
 enum {
+	FMAUDIO_TX = 0,
 	BTAUDIO_TX = 1,
 	BTAUDIO_RX = 2,
 	BTAUDIO_NUM_CODEC_DAIS

@@ -6,6 +6,13 @@ targets = [
     "shikra",
     "sun",
     "vienna",
+    "parrot",
+    "chora",
+    "bengal",
+    "malabar",
+    "seraph",
+    "hamoa",
+    "hamoa_la"
 ]
 
 la_variants = [
@@ -32,6 +39,13 @@ vm_types = [
 vm_target_bases = [
     "sun",
     "canoe",
+    "chora",
+    "bengal",
+    "malabar",
+    "seraph",
+    "hamoa",
+    "hamoa_la",
+    "lahaina"
 ]
 
 vm_targets = ["{}-{}".format(t, vt) for t in vm_target_bases for vt in vm_types]
