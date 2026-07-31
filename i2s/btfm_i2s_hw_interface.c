@@ -24,6 +24,7 @@
 static uint8_t usecase_codec;
 static uint8_t rx_sd_line_idx;
 static uint8_t tx_sd_line_idx;
+int btfm_feedback_ch_setting;
 
 /* --------------------------------------------------------------------------
  * Component driver stubs
@@ -60,6 +61,22 @@ static void btfm_i2s_hwep_remove(struct snd_soc_component *codec)
  * Mixer control callbacks
  * --------------------------------------------------------------------------
  */
+
+static int btfm_i2s_get_feedback_ch_setting(struct snd_kcontrol *kcontrol,
+					     struct snd_ctl_elem_value *ucontrol)
+{
+	BTFMI2S_DBG("current feedback ch setting: %d", btfm_feedback_ch_setting);
+	ucontrol->value.integer.value[0] = btfm_feedback_ch_setting;
+	return 1;
+}
+
+static int btfm_i2s_put_feedback_ch_setting(struct snd_kcontrol *kcontrol,
+					     struct snd_ctl_elem_value *ucontrol)
+{
+	btfm_feedback_ch_setting = ucontrol->value.integer.value[0];
+	BTFMI2S_DBG("feedback ch setting changed: %d", btfm_feedback_ch_setting);
+	return 1;
+}
 
 static int btfm_i2s_get_codec_type(struct snd_kcontrol *kcontrol,
 				    struct snd_ctl_elem_value *ucontrol)
@@ -119,6 +136,9 @@ static int btfm_i2s_put_tx_sd_line_idx(struct snd_kcontrol *kcontrol,
 }
 
 static struct snd_kcontrol_new status_controls[] = {
+	SOC_SINGLE_EXT("BT set feedback channel", 0, 0, 1, 0,
+		       btfm_i2s_get_feedback_ch_setting,
+		       btfm_i2s_put_feedback_ch_setting),
 	SOC_ENUM_EXT("BT codec type", codec_display,
 		     btfm_i2s_get_codec_type, btfm_i2s_put_codec_type),
 	SOC_SINGLE_EXT("BT I2S RX SD line", SND_SOC_NOPM, 0, 8, 0,
