@@ -350,6 +350,9 @@ struct platform_pwr_data {
 	int bt_gpio_debug;                     /* Bluetooth debug gpio */
 	unsigned int wlan_sw_ctrl_gpio;        /* Wlan switch control gpio*/
 	int bt_gpio_resetb;                    /* BT RESETB GPIO */
+	bool bt_gpio_sys_rst_requested;        /* tracks if bt_gpio_sys_rst is currently requested */
+	bool bt_gpio_debug_requested;          /* tracks if bt_gpio_debug is currently requested */
+	bool bt_gpio_resetb_requested;         /* tracks if bt_gpio_resetb is currently requested */
 #ifdef CONFIG_MSM_BT_OOBS
 	int bt_gpio_dev_wake;                  /* Bluetooth bt_wake */
 	int bt_gpio_host_wake;                 /* Bluetooth bt_host_wake */
@@ -387,6 +390,7 @@ struct platform_pwr_data {
 	enum ssr_states sub_state;
 	enum ssr_states wrkq_signal_state;
 	struct workqueue_struct *workq;
+	struct workqueue_struct *pwr_vote_wq; /* dedicated WQ for power voting */
 	struct device_node *bt_of_node;
 	struct device_node *uwb_of_node;
 	struct work_struct bt_wq;
@@ -400,6 +404,10 @@ struct platform_pwr_data {
 	struct nvmem_cell *nvmem_cell_fmd_set;
 	struct nvmem_cell *nvmem_cell_fmd_chg_pon;
 	struct nvmem_cell *nvmem_cell_fmd_cnt2_stop;
+#ifdef CONFIG_EXT_BUCK
+	struct nvmem_cell *nvmem_cell_ext_bk;
+	bool is_ext_bk_enabled;
+#endif
 	u32 fmd_clk_gpio_id;
 };
 
@@ -424,6 +432,35 @@ int bt_aop_pdc_reconfig(struct platform_pwr_data *pdata);
 #define BT_CMD_ACCESS_CTRL          0xbfe4
 #define UWB_CMD_ACCESS_CTRL         0xbfe5
 #define UWB_GET_SSR_STATE           0xbfe6
+#define BT_CMD_GET_DT_PROPERTIES    0xbfe8    /* Batch ioctl: query multiple DT properties in one call */
+
+/* Max DT property name length including null terminator */
+#define BT_DT_PROP_NAME_MAX_LEN         64
+/* Max raw DT property data bytes — covers all BT DT property types */
+#define BT_DT_PROP_DATA_MAX_LEN         256
+/* Max properties per batch query */
+#define BT_DT_PROP_BATCH_MAX            8
+
+/* status codes for bt_dt_property.status */
+enum bt_dt_prop_status {
+	BT_DT_PROP_FOUND        = 0,  /* property found in DT */
+	BT_DT_PROP_NOT_FOUND    = 1,  /* property not present in DT */
+	BT_DT_PROP_INVALID_NAME = 2,  /* name failed prefix/safety check */
+};
+
+/* holds DT property name and raw bytes returned by kernel */
+struct bt_dt_property {
+	char     name[BT_DT_PROP_NAME_MAX_LEN];
+	uint32_t length;                          /* bytes populated in data[] */
+	uint8_t  data[BT_DT_PROP_DATA_MAX_LEN];  /* raw big-endian bytes from DT */
+	uint32_t status;                          /* see enum bt_dt_prop_status */
+};
+
+/* holds a batch of DT property queries — one ioctl replaces N individual ioctls */
+struct bt_dt_property_batch {
+	uint32_t              count;                           /* IN: number of properties to query */
+	struct bt_dt_property props[BT_DT_PROP_BATCH_MAX];    /* IN: names; OUT: length+data */
+};
 #define BT_CMD_FMD_OPERATION        0xbfb2
 #define BT_CMD_GET_PWR_STATE        0xbfb4
 #define BT_CMD_CP_ENABLE_CHECK      0xbfe7
