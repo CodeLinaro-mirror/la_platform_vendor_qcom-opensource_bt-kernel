@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef BTFM_SLIM_H
@@ -79,6 +79,7 @@ struct btfmslim {
 		uint8_t rxport, uint8_t enable);
 #if IS_ENABLED(CONFIG_SLIM_BTFM_CODEC)
 	int device_id;
+	bool register_with_alsa_in_cp_arch;
 #endif
 };
 
@@ -173,4 +174,41 @@ int btfm_slim_register_codec(struct btfmslim *btfmslim);
  * VOID
  */
 void btfm_slim_unregister_codec(struct device *dev);
+
+#if IS_ENABLED(CONFIG_SLIM_BTFM_CODEC)
+/**
+ * btfm_slim_is_reg_with_alsa_in_cp_enabled_in_dt: Check DT property
+ * qcom,btfm-register-with-alsa-in-cp-arch to decide registration path.
+ * If the property is present and true, register_with_alsa_in_cp_arch is set
+ * to true and ASoC codec registration path is used
+ * (btfm_slim_register_codec_via_hwep). If absent or false,
+ * register_with_alsa_in_cp_arch is set to false and HWEP registration
+ * path is used (btfm_slim_register_hw_ep).
+ * @sdev: slimbus device pointer
+ * @btfm_slim: btfmslim driver data pointer
+ * Returns:
+ * true:  register_with_alsa_in_cp_arch = true, use ASoC codec registration
+ * false: register_with_alsa_in_cp_arch = false, use HWEP registration
+ */
+bool btfm_slim_is_reg_with_alsa_in_cp_enabled_in_dt(struct slim_device *sdev,
+					struct btfmslim *btfm_slim);
+
+/**
+ * btfm_slim_register_codec_via_hwep: Register ASoC codec component
+ * when CONFIG_SLIM_BTFM_CODEC is enabled but codec registration
+ * mode is selected at runtime.
+ * @btfm_slim: btfmslim driver data pointer
+ * Returns:
+ * 0: Success
+ * else: Fail
+ */
+int btfm_slim_register_codec_via_hwep(struct btfmslim *btfm_slim);
+
+/**
+ * btfm_slim_unregister_codec_via_hwep: Unregister ASoC codec component
+ * registered via btfm_slim_register_codec_via_hwep.
+ * @dev: device node
+ */
+void btfm_slim_unregister_codec_via_hwep(struct device *dev);
+#endif /* CONFIG_SLIM_BTFM_CODEC */
 #endif /* BTFM_SLIM_H */

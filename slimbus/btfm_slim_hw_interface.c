@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021, 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/init.h>
@@ -27,6 +27,11 @@
 static int bt_soc_enable_status;
 int btfm_feedback_ch_setting;
 static uint8_t usecase_codec;
+
+/* Runtime flag: true = use ASoC codec registration,
+ * false = use HWEP registration (default)
+ */
+static bool register_with_alsa_in_cp_arch;
 
 static int btfm_slim_hwep_write(struct snd_soc_component *codec,
 			unsigned int reg, unsigned int value)
@@ -88,6 +93,9 @@ static int btfm_put_codec_type(struct snd_kcontrol *kcontrol,
 	BTFMSLIM_DBG("codec type set to:%s", codec_text[usecase_codec]);
 	return 1;
 }
+/* Mixer controls for the HWEP registration path —
+ * includes all 3 controls: SOC status, feedback channel and codec type.
+ */
 static struct snd_kcontrol_new status_controls[] = {
 	SOC_SINGLE_EXT("BT SOC status", 0, 0, 1, 0,
 	btfm_soc_status_get, btfm_soc_status_put),
@@ -96,6 +104,17 @@ static struct snd_kcontrol_new status_controls[] = {
 	btfm_put_feedback_ch_setting),
 	SOC_ENUM_EXT("BT codec type", codec_display,
 	btfm_get_codec_type, btfm_put_codec_type),
+};
+
+/* Mixer controls for the ASoC codec registration path —
+ * mirrors btfm_slim_codec.c exactly: only SOC status and
+ * feedback channel controls, no codec type control.
+ */
+static const struct snd_kcontrol_new asoc_codec_controls[] = {
+	SOC_SINGLE_EXT("BT SOC status", 0, 0, 1, 0,
+		btfm_soc_status_get, btfm_soc_status_put),
+	SOC_SINGLE_EXT("BT set feedback channel", 0, 0, 1, 0,
+		btfm_get_feedback_ch_setting, btfm_put_feedback_ch_setting),
 };
 
 
@@ -190,7 +209,8 @@ void btfm_get_sampling_rate(uint32_t *sampling_rate)
 
 	if (*sampling_rate == 44100 || *sampling_rate == 48000) {
 		if (usecase_codec == LDAC ||
-		    usecase_codec == APTX_AD)
+		    usecase_codec == APTX_AD ||
+		    usecase_codec == LHDC)
 			*sampling_rate = (*sampling_rate) *2;
 	}
 
@@ -463,6 +483,20 @@ static struct hwep_dai_ops  btfmslim_hw_dai_ops = {
 };
 
 static struct hwep_dai_driver btfmslim_dai_driver[] = {
+	{	/* FM audio: fm -> lpass */
+		.dai_name = "btaudio_fm_tx",
+		.id = FMAUDIO_TX,
+		.capture = {
+			.stream_name = "FM TX Capture",
+			.rates = SNDRV_PCM_RATE_48000,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE, /* 16 bits */
+			.rate_max = 48000,
+			.rate_min = 48000,
+			.channels_min = 1,
+			.channels_max = 2,
+		},
+		.dai_ops = &btfmslim_hw_dai_ops,
+	},
 	{	/* Bluetooth SCO voice uplink: bt -> lpass */
 		.dai_name = "btaudio_tx",
 		.id = BTAUDIO_TX,
@@ -510,6 +544,445 @@ static struct hwep_comp_drv btfmslim_hw_driver = {
 	.hwep_write	= btfm_slim_hwep_write,
 };
 
+bool btfm_slim_is_reg_with_alsa_in_cp_enabled_in_dt(struct slim_device *sdev,
+					struct btfmslim *btfm_slim)
+{
+	struct device_node *np = sdev->dev.of_node;
+
+	/* Check DT property: if qcom,btfm-register-with-alsa-in-cp-arch is
+	 * present and true, set register_with_alsa_in_cp_arch = true and use
+	 * ASoC codec registration path (btfm_slim_register_codec_via_hwep).
+	 * If absent or false, set register_with_alsa_in_cp_arch = false and
+	 * use HWEP registration path (btfm_slim_register_hw_ep).
+	 */
+	if (of_property_read_bool(np, "qcom,btfm-register-with-alsa-in-cp-arch")) {
+		register_with_alsa_in_cp_arch = true;
+		BTFMSLIM_INFO("codec registration disabled, using ASoC codec path");
+	} else {
+		register_with_alsa_in_cp_arch = false;
+		BTFMSLIM_INFO("codec registration not disabled, using HWEP path");
+	}
+	btfm_slim->register_with_alsa_in_cp_arch = register_with_alsa_in_cp_arch;
+
+	return register_with_alsa_in_cp_arch;
+}
+
+/* ASoC codec component driver and DAI drivers mirroring btfm_slim_codec.c,
+ * used when CONFIG_SLIM_BTFM_CODEC is enabled but codec registration
+ * mode is selected at runtime via DT property.
+ */
+static int btfm_slim_codec_write_hwep(struct snd_soc_component *codec,
+			unsigned int reg, unsigned int value)
+{
+	BTFMSLIM_DBG("");
+	return 0;
+}
+
+static unsigned int btfm_slim_codec_read_hwep(struct snd_soc_component *codec,
+				unsigned int reg)
+{
+	BTFMSLIM_DBG("");
+	return 0;
+}
+
+static int btfm_slim_codec_probe_hwep(struct snd_soc_component *codec)
+{
+	BTFMSLIM_DBG("");
+	/* Use asoc_codec_controls (2 controls) to exactly mirror
+	 * btfm_slim_codec.c — excludes the HWEP-specific "BT codec type"
+	 * control which belongs only to the HWEP registration path.
+	 */
+	snd_soc_add_component_controls(codec, asoc_codec_controls,
+				   ARRAY_SIZE(asoc_codec_controls));
+	return 0;
+}
+
+static void btfm_slim_codec_remove_hwep(struct snd_soc_component *codec)
+{
+	BTFMSLIM_DBG("");
+}
+
+static int btfm_slim_asoc_dai_startup(struct snd_pcm_substream *substream,
+		struct snd_soc_dai *dai)
+{
+	int ret = -1;
+	struct btfmslim *btfmslim =
+			snd_soc_component_get_drvdata(dai->component);
+
+	BTFMSLIM_DBG("substream = %s stream = %d dai->name = %s",
+		 substream->name, substream->stream, dai->name);
+	ret = btfm_slim_hw_init(btfmslim);
+	return ret;
+}
+
+static void btfm_slim_asoc_dai_shutdown(struct snd_pcm_substream *substream,
+		struct snd_soc_dai *dai)
+{
+	int i;
+	struct btfmslim *btfmslim =
+			snd_soc_component_get_drvdata(dai->component);
+	struct btfmslim_ch *ch;
+	uint8_t rxport, nchan = 1;
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
+	BTFMSLIM_DBG("dai->name: %s, dai->id: %d, dai->rate: %d", dai->name,
+		dai->id, dai->symmetric_rate);
+#else
+	BTFMSLIM_DBG("dai->name: %s, dai->id: %d, dai->rate: %d", dai->name,
+		dai->id, dai->rate);
+#endif
+
+	switch (dai->id) {
+	case BTFM_FM_SLIM_TX:
+		nchan = 2;
+		ch = btfmslim->tx_chs;
+		rxport = 0;
+		break;
+	case BTFM_BT_SCO_SLIM_TX:
+		ch = btfmslim->tx_chs;
+		rxport = 0;
+		break;
+	case BTFM_BT_SCO_A2DP_SLIM_RX:
+	case BTFM_BT_SPLIT_A2DP_SLIM_RX:
+		ch = btfmslim->rx_chs;
+		rxport = 1;
+		break;
+	case BTFM_SLIM_NUM_CODEC_DAIS:
+	default:
+		BTFMSLIM_ERR("dai->id is invalid:%d", dai->id);
+		return;
+	}
+
+	for (i = 0; (i < BTFM_SLIM_NUM_CODEC_DAIS) &&
+		(ch->id != BTFM_SLIM_NUM_CODEC_DAIS) &&
+		(ch->id != dai->id); ch++, i++)
+		;
+
+	if ((ch->port == BTFM_SLIM_PGD_PORT_LAST) ||
+		(ch->id == BTFM_SLIM_NUM_CODEC_DAIS)) {
+		BTFMSLIM_ERR("ch is invalid!!");
+		return;
+	}
+
+	btfm_slim_disable_ch(btfmslim, ch, rxport, nchan);
+	btfm_slim_hw_deinit(btfmslim);
+}
+
+static int btfm_slim_asoc_dai_hw_params(struct snd_pcm_substream *substream,
+			    struct snd_pcm_hw_params *params,
+			    struct snd_soc_dai *dai)
+{
+	struct btfmslim *btfmslim =
+			snd_soc_component_get_drvdata(dai->component);
+
+	btfmslim->bps = params_width(params);
+	btfmslim->direction = substream->stream;
+	BTFMSLIM_DBG("dai->name = %s DAI-ID %x rate %d bps %d num_ch %d",
+		dai->name, dai->id, params_rate(params),
+		params_width(params), params_channels(params));
+	return 0;
+}
+
+static int btfm_slim_asoc_dai_prepare(struct snd_pcm_substream *substream,
+	struct snd_soc_dai *dai)
+{
+	int ret = -EINVAL;
+	int i = 0;
+	struct btfmslim_ch *ch;
+	uint8_t rxport, nchan = 1;
+	struct btfmslim *btfmslim =
+			snd_soc_component_get_drvdata(dai->component);
+
+	btfmslim->direction = substream->stream;
+	bt_soc_enable_status = 0;
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
+	BTFMSLIM_INFO("dai->name: %s, dai->id: %d, dai->rate: %d direction: %d",
+		dai->name, dai->id, dai->symmetric_rate, btfmslim->direction);
+	btfmslim->sample_rate = dai->symmetric_rate;
+#else
+	BTFMSLIM_INFO("dai->name: %s, dai->id: %d, dai->rate: %d direction: %d",
+		dai->name, dai->id, dai->rate, btfmslim->direction);
+	btfmslim->sample_rate = dai->rate;
+#endif
+
+	switch (dai->id) {
+	case BTFM_FM_SLIM_TX:
+		nchan = 2;
+		ch = btfmslim->tx_chs;
+		rxport = 0;
+		break;
+	case BTFM_BT_SCO_SLIM_TX:
+		ch = btfmslim->tx_chs;
+		rxport = 0;
+		break;
+	case BTFM_BT_SCO_A2DP_SLIM_RX:
+	case BTFM_BT_SPLIT_A2DP_SLIM_RX:
+		ch = btfmslim->rx_chs;
+		rxport = 1;
+		break;
+	case BTFM_SLIM_NUM_CODEC_DAIS:
+	default:
+		BTFMSLIM_ERR("dai->id is invalid:%d", dai->id);
+		return ret;
+	}
+
+	for (i = 0; (i < BTFM_SLIM_NUM_CODEC_DAIS) &&
+		(ch->id != BTFM_SLIM_NUM_CODEC_DAIS) &&
+		(ch->id != dai->id); ch++, i++)
+		;
+
+	if ((ch->port == BTFM_SLIM_PGD_PORT_LAST) ||
+		(ch->id == BTFM_SLIM_NUM_CODEC_DAIS)) {
+		BTFMSLIM_ERR("ch is invalid!!");
+		return ret;
+	}
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
+	ret = btfm_slim_enable_ch(btfmslim, ch, rxport,
+				  dai->symmetric_rate, nchan);
+#else
+	ret = btfm_slim_enable_ch(btfmslim, ch, rxport, dai->rate, nchan);
+#endif
+
+	if (ret == 0)
+		bt_soc_enable_status = 1;
+
+	if (ret == -EISCONN) {
+		BTFMSLIM_ERR("channel opened without closing, returning success");
+		ret = 0;
+	}
+	return ret;
+}
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static int btfm_slim_asoc_dai_set_channel_map(struct snd_soc_dai *dai,
+				unsigned int tx_num, const unsigned int *tx_slot,
+				unsigned int rx_num, const unsigned int *rx_slot)
+#else
+static int btfm_slim_asoc_dai_set_channel_map(struct snd_soc_dai *dai,
+				unsigned int tx_num, unsigned int *tx_slot,
+				unsigned int rx_num, unsigned int *rx_slot)
+#endif
+{
+	int ret = 0, i;
+	struct btfmslim *btfmslim =
+			snd_soc_component_get_drvdata(dai->component);
+	struct btfmslim_ch *rx_chs;
+	struct btfmslim_ch *tx_chs;
+
+	BTFMSLIM_DBG("");
+
+	if (!btfmslim)
+		return -EINVAL;
+
+	rx_chs = btfmslim->rx_chs;
+	tx_chs = btfmslim->tx_chs;
+
+	if (!rx_chs || !tx_chs)
+		return ret;
+
+	for (i = 0; (rx_chs->port != BTFM_SLIM_PGD_PORT_LAST) && (i < rx_num);
+		i++, rx_chs++) {
+		rx_chs->ch = *(uint8_t *)(rx_slot + i);
+		BTFMSLIM_DBG("Rx id:%d name:%s port:%d ch:%d",
+			rx_chs->id, rx_chs->name, rx_chs->port, rx_chs->ch);
+	}
+
+	for (i = 0; (tx_chs->port != BTFM_SLIM_PGD_PORT_LAST) && (i < tx_num);
+		i++, tx_chs++) {
+		tx_chs->ch = *(uint8_t *)(tx_slot + i);
+		BTFMSLIM_DBG("Tx id:%d name:%s port:%d ch:%d",
+			tx_chs->id, tx_chs->name, tx_chs->port, tx_chs->ch);
+	}
+
+	return ret;
+}
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static int btfm_slim_asoc_dai_get_channel_map(const struct snd_soc_dai *dai,
+				 unsigned int *tx_num, unsigned int *tx_slot,
+				 unsigned int *rx_num, unsigned int *rx_slot)
+#else
+static int btfm_slim_asoc_dai_get_channel_map(struct snd_soc_dai *dai,
+				 unsigned int *tx_num, unsigned int *tx_slot,
+				 unsigned int *rx_num, unsigned int *rx_slot)
+#endif
+{
+	int i, ret = -EINVAL, *slot = NULL, j = 0, num = 1;
+	struct btfmslim *btfmslim =
+			snd_soc_component_get_drvdata(dai->component);
+	struct btfmslim_ch *ch = NULL;
+
+	if (!btfmslim)
+		return ret;
+
+	switch (dai->id) {
+	case BTFM_FM_SLIM_TX:
+		num = 2;
+		fallthrough;
+	case BTFM_BT_SCO_SLIM_TX:
+		if (!tx_slot || !tx_num) {
+			BTFMSLIM_ERR("Invalid tx_slot %p or tx_num %p",
+				tx_slot, tx_num);
+			return -EINVAL;
+		}
+		ch = btfmslim->tx_chs;
+		if (!ch)
+			return -EINVAL;
+		slot = tx_slot;
+		*rx_slot = 0;
+		*tx_num = num;
+		*rx_num = 0;
+		break;
+	case BTFM_BT_SCO_A2DP_SLIM_RX:
+	case BTFM_BT_SPLIT_A2DP_SLIM_RX:
+		if (!rx_slot || !rx_num) {
+			BTFMSLIM_ERR("Invalid rx_slot %p or rx_num %p",
+				 rx_slot, rx_num);
+			return -EINVAL;
+		}
+		ch = btfmslim->rx_chs;
+		if (!ch)
+			return -EINVAL;
+		slot = rx_slot;
+		*tx_slot = 0;
+		*tx_num = 0;
+		*rx_num = num;
+		break;
+	default:
+		BTFMSLIM_ERR("Unsupported DAI %d", dai->id);
+		return -EINVAL;
+	}
+
+	do {
+		if (!ch)
+			return -EINVAL;
+		for (i = 0; (i < BTFM_SLIM_NUM_CODEC_DAIS) &&
+			(ch->id != BTFM_SLIM_NUM_CODEC_DAIS) &&
+			(ch->id != dai->id); ch++, i++)
+			;
+
+		if (ch->id == BTFM_SLIM_NUM_CODEC_DAIS ||
+			i == BTFM_SLIM_NUM_CODEC_DAIS) {
+			BTFMSLIM_ERR(
+				"No channel allocated for dai (%d)",
+				dai->id);
+			return -EINVAL;
+		}
+		if (!slot)
+			return -EINVAL;
+		*(slot + j) = ch->ch;
+		BTFMSLIM_DBG("id:%d, port:%d, ch:%d, slot: %d",
+			ch->id, ch->port, ch->ch, *(slot + j));
+
+		if (++j < num)
+			ch++;
+	} while (j < num);
+
+	return 0;
+}
+
+static struct snd_soc_dai_ops btfmslim_asoc_dai_ops = {
+	.startup        = btfm_slim_asoc_dai_startup,
+	.shutdown       = btfm_slim_asoc_dai_shutdown,
+	.hw_params      = btfm_slim_asoc_dai_hw_params,
+	.prepare        = btfm_slim_asoc_dai_prepare,
+	.set_channel_map = btfm_slim_asoc_dai_set_channel_map,
+	.get_channel_map = btfm_slim_asoc_dai_get_channel_map,
+};
+
+static struct snd_soc_dai_driver btfmslim_asoc_dai[] = {
+	{	/* FM Audio data multiple channel: FM -> qdsp */
+		.name = "btfm_fm_slim_tx",
+		.id = BTFM_FM_SLIM_TX,
+		.capture = {
+			.stream_name = "FM TX Capture",
+			.rates = SNDRV_PCM_RATE_48000,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE,
+			.rate_max = 48000,
+			.rate_min = 48000,
+			.channels_min = 1,
+			.channels_max = 2,
+		},
+		.ops = &btfmslim_asoc_dai_ops,
+	},
+	{	/* Bluetooth SCO voice uplink: bt -> lpass */
+		.name = "btfm_bt_sco_slim_tx",
+		.id = BTFM_BT_SCO_SLIM_TX,
+		.capture = {
+			.stream_name = "SCO TX Capture",
+			.rates = SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000
+				| SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000
+				| SNDRV_PCM_RATE_88200 | SNDRV_PCM_RATE_96000
+				| SNDRV_PCM_RATE_192000,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE,
+			.rate_max = 192000,
+			.rate_min = 8000,
+			.channels_min = 1,
+			.channels_max = 1,
+		},
+		.ops = &btfmslim_asoc_dai_ops,
+	},
+	{	/* Bluetooth SCO voice downlink: lpass -> bt or A2DP Playback */
+		.name = "btfm_bt_sco_a2dp_slim_rx",
+		.id = BTFM_BT_SCO_A2DP_SLIM_RX,
+		.playback = {
+			.stream_name = "SCO A2DP RX Playback",
+			.rates = SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000
+				| SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000
+				| SNDRV_PCM_RATE_88200 | SNDRV_PCM_RATE_96000
+				| SNDRV_PCM_RATE_192000,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE,
+			.rate_max = 192000,
+			.rate_min = 8000,
+			.channels_min = 1,
+			.channels_max = 1,
+		},
+		.ops = &btfmslim_asoc_dai_ops,
+	},
+	{	/* Bluetooth Split A2DP data: qdsp -> bt */
+		.name = "btfm_bt_split_a2dp_slim_rx",
+		.id = BTFM_BT_SPLIT_A2DP_SLIM_RX,
+		.playback = {
+			.stream_name = "SPLIT A2DP Playback",
+			.rates = SNDRV_PCM_RATE_48000,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE,
+			.rate_max = 48000,
+			.rate_min = 48000,
+			.channels_min = 1,
+			.channels_max = 1,
+		},
+		.ops = &btfmslim_asoc_dai_ops,
+	},
+};
+
+static const struct snd_soc_component_driver btfmslim_asoc_codec = {
+	.probe  = btfm_slim_codec_probe_hwep,
+	.remove = btfm_slim_codec_remove_hwep,
+	.read   = btfm_slim_codec_read_hwep,
+	.write  = btfm_slim_codec_write_hwep,
+};
+
+int btfm_slim_register_codec_via_hwep(struct btfmslim *btfm_slim)
+{
+	int ret = 0;
+	struct device *dev = btfm_slim->dev;
+
+	BTFMSLIM_INFO("Registering ASoC codec component via HWEP path");
+	ret = snd_soc_register_component(dev, &btfmslim_asoc_codec,
+		btfmslim_asoc_dai, ARRAY_SIZE(btfmslim_asoc_dai));
+	if (ret)
+		BTFMSLIM_ERR("failed to register ASoC codec (%d)", ret);
+	return ret;
+}
+
+void btfm_slim_unregister_codec_via_hwep(struct device *dev)
+{
+	BTFMSLIM_INFO("Unregistering ASoC codec component via HWEP path");
+	snd_soc_unregister_component(dev);
+}
+
 int btfm_slim_register_hw_ep(struct btfmslim *btfm_slim)
 {
 	struct device *dev = btfm_slim->dev;
@@ -531,7 +1004,6 @@ int btfm_slim_register_hw_ep(struct btfmslim *btfm_slim)
 	hwep_info->drv = &btfmslim_hw_driver;
 	hwep_info->dai_drv = btfmslim_dai_driver;
 	hwep_info->num_dai = ARRAY_SIZE(btfmslim_dai_driver);
-	hwep_info->num_dai = 2;
 	hwep_info->num_mixer_ctrl = ARRAY_SIZE(status_controls);
 	hwep_info->mixer_ctrl = status_controls;
 	/* Register to hardware endpoint */
