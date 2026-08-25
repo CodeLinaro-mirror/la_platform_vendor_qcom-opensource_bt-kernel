@@ -716,9 +716,14 @@ static int btpower_toggle_radio(void *data, bool blocked)
 {
 	int ret = 0;
 	int (*power_control)(int enable);
+	struct btpower_platform_data *pdata = data;
 
-	power_control =
-		((struct btpower_platform_data *)data)->bt_power_setup;
+	if (!pdata || !probe_finished) {
+		pr_err("%s: BTPower not ready, blocked=%d\n", __func__, blocked);
+		return -EAGAIN;
+	}
+
+	power_control = pdata->bt_power_setup;
 
 	if (previous != blocked)
 		ret = (*power_control)(!blocked);
@@ -1245,11 +1250,6 @@ static int bt_power_probe(struct platform_device *pdev)
 		pr_err("%s: Failed to get platform data\n", __func__);
 		goto free_pdata;
 	}
-	if (btpower_rfkill_probe(pdev) < 0)
-		goto free_pdata;
-        bt_power_pdc_init_params(bt_power_pdata);
-	btpower_aop_mbox_init(bt_power_pdata);
-
 #if IS_ENABLED(CONFIG_ARCH_QTI_VM)
 	bt_power_pdata->is_fw_managed_pwr = btpower_is_fw_managed(bt_power_pdata);
 	if (bt_power_pdata->is_fw_managed_pwr) {
@@ -1257,6 +1257,11 @@ static int bt_power_probe(struct platform_device *pdev)
 		if (ret) goto free_pdata;
 	}
 #endif
+
+	if (btpower_rfkill_probe(pdev) < 0)
+		goto free_pdata;
+        bt_power_pdc_init_params(bt_power_pdata);
+	btpower_aop_mbox_init(bt_power_pdata);
 
 	probe_finished = true;
 	return 0;
