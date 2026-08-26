@@ -224,3 +224,16 @@ def define_hamoa_la():
              # "CONFIG_FMD_ENABLE",  # Commented out - cnss_utils dependency not available for hamoa_la
         ]
     )
+
+def define_waipio():
+    define_bt_modules(
+        target = "waipio",
+        modules = [
+            "btpower",
+            "radio-i2c-rtc6226-qca",
+        ],
+        config_options = [
+            "CONFIG_MSM_BT_POWER",
+            "CONFIG_I2C_RTC6226_QCA",
+        ]
+    )

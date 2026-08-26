@@ -11,7 +11,8 @@ targets = [
     "seraph",
     "hamoa",
     "hamoa_la",
-    "lahaina"
+    "lahaina",
+    "waipio"
 ]
 
 la_variants = [
@@ -44,7 +45,8 @@ vm_target_bases = [
     "seraph",
     "hamoa",
     "hamoa_la",
-    "lahaina"
+    "lahaina",
+    "waipio"
 ]
 
 vm_targets = ["{}-{}".format(t, vt) for t in vm_target_bases for vt in vm_types]
