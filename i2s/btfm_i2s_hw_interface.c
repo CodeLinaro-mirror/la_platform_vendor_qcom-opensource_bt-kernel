@@ -187,7 +187,7 @@ void btfm_i2s_get_sampling_rate(uint32_t *sampling_rate)
 			     codec_text[usecase_codec], original_rate);
 	}
 
-	if (usecase_codec == APTX_AD_QLEA) {
+	if (usecase_codec == APTX_AD_QLEA || usecase_codec == APTX_PLUS) {
 		*sampling_rate = 192000;
 		BTFMI2S_INFO("codec %s: forced rate %u -> 192000",
 			     codec_text[usecase_codec], original_rate);
