@@ -16,15 +16,19 @@ ifeq ($(BT_DLKM_ENABLE),  true)
 LOCAL_PATH := $(call my-dir)
 
 # Build/Package only in case of supported target
-ifeq ($(call is-board-platform-in-list, taro kalama pineapple blair bengal lahaina sun parrot canoe chora malabar hamoa seraph), true)
+ifeq ($(call is-board-platform-in-list, taro kalama pineapple blair bengal lahaina sun parrot canoe chora malabar hamoa seraph hamoa_la), true)
 
 BT_SELECT := CONFIG_MSM_BT_POWER=m
 ifneq ($(call is-board-platform-in-list, seraph), true)
 BT_SELECT += CONFIG_I2C_RTC6226_QCA=m
 endif
 
-ifneq ($(call is-board-platform-in-list, parrot canoe chora hamoa), true)
+ifneq ($(call is-board-platform-in-list, parrot canoe chora hamoa hamoa_la), true)
 BT_SELECT += CONFIG_FMD_ENABLE=y
+endif
+
+ifeq ($(call is-board-platform-in-list, chora), true)
+BT_SELECT += CONFIG_EXT_BUCK=y
 endif
 
 ifeq ($(TARGET_KERNEL_DLKM_SECUREMSM_QTEE_OVERRIDE), true)
@@ -215,6 +219,7 @@ LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 ################################  thqspi driver################################
+ifeq ($(BOARD_HAVE_STANDALONE_THREAD), true)
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(BT_SRC_FILES)
 LOCAL_MODULE              := thqspi_proto.ko
@@ -223,6 +228,7 @@ LOCAL_MODULE_TAGS         := optional
 LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
+endif
 ###########################################################
 
 endif # DLKM check

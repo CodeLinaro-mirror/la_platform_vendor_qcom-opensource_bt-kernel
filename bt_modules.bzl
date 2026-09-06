@@ -65,7 +65,7 @@ register_bt_modules(
         "CONFIG_FMD_ENABLE": ["//vendor/qcom/opensource/wlan/platform:%b_cnss_utils"],
     },
     deps = [
-        "//vendor/qcom/opensource/wlan/platform:all-wlan-platform-headers"
+      "//vendor/qcom/opensource/wlan/platform:all-wlan-platform-headers",
     ],
 )
 

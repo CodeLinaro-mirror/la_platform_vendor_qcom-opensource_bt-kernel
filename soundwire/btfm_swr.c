@@ -34,6 +34,7 @@ static int btfm_num_ports_open;
 #define SWRS_SCP_CONTROL 0x00000044
 #define DELAY_FOR_SWR_SLAVE_RESET 20
 #define DELAY_BEFORE_SLAVE_RESET 10
+#define DELAY_FOR_PORT_OPEN_MS (200)
 
 static int btfm_swr_probe(struct swr_device *pdev);
 
@@ -226,6 +227,11 @@ int btfm_swr_disable_port(u8 port_num, u8 ch_count, u8 usecase)
 		btfm_num_ports_open--;
 
 	BTFMSWR_INFO("btfm_num_ports_open: %d", btfm_num_ports_open);
+
+	if (btfm_num_ports_open == 0) {
+		BTFMSWR_INFO("SoundWire reset needed after all ports disabled, sleeping");
+		msleep(DELAY_FOR_PORT_OPEN_MS);
+	}
 
 	return ret;
 }

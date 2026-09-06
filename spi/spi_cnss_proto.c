@@ -1675,6 +1675,13 @@ static int spi_cnss_controller_init(struct spi_cnss_priv *spi_drv)
 	spi_stub_driver_reg_cb(notification_to_schedule_wq);
 #else
 	enable_irq(spi_drv->irq);
+
+	if (gpio_get_value(spi_drv->gpio)) {
+		SPI_CNSS_ERR(spi_drv, "%s: irq gpio is high which should not suppose to be high",
+			__func__);
+		pr_err("%s: irq gpio is high which should not suppose to be high\n",__func__);
+	}
+
 	ret = spi_cnss_wakeup_client(spi_drv, NUM_OF_TRIALS_DURING_OPEN);
 
 	if (ret < 0 && gpio_get_value(spi_drv->gpio)) {
@@ -1806,6 +1813,7 @@ static int spi_cnss_open(struct inode *inode, struct file *filp)
 	}
 	if (!spi_drv->client_init) {
 		spi_drv->client_state = ASLEEP;
+		atomic_set(&spi_drv->check_resume_wait, FALSE);
 		ret = spi_cnss_controller_init(spi_drv);
 		if (ret < 0) {
 			SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError spi_cnss_controller_init failed\n", __func__);
@@ -2470,7 +2478,7 @@ static int spi_cnss_suspend(struct device *dev)
 		if (ret != 0)
 			SPI_CNSS_ERR(spi_drv, "%s runtime suspend failed\n", __func__);
 	}
-	if (ret == 0) {
+	if (ret == 0 && spi_drv->usr_cnt > 0) {
 		atomic_set(&spi_drv->check_resume_wait, TRUE);
 		reinit_completion(&spi_drv->resume_wait);
 	}
@@ -2491,7 +2499,7 @@ static int spi_cnss_resume(struct device *dev)
 	}
 	SPI_CNSS_ERR(spi_drv, "%s \n", __func__);
 	if (spi_drv->usr_cnt == 0) {
-		pr_err("%s: no active clients\n",__func__);
+		SPI_CNSS_INFO(spi_drv, "%s: no active clients\n",__func__);
 		return 0;
 	}
 	complete(&spi_drv->resume_wait);
