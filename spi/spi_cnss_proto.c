@@ -1675,6 +1675,13 @@ static int spi_cnss_controller_init(struct spi_cnss_priv *spi_drv)
 	spi_stub_driver_reg_cb(notification_to_schedule_wq);
 #else
 	enable_irq(spi_drv->irq);
+
+	if (gpio_get_value(spi_drv->gpio)) {
+		SPI_CNSS_ERR(spi_drv, "%s: irq gpio is high which should not suppose to be high",
+			__func__);
+		pr_err("%s: irq gpio is high which should not suppose to be high\n",__func__);
+	}
+
 	ret = spi_cnss_wakeup_client(spi_drv, NUM_OF_TRIALS_DURING_OPEN);
 
 	if (ret < 0 && gpio_get_value(spi_drv->gpio)) {

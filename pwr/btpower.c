@@ -476,6 +476,7 @@ static void bt_power_vote(struct work_struct *work);
 void fmd_set_sdam_bit(unsigned char arg);
 void fmd_reboot_on_usb_detection(unsigned char arg);
 void fmd_write_stop_counter(unsigned char arg);
+int schedule_client_voting(enum plt_pwr_state request);
 
 static struct {
 	int platform_state[BT_POWER_SRC_SIZE];
@@ -765,8 +766,8 @@ retry_gpio_req:
 	rc = gpio_request(xo_clk_gpio, "bt_xo_clk_gpio");
 	if (rc) {
 		if (retry++ < XO_CLK_RETRY_COUNT_MAX) {
-			/* wait for ~(10 - 20) ms */
-			usleep_range(10000, 20000);
+			/* wait ~15 ms before retrying */
+			msleep(15);
 			goto retry_gpio_req;
 		}
 	}
@@ -859,7 +860,7 @@ static int bt_resetb_operation(int resetb)
 	rc = bt_pull_resetb(resetb, RESETB_GPIO_LOW);
 	if (rc)
 		return rc;
-	usleep_range(20000, 22000);
+	msleep(20);
 	/* making resetb to high after delay */
 	pr_info("BTON: Turn bt_resetb_gpio to High\n");
 	rc = bt_pull_resetb(resetb, RESETB_GPIO_HIGH);
@@ -883,6 +884,7 @@ static int bt_configure_gpios(int on)
 					__func__, bt_reset_gpio, rc);
 			return rc;
 		}
+		pwr_data->bt_gpio_sys_rst_requested = true;
 		if (bt_resetb_gpio  >=  0) {
 			rc = gpio_request(bt_resetb_gpio, "bt_resetb_gpio_n");
 			if (rc) {
@@ -890,6 +892,7 @@ static int bt_configure_gpios(int on)
 						__func__, bt_resetb_gpio, rc);
 				return rc;
 			}
+			pwr_data->bt_gpio_resetb_requested = true;
 		}
 
 		pr_info("BTON:Turn Bt OFF asserting BT_EN to low\n");
@@ -902,7 +905,7 @@ static int bt_configure_gpios(int on)
 		}
 		power_src.platform_state[BT_RESET_GPIO] =
 			gpio_get_value(bt_reset_gpio);
-		usleep_range(50000, 55000);
+		msleep(50);
 		pr_info("BTON:Turn Bt OFF post asserting BT_EN to low\n");
 		pr_info("bt-reset-gpio(%d) value(%d)\n", bt_reset_gpio,
 			gpio_get_value(bt_reset_gpio));
@@ -960,7 +963,7 @@ static int bt_configure_gpios(int on)
 			}
 			pr_info("BTON: WLAN OFF waiting for 100ms delay\n");
 			pr_info("for AON output to fully discharge\n");
-			usleep_range(100000, 110000);
+			msleep(100);
 			pr_info("BTON: WLAN OFF Asserting BT_EN to high\n");
 			btpower_set_xo_clk_gpio_state(true);
 			if (bt_resetb_gpio  >=  0)
@@ -991,7 +994,7 @@ static int bt_configure_gpios(int on)
 				gpio_get_value(bt_reset_gpio);
 			btpower_set_xo_clk_gpio_state(false);
 		}
-		usleep_range(50000, 55000);
+		msleep(50);
 #ifdef CONFIG_MSM_BT_OOBS
 		bt_configure_wakeup_gpios(on);
 #endif
@@ -1012,6 +1015,7 @@ static int bt_configure_gpios(int on)
 			if  (rc)  {
 				pr_err("unable to request Debug Gpio\n");
 			}  else  {
+				pwr_data->bt_gpio_debug_requested = true;
 				rc = gpio_direction_output(bt_debug_gpio,  1);
 				if (rc)
 					pr_err("%s:Prob Set Debug-Gpio\n",
@@ -1032,7 +1036,7 @@ static int bt_configure_gpios(int on)
 		bt_configure_wakeup_gpios(on);
 #endif
 		gpio_set_value(bt_reset_gpio, 0);
-		usleep_range(100000, 110000);
+		msleep(100);
 		pr_info("BT-OFF:bt-reset-gpio(%d) value(%d)\n",
 			bt_reset_gpio, gpio_get_value(bt_reset_gpio));
 		if (bt_sw_ctrl_gpio >= 0) {
@@ -1140,14 +1144,23 @@ static int bt_regulators_pwr(int pwr_state)
 		}
 gpio_fail:
 		if (!get_fmd_mode()) {
-			if (pwr_data->bt_gpio_sys_rst > 0)
+			if (pwr_data->bt_gpio_sys_rst > 0 &&
+			    pwr_data->bt_gpio_sys_rst_requested) {
 				gpio_free(pwr_data->bt_gpio_sys_rst);
-			if (pwr_data->bt_gpio_debug  >  0)
+				pwr_data->bt_gpio_sys_rst_requested = false;
+			}
+			if (pwr_data->bt_gpio_debug > 0 &&
+			    pwr_data->bt_gpio_debug_requested) {
 				gpio_free(pwr_data->bt_gpio_debug);
+				pwr_data->bt_gpio_debug_requested = false;
+			}
 			if (pwr_data->bt_chip_clk)
 				bt_clk_disable(pwr_data->bt_chip_clk);
-			if (pwr_data->bt_gpio_resetb  >  0)
+			if (pwr_data->bt_gpio_resetb > 0 &&
+			    pwr_data->bt_gpio_resetb_requested) {
 				gpio_free(pwr_data->bt_gpio_resetb);
+				pwr_data->bt_gpio_resetb_requested = false;
+			}
 		}
 regulator_fail:
 		rc = handle_pwr_disable_req(BT_CORE,
@@ -1313,10 +1326,16 @@ static int platform_regulators_pwr(int pwr_state)
 		}
 gpio_failed:
 		if (!get_fmd_mode()) {
-			if (pwr_data->bt_gpio_sys_rst > 0)
+			if (pwr_data->bt_gpio_sys_rst > 0 &&
+			    pwr_data->bt_gpio_sys_rst_requested) {
 				gpio_free(pwr_data->bt_gpio_sys_rst);
-			if (pwr_data->bt_gpio_debug  >  0)
+				pwr_data->bt_gpio_sys_rst_requested = false;
+			}
+			if (pwr_data->bt_gpio_debug > 0 &&
+			    pwr_data->bt_gpio_debug_requested) {
 				gpio_free(pwr_data->bt_gpio_debug);
+				pwr_data->bt_gpio_debug_requested = false;
+			}
 		}
 regulator_failed:
 		rc = handle_pwr_disable_req(PLATFORM_CORE,
@@ -1381,15 +1400,22 @@ static int power_regulators(int core_type, int mode)
 static int btpower_toggle_radio(void *data, bool blocked)
 {
 	int ret = 0;
-	int (*power_control)(int Core, int enable);
 
-	power_control =
-		((struct platform_pwr_data *)data)->power_setup;
+	if (previous != blocked) {
+		/*
+		 * Route through the same serialized workqueue used by the
+		 * ioctl path to prevent races between rfkill and bt_power_vote.
+		 */
+		if (blocked)
+			ret = schedule_client_voting(POWER_OFF_BT);
+		else
+			ret = schedule_client_voting(POWER_ON_BT);
 
-	if (previous != blocked)
-		ret = (*power_control)(BT_CORE, !blocked);
-	if (!ret)
-		previous = blocked;
+		if (ret >= 0) {
+			previous = blocked;
+			ret = 0;
+		}
+	}
 	return ret;
 }
 
@@ -2002,6 +2028,20 @@ static int bt_power_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
+	/*
+	 * Dedicated unbound high-priority workqueue for power-state voting.
+	 * WQ_UNBOUND lets the scheduler pick any available CPU, reducing
+	 * wake-up latency after the msleep() calls inside bt_power_vote().
+	 */
+	pwr_data->pwr_vote_wq = alloc_workqueue("btpower_pwr_vote_wq",
+						 WQ_HIGHPRI | WQ_UNBOUND, 0);
+	if (!pwr_data->pwr_vote_wq) {
+		pr_err("%s: Failed to create power voting workqueue\n",
+			__func__);
+		destroy_workqueue(pwr_data->workq);
+		return -ENOMEM;
+	}
+
 	INIT_WORK(&pwr_data->uwb_wq, uwb_signal_handler);
 	INIT_WORK(&pwr_data->bt_wq, bt_signal_handler);
 	INIT_WORK(&pwr_data->wq_pwr_voting, bt_power_vote);
@@ -2068,12 +2108,23 @@ static void bt_power_remove(struct platform_device *pdev)
 static int bt_power_remove(struct platform_device *pdev)
 #endif
 {
+	int i;
+
 	dev_dbg(&pdev->dev, "%s\n", __func__);
 	probe_finished = false;
 	btpower_rfkill_remove(pdev);
 	bt_power_vreg_put();
+
+	/* Unblock any callers waiting in schedule_client_voting() */
+	for (i = 0; i < BTPWR_MAX_REQ; i++) {
+		pwr_data->wait_status[i] = -ENODEV;
+		wake_up_interruptible(&pwr_data->rsp_wait_q[i]);
+	}
+	cancel_work_sync(&pwr_data->wq_pwr_voting);
+
 	if (pwr_data->is_multi_tech_soc_dt)
 		destroy_workqueue(pwr_data->workq);
+	destroy_workqueue(pwr_data->pwr_vote_wq);
 	kfree(pwr_data);
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
 	return 0;
@@ -2640,6 +2691,9 @@ int schedule_client_voting(enum plt_pwr_state request)
 	int ret = 0;
 	uint32_t req = (uint32_t)request;
 
+	if (!probe_finished)
+		return -ENODEV;
+
 	mutex_lock(&pwr_data->pwr_mtx);
 	skb = alloc_skb(sizeof(uint32_t), GFP_KERNEL);
 
@@ -2654,7 +2708,7 @@ int schedule_client_voting(enum plt_pwr_state request)
 	*status = PWR_WAITING_RSP;
 	skb_put_data(skb, &req, sizeof(uint32_t));
 	skb_queue_tail(&pwr_data->rxq, skb);
-	queue_work(system_highpri_wq, &pwr_data->wq_pwr_voting);
+	queue_work(pwr_data->pwr_vote_wq, &pwr_data->wq_pwr_voting);
 	mutex_unlock(&pwr_data->pwr_mtx);
 	ret = wait_event_interruptible_timeout(*rsp_wait_q, (*status) != PWR_WAITING_RSP,
 					       msecs_to_jiffies(BTPOWER_CONFIG_MAX_TIMEOUT));
@@ -3171,6 +3225,82 @@ static long bt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			ret = -EFAULT;
 		}
 		break;
+	/* Batch DT property query — N properties in one ioctl crossing */
+	case BT_CMD_GET_DT_PROPERTIES: {
+		struct bt_dt_property_batch *batch;
+		uint32_t i;
+
+		pr_err("%s: BT_CMD_GET_DT_PROPERTIES triggered\n", __func__);
+
+		batch = kzalloc(sizeof(*batch), GFP_KERNEL);
+		if (!batch) {
+			pr_err("%s: failed to alloc batch\n", __func__);
+			ret = -ENOMEM;
+			break;
+		}
+		if (copy_from_user(batch, (void __user *)arg, sizeof(*batch))) {
+			pr_err("%s: copy from user failed\n", __func__);
+			kfree(batch);
+			ret = -EFAULT;
+			break;
+		}
+		if (batch->count == 0 || batch->count > BT_DT_PROP_BATCH_MAX) {
+			pr_err("%s: invalid count %u\n", __func__, batch->count);
+			kfree(batch);
+			ret = -EINVAL;
+			break;
+		}
+		if (!pwr_data->pdev->dev.of_node) {
+			pr_err("%s: of_node is NULL\n", __func__);
+			kfree(batch);
+			ret = -ENODEV;
+			break;
+		}
+		for (i = 0; i < batch->count; i++) {
+			struct bt_dt_property *bt_prop = &batch->props[i];
+			struct property *prop_node;
+			int dt_prop_data_len;
+			char prop_name[BT_DT_PROP_NAME_MAX_LEN];
+
+			memset(bt_prop->data, 0, sizeof(bt_prop->data));
+			bt_prop->length = 0;
+			bt_prop->status = BT_DT_PROP_NOT_FOUND;
+
+			bt_prop->name[BT_DT_PROP_NAME_MAX_LEN - 1] = '\0';
+			/* validate: must start with "qcom,bt-" and contain only safe chars */
+			if (strncmp(bt_prop->name, "qcom,bt-", 8) != 0 ||
+			    bt_prop->name[8] == '\0' ||
+			    strpbrk(bt_prop->name + 8, "/ \t\n") != NULL) {
+				pr_err("%s: batch[%u] '%s' not permitted\n",
+					__func__, i, bt_prop->name);
+				bt_prop->status = BT_DT_PROP_INVALID_NAME;
+				continue;
+			}
+			/* copy name to local variable — pass only clean minimal string */
+			strscpy(prop_name, bt_prop->name, sizeof(prop_name));
+			prop_node = of_find_property(pwr_data->pdev->dev.of_node,
+						     prop_name, NULL);
+			if (!prop_node) {
+				pr_err("%s: batch[%u] %s not found in DT\n",
+					__func__, i, prop_name);
+				/* status stays 1 (not found) */
+				continue;
+			}
+			dt_prop_data_len = min_t(int, prop_node->length,
+					 BT_DT_PROP_DATA_MAX_LEN);
+			bt_prop->length = dt_prop_data_len;
+			memcpy(bt_prop->data, prop_node->value, dt_prop_data_len);
+			bt_prop->status = BT_DT_PROP_FOUND;
+			pr_info("%s: batch[%u] %s length=%u\n",
+				__func__, i, prop_name, bt_prop->length);
+		}
+		if (copy_to_user((void __user *)arg, batch, sizeof(*batch))) {
+			pr_err("%s: copy to user failed\n", __func__);
+			ret = -EFAULT;
+		}
+		kfree(batch);
+		break;
+	}
 	default:
 		return -ENOIOCTLCMD;
 	}
