@@ -476,6 +476,8 @@ static void bt_power_vote(struct work_struct *work);
 void fmd_set_sdam_bit(unsigned char arg);
 void fmd_reboot_on_usb_detection(unsigned char arg);
 void fmd_write_stop_counter(unsigned char arg);
+void fmd_set_cont_after_pon(unsigned char arg);
+void bt_power_get_transport(struct device *pdev);
 int schedule_client_voting(enum plt_pwr_state request);
 
 static struct {
@@ -1976,6 +1978,8 @@ static int bt_power_probe(struct platform_device *pdev)
 			pwr_data->nvmem_cell_fmd_set;
 		pwr_data->nvmem_cell_fmd_cnt2_stop =
 			pwr_data->nvmem_cell_fmd_set;
+		pwr_data->nvmem_cell_fmd_cont_after_pon =
+			pwr_data->nvmem_cell_fmd_set;
 	} else {
 		pr_info("%s: Got fmd_set nvmem-cells\n", __func__);
 /* Get fmd_chg_pon NVMEM Cell Handler */
@@ -2001,6 +2005,17 @@ static int bt_power_probe(struct platform_device *pdev)
 		fmd_set_sdam_bit((unsigned char)POWER_DISABLE);
 		fmd_reboot_on_usb_detection((unsigned char)0);
 		fmd_write_stop_counter((unsigned char)0);
+
+/* Get fmd_cont_after_pon NVMEM Cell Handler */
+		pwr_data->nvmem_cell_fmd_cont_after_pon =
+			devm_nvmem_cell_get(devi, "fmd_cont_after_pon");
+		if (IS_ERR(pwr_data->nvmem_cell_fmd_cont_after_pon)) {
+			rc = PTR_ERR(pwr_data->nvmem_cell_fmd_cont_after_pon);
+			pr_err("%s: Failed to get fmd_cont_after_pon nvmem-cells %d\n",
+				__func__, rc);
+		} else {
+			pr_info("%s: Got fmd_cont_after_pon nvmem-cells\n", __func__);
+		}
 
 	}
 	pr_info("%s: FMD nvmem-cells read completed\n", __func__);
@@ -2947,7 +2962,52 @@ void fmd_write_stop_counter(unsigned char arg)
 	kfree(buf);
 }
 
-int perform_fmd_operation(void)
+void fmd_set_cont_after_pon(unsigned char arg)
+{
+	int rc = 0;
+	u8 *buf;
+	size_t len;
+	struct device *devi = &pwr_data->pdev->dev;
+
+	if (IS_ERR(pwr_data->nvmem_cell_fmd_cont_after_pon)) {
+		pr_err("%s: 'fmd_cont_after_pon' cell is not available to configure\n",
+			__func__);
+		return;
+	}
+
+	rc = nvmem_cell_write(pwr_data->nvmem_cell_fmd_cont_after_pon,
+						&arg,
+						sizeof(arg));
+	if (rc < 0) {
+		pr_err("%s: Write fmd_cont_after_pon for FMD operation Failed %d\n",
+			__func__, rc);
+		return;
+	}
+
+	buf = nvmem_cell_read(pwr_data->nvmem_cell_fmd_cont_after_pon, &len);
+	if (IS_ERR(buf)) {
+		dev_err(devi, "Failed to read fmd_cont_after_pon: %ld\n",
+			PTR_ERR(buf));
+		pr_err("%s: Failed to read fmd_cont_after_pon = %d\n",
+			__func__, buf[0]);
+		kfree(buf);
+		return;
+	}
+
+	if (buf[0] == arg) {
+		dev_info(devi, "Successfully configured the fmd_cont_after_pon\n");
+		pr_info("%s: Successfully configured (fmd_cont_after_pon: %u)\n",
+			__func__, buf[0]);
+	} else {
+		dev_err(devi, "Failed to configure fmd_cont_after_pon: %ld\n",
+			PTR_ERR(buf));
+		pr_err("%s: Failed to configure fmd_cont_after_pon = %u\n",
+			__func__, buf[0]);
+	}
+	kfree(buf);
+}
+
+static int perform_fmd_operation(void)
 {
 	int ret = 0;
 	switch ((enum FmdOperation) fmdStruct.fmdOperation) {
@@ -2990,6 +3050,11 @@ int perform_fmd_operation(void)
 			pr_info("%s: ENABLE_FMD\n", __func__);
 
 			fmd_set_sdam_bit((unsigned char)POWER_ENABLE);
+
+			if (fmdStruct.cont_after_pon != -1)
+				fmd_set_cont_after_pon((unsigned char)fmdStruct.cont_after_pon);
+			else
+				pr_err("%s: fmd_cont_after_pon is not configured\n", __func__);
 
 			if (fmdStruct.rebootStatus != -1)
 				fmd_reboot_on_usb_detection((unsigned char)fmdStruct.rebootStatus);

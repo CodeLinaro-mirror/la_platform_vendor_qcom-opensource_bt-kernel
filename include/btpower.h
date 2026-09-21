@@ -299,6 +299,7 @@ struct fmdOperationStruct {
 	unsigned char socFwVer;
 	short int rebootStatus;
 	short int fmdCycles;
+	short int cont_after_pon;
 };
 
 struct vreg_data {
@@ -404,6 +405,7 @@ struct platform_pwr_data {
 	struct nvmem_cell *nvmem_cell_fmd_set;
 	struct nvmem_cell *nvmem_cell_fmd_chg_pon;
 	struct nvmem_cell *nvmem_cell_fmd_cnt2_stop;
+	struct nvmem_cell *nvmem_cell_fmd_cont_after_pon;
 #ifdef CONFIG_EXT_BUCK
 	struct nvmem_cell *nvmem_cell_ext_bk;
 	bool is_ext_bk_enabled;
