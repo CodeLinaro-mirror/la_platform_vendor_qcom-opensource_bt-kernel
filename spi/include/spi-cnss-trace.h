@@ -11,11 +11,7 @@
 
 #include <linux/ktime.h>
 #include <linux/tracepoint.h>
-<<<<<<< HEAD
-
-=======
 #include <linux/version.h>
->>>>>>> origin/bt-kernel.lnx.16.0
 #define MAX_MSG_LEN 256
 
 TRACE_EVENT(spi_cnss_log_info,
@@ -23,11 +19,6 @@ TRACE_EVENT(spi_cnss_log_info,
 			TP_ARGS(name, vaf),
 			TP_STRUCT__entry(__string(name, name)
 			__dynamic_array(char, msg, MAX_MSG_LEN)),
-<<<<<<< HEAD
-			TP_fast_assign(__assign_str(name, name);
-			WARN_ON_ONCE(vsnprintf(__get_dynamic_array(msg), MAX_MSG_LEN,
-				vaf->fmt, *vaf->va) >= MAX_MSG_LEN);),
-=======
 			#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
 			TP_fast_assign(__assign_str(name);
 			#else
@@ -35,7 +26,6 @@ TRACE_EVENT(spi_cnss_log_info,
 			#endif
 			WARN_ON_ONCE(vsnprintf(__get_dynamic_array(msg), MAX_MSG_LEN,
 			vaf->fmt, *vaf->va) >= MAX_MSG_LEN);),
->>>>>>> origin/bt-kernel.lnx.16.0
 			TP_printk("%s: %s", __get_str(name), __get_str(msg))
 );
 

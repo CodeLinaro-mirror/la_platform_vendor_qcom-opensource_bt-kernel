@@ -350,12 +350,9 @@ struct platform_pwr_data {
 	int bt_gpio_debug;                     /* Bluetooth debug gpio */
 	unsigned int wlan_sw_ctrl_gpio;        /* Wlan switch control gpio*/
 	int bt_gpio_resetb;                    /* BT RESETB GPIO */
-<<<<<<< HEAD
-=======
 	bool bt_gpio_sys_rst_requested;        /* tracks if bt_gpio_sys_rst is currently requested */
 	bool bt_gpio_debug_requested;          /* tracks if bt_gpio_debug is currently requested */
 	bool bt_gpio_resetb_requested;         /* tracks if bt_gpio_resetb is currently requested */
->>>>>>> origin/bt-kernel.lnx.16.0
 #ifdef CONFIG_MSM_BT_OOBS
 	int bt_gpio_dev_wake;                  /* Bluetooth bt_wake */
 	int bt_gpio_host_wake;                 /* Bluetooth bt_host_wake */
@@ -407,13 +404,10 @@ struct platform_pwr_data {
 	struct nvmem_cell *nvmem_cell_fmd_set;
 	struct nvmem_cell *nvmem_cell_fmd_chg_pon;
 	struct nvmem_cell *nvmem_cell_fmd_cnt2_stop;
-<<<<<<< HEAD
-=======
 #ifdef CONFIG_EXT_BUCK
 	struct nvmem_cell *nvmem_cell_ext_bk;
 	bool is_ext_bk_enabled;
 #endif
->>>>>>> origin/bt-kernel.lnx.16.0
 	u32 fmd_clk_gpio_id;
 };
 
@@ -438,9 +432,6 @@ int bt_aop_pdc_reconfig(struct platform_pwr_data *pdata);
 #define BT_CMD_ACCESS_CTRL          0xbfe4
 #define UWB_CMD_ACCESS_CTRL         0xbfe5
 #define UWB_GET_SSR_STATE           0xbfe6
-<<<<<<< HEAD
-#define BT_CMD_FMD_OPERATION        0xbfb2
-=======
 #define BT_CMD_GET_DT_PROPERTIES    0xbfe8    /* Batch ioctl: query multiple DT properties in one call */
 
 /* Max DT property name length including null terminator */
@@ -472,7 +463,6 @@ struct bt_dt_property_batch {
 };
 #define BT_CMD_FMD_OPERATION        0xbfb2
 #define BT_CMD_GET_PWR_STATE        0xbfb4
->>>>>>> origin/bt-kernel.lnx.16.0
 
 #ifdef CONFIG_MSM_BT_OOBS
 #define BT_CMD_OBS_VOTE_CLOCK		0xbfd1

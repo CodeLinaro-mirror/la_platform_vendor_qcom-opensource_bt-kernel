@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
-<<<<<<< HEAD
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
-=======
  * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
->>>>>>> origin/bt-kernel.lnx.16.0
  */
 
 #include <linux/slab.h>
@@ -144,12 +140,6 @@ static int btfmcodec_dev_release(struct inode *inode, struct file *file)
 	if (btfmcodec_dev->wq_prepare_bearer.func)
 		cancel_work_sync(&btfmcodec_dev->wq_prepare_bearer);
 
-<<<<<<< HEAD
-	btfmcodec->states.current_state = IDLE;
-	btfmcodec->states.next_state = IDLE;
-
-=======
->>>>>>> origin/bt-kernel.lnx.16.0
 	return 0;
 }
 
@@ -185,8 +175,6 @@ static void btfmcodec_dev_rxwork(struct work_struct *work)
 					&btfmcodec_dev->status[BTM_PKT_TYPE_BEARER_SWITCH_IND];
 				*bearer_switch_ind = BTM_WAITING_RSP;
 				btfmcodec_enqueue_transport(btfmcodec_dev, skb->data[0]);
-<<<<<<< HEAD
-=======
 				if (skb->data[0] == NONE &&
 					btfmcodec_get_current_transport(state) == BT_Connecting &&
 					btfmcodec_get_prev_transport(state) ==
@@ -197,7 +185,6 @@ static void btfmcodec_dev_rxwork(struct work_struct *work)
 					*dma_rsp = BTM_FAIL_RESP_RECV;
 					wake_up_interruptible(&btfmcodec_dev->rsp_wait_q[idx]);
 				}
->>>>>>> origin/bt-kernel.lnx.16.0
 				queue_work(btfmcodec_dev->workqueue,
 					&btfmcodec_dev->wq_prepare_bearer);
 			} else {

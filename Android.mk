@@ -16,22 +16,13 @@ ifeq ($(BT_DLKM_ENABLE),  true)
 LOCAL_PATH := $(call my-dir)
 
 # Build/Package only in case of supported target
-<<<<<<< HEAD
-ifeq ($(call is-board-platform-in-list, taro kalama pineapple blair sun volcano parrot), true)
-=======
-ifeq ($(call is-board-platform-in-list, taro kalama pineapple blair bengal lahaina sun parrot canoe chora malabar hamoa seraph hamoa_la), true)
->>>>>>> origin/bt-kernel.lnx.16.0
+ifeq ($(call is-board-platform-in-list, taro kalama pineapple blair bengal volcano lahaina sun parrot canoe chora malabar hamoa seraph hamoa_la), true)
 
 BT_SELECT := CONFIG_MSM_BT_POWER=m
-ifneq ($(call is-board-platform-in-list, seraph), true)
+ifneq ($(call is-board-platform-in-list, seraph volcano), true)
 BT_SELECT += CONFIG_I2C_RTC6226_QCA=m
 endif
 
-<<<<<<< HEAD
-ifneq ($(call is-board-platform-in-list, parrot), true)
-BT_SELECT += CONFIG_FMD_ENABLE=y
-endif
-=======
 ifneq ($(call is-board-platform-in-list, parrot canoe chora hamoa hamoa_la), true)
 BT_SELECT += CONFIG_FMD_ENABLE=y
 endif
@@ -39,7 +30,6 @@ endif
 ifeq ($(call is-board-platform-in-list, chora), true)
 BT_SELECT += CONFIG_EXT_BUCK=y
 endif
->>>>>>> origin/bt-kernel.lnx.16.0
 
 ifeq ($(TARGET_KERNEL_DLKM_SECUREMSM_QTEE_OVERRIDE), true)
 ifeq ($(ENABLE_PERIPHERAL_STATE_UTILS), true)
@@ -50,15 +40,10 @@ endif
 LOCAL_PATH := $(call my-dir)
 LOCAL_MODULE_DDK_BUILD := true
 LOCAL_MODULE_KO_DIRS := pwr/btpower.ko
-<<<<<<< HEAD
-#LOCAL_MODULE_KO_DIRS += rtc6226/radio-i2c-rtc6226-qca.ko
-=======
-ifneq ($(call is-board-platform-in-list, seraph), true)
+ifneq ($(call is-board-platform-in-list, seraph volcano), true)
 LOCAL_MODULE_KO_DIRS += rtc6226/radio-i2c-rtc6226-qca.ko
 endif
->>>>>>> origin/bt-kernel.lnx.16.0
 
-ifeq ($(TARGET_USES_QMAA_OVERRIDE_BLUETOOTH_AUDIO), true)
 ifeq ($(call is-board-platform-in-list, sun canoe chora malabar), true)
 BT_SELECT += CONFIG_BTFM_CODEC=m
 BT_SELECT += CONFIG_SLIM_BTFM_CODEC=m
@@ -86,19 +71,15 @@ else
 BT_SELECT += CONFIG_BTFM_SLIM=m
 LOCAL_MODULE_KO_DIRS += slimbus/bt_fm_slim.ko
 endif
-endif
 
 ifeq ($(TARGET_USES_QTI_UWB), true)
 BT_SELECT += CONFIG_SPI_CNSS_PROTO=m
 LOCAL_MODULE_KO_DIRS += spi/spi_cnss_proto.ko
 endif
-<<<<<<< HEAD
-=======
 ifeq ($(BOARD_HAVE_STANDALONE_THREAD), true)
 BT_SELECT += CONFIG_THQSPI_PROTO=m
 LOCAL_MODULE_KO_DIRS += thq-spi/thqspi_proto.ko
 endif
->>>>>>> origin/bt-kernel.lnx.16.0
 # This makefile is only for DLKM
 ifneq ($(findstring vendor,$(LOCAL_PATH)),)
 
@@ -125,14 +106,11 @@ KBUILD_REQUIRED_KOS := smcinvoke_dlkm.ko
 endif
 endif
 
-<<<<<<< HEAD
 
 ifeq ($(TARGET_BOARD_PLATFORM), sun)
 KBUILD_REQUIRED_KOS += swr_dlkm.ko
 endif
 
-=======
->>>>>>> origin/bt-kernel.lnx.16.0
 # Module.symvers needs to be generated as a intermediate module so that
 # other modules which depend on BT platform modules can set local
 # dependencies to it.
@@ -162,12 +140,7 @@ LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 
-<<<<<<< HEAD
-ifeq ($(TARGET_BOARD_PLATFORM), sun)
-=======
-ifeq ($(TARGET_USES_QMAA_OVERRIDE_BLUETOOTH_AUDIO), true)
 ifeq ($(call is-board-platform-in-list, sun canoe chora malabar), true)
->>>>>>> origin/bt-kernel.lnx.16.0
 ################################ BTFM CODEC Driver #########################
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(BT_SRC_FILES)
@@ -276,7 +249,6 @@ LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 endif
-endif
 
 ################################ rtc6226 ################################
 #include $(CLEAR_VARS)
@@ -287,17 +259,6 @@ endif
 #LOCAL_MODULE_DEBUG_ENABLE := true
 #LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 #include $(DLKM_DIR)/Build_external_kernelmodule.mk
-################################ spi cnss proto driver################################
-include $(CLEAR_VARS)
-LOCAL_SRC_FILES           := $(BT_SRC_FILES)
-LOCAL_MODULE              := spi_cnss_proto.ko
-LOCAL_MODULE_KBUILD_NAME  := spi/spi_cnss_proto.ko
-LOCAL_MODULE_TAGS         := optional
-LOCAL_MODULE_DEBUG_ENABLE := true
-LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
-include $(DLKM_DIR)/Build_external_kernelmodule.mk
-<<<<<<< HEAD
-=======
 ################################ spi cnss proto driver################################
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(BT_SRC_FILES)
@@ -318,7 +279,6 @@ LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 endif
->>>>>>> origin/bt-kernel.lnx.16.0
 ###########################################################
 
 endif # DLKM check

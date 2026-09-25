@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
-<<<<<<< HEAD
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
-=======
  * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
->>>>>>> origin/bt-kernel.lnx.16.0
  */
 
 
@@ -70,10 +66,7 @@ int btfm_swr_hw_init(void)
 	int ret = 0;
 	int chipset_ver;
 	uint8_t retry = 0;
-<<<<<<< HEAD
-=======
 	uint8_t reg_val = 0;
->>>>>>> origin/bt-kernel.lnx.16.0
 
 	BTFMSWR_DBG("");
 

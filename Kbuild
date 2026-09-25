@@ -33,24 +33,18 @@ ifeq ($(CONFIG_FMD_ENABLE), y)
 KBUILD_CPPFLAGS += -DCONFIG_FMD_ENABLE
 endif
 
-<<<<<<< HEAD
-=======
 ifeq ($(CONFIG_EXT_BUCK), y)
 KBUILD_CPPFLAGS += -DCONFIG_EXT_BUCK
 endif
 
->>>>>>> origin/bt-kernel.lnx.16.0
 ifeq ($(CONFIG_SPI_CNSS_PROTO),m)
 KBUILD_CPPFLAGS += -DCONFIG_SPI_CNSS_PROTO
 endif
 
-<<<<<<< HEAD
-=======
 ifeq ($(CONFIG_THQSPI_PROTO),m)
 KBUILD_CPPFLAGS += -DCONFIG_THQSPI_PROTO
 endif
 
->>>>>>> origin/bt-kernel.lnx.16.0
 obj-$(CONFIG_MSM_BT_POWER) += pwr/
 obj-$(CONFIG_BTFM_SLIM) += slimbus/
 obj-$(CONFIG_I2C_RTC6226_QCA) += rtc6226/
@@ -58,7 +52,4 @@ obj-$(CONFIG_BTFM_CODEC) += btfmcodec/
 obj-$(CONFIG_SLIM_BTFM_CODEC) += slimbus/
 obj-$(CONFIG_BTFM_SWR) += soundwire/
 obj-$(CONFIG_SPI_CNSS_PROTO) += spi/
-<<<<<<< HEAD
-=======
 obj-$(CONFIG_THQSPI_PROTO) += thq-spi/
->>>>>>> origin/bt-kernel.lnx.16.0

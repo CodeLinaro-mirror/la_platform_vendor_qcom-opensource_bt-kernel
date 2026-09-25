@@ -49,11 +49,7 @@ struct btm_ctrl_pkt {
 
 #define BTM_MASTER_CONFIG_REQ_LEN			13
 #define BTM_MASTER_CONFIG_RSP_TIMEOUT			5000
-<<<<<<< HEAD
-#define BTM_BEARER_SWITCH_IND_TIMEOUT			17000
-=======
 #define BTM_BEARER_SWITCH_IND_TIMEOUT			25000
->>>>>>> origin/bt-kernel.lnx.16.0
 #define BTM_MASTER_DMA_CONFIG_RSP_TIMEOUT		5000
 #define BTM_HEADER_LEN					8
 #define BTM_PREPARE_AUDIO_BEARER_SWITCH_RSP_LEN		2
@@ -141,15 +137,12 @@ struct btm_adsp_state_ind {
 	uint32_t action;
 } __attribute__((packed));
 
-<<<<<<< HEAD
-=======
 struct btm_port_state_ind {
 	btm_opcode opcode;
 	uint32_t len;
 	uint8_t port_state;
 } __attribute__((packed));
 
->>>>>>> origin/bt-kernel.lnx.16.0
 int btfmcodec_dev_enqueue_pkt(struct btfmcodec_char_device *btfmcodec_dev, void *buf, int len);
 bool btfmcodec_is_valid_cache_avb(struct btfmcodec_data *btfmcodec);
 int btfmcodec_enqueue_transport(struct btfmcodec_char_device *btfmcodec_dev, uint8_t transport);

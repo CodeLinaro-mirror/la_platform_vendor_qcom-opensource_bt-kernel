@@ -23,10 +23,6 @@
 #include <sound/tlv.h>
 #include "btfm_slim.h"
 #include <linux/version.h>
-<<<<<<< HEAD
-=======
-
->>>>>>> origin/bt-kernel.lnx.16.0
 static int bt_soc_enable_status;
 int btfm_feedback_ch_setting;
 

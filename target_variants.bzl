@@ -12,12 +12,15 @@ targets = [
     "hamoa",
     "hamoa_la",
     "lahaina",
+    "pineapple",
+    "volcano",
     "waipio"
 ]
 
 la_variants = [
     # keep sorted
     "consolidate",
+    "gki",
     "perf",
 ]
 

@@ -24,10 +24,7 @@ enum Codec {
 	RVP,
 	SSC,
 	LHDC,
-<<<<<<< HEAD
-=======
 	APTX_PLUS,
->>>>>>> origin/bt-kernel.lnx.16.0
 	NO_CODEC
 };
 
@@ -37,11 +34,7 @@ static const char * const codec_text[] = {"CODEC_TYPE_SBC", "CODEC_TYPE_AAC",
 				   "CODEC_TYPE_LC3", "CODEC_TYPE_APTX_AD_SPEECH",
 				   "CODEC_TYPE_LC3_VOICE", "CODEC_TYPE_APTX_AD_QLEA",
 				   "CODEC_TYPE_APTX_AD_R4", "CODEC_TYPE_RVP",
-<<<<<<< HEAD
-				   "CODEC_TYPE_SSC", "CODEC_TYPE_LHDC", "CODEC_TYPE_INVALID"};
-=======
 				   "CODEC_TYPE_SSC", "CODEC_TYPE_LHDC", "CODEC_TYPE_APTX_PLUS", "CODEC_TYPE_INVALID"};
->>>>>>> origin/bt-kernel.lnx.16.0
 
 static SOC_ENUM_SINGLE_EXT_DECL(codec_display, codec_text);
 #endif /*__LINUX_BTFM_SWR_HW_INTERFACE_H*/

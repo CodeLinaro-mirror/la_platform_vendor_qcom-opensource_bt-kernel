@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
-<<<<<<< HEAD
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
-=======
  * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
->>>>>>> origin/bt-kernel.lnx.16.0
  */
 
 

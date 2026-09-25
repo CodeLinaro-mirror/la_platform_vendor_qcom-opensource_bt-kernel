@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
-<<<<<<< HEAD
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
-=======
  * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
->>>>>>> origin/bt-kernel.lnx.16.0
  */
 
 #include <linux/kernel.h>
@@ -337,8 +333,6 @@ static void btfmcodec_dai_shutdown(struct snd_pcm_substream *substream,
 		dai->id, dai->rate);
 #endif
 
-<<<<<<< HEAD
-=======
 	if (btfmcodec_get_current_transport(state) == IDLE) {
 		BTFMCODEC_INFO("%s not allowing shutdown as state is IDLE", __func__);
 		return;
@@ -352,28 +346,11 @@ static void btfmcodec_dai_shutdown(struct snd_pcm_substream *substream,
 		btfmcodec_port_state_notify(IDLE);
 	}
 
->>>>>>> origin/bt-kernel.lnx.16.0
 	if (btfmcodec_get_current_transport(state) == BTADV_AUDIO_Connecting &&
 	    btfmcodec_get_prev_transport(state) == BT_Connected) {
 		BTFMCODEC_INFO("%s: closing these ports as graph stopped when CIS is active",
 			__func__);
 		btfmcodec_hwep_shutdown(btfmcodec, dai->id, false);
-<<<<<<< HEAD
-		btfmcodec_delete_configs(btfmcodec, dai->id);
-		if (!btfmcodec_is_valid_cache_avb(btfmcodec))
-			btfmcodec_set_current_state(state, IDLE);
-		return;
-	}
-
-	if ((btfmcodec_get_current_transport(state) != IDLE &&
-	    btfmcodec_get_current_transport(state) != BT_Connected) ||
-	    (btfmcodec_get_current_transport(state) == BTADV_AUDIO_Connecting &&
-	     btfmcodec_get_prev_transport(state) != BT_Connected)) {
-		BTFMCODEC_WARN("not allowing shutdown as state is:%s",
-			coverttostring(btfmcodec_get_current_transport(state)));
-		/* Delete stored configs */
-=======
->>>>>>> origin/bt-kernel.lnx.16.0
 		btfmcodec_delete_configs(btfmcodec, dai->id);
 		if (!btfmcodec_is_valid_cache_avb(btfmcodec))
 			btfmcodec_set_current_state(state, IDLE);
@@ -642,11 +619,6 @@ int btfmcodec_hwep_prepare(struct btfmcodec_data *btfmcodec, uint32_t sampling_r
 			ret = btfmcodec_configure_master(btfmcodec, (uint8_t)id);
 			if (ret < 0) {
 				BTFMCODEC_ERR("failed to configure master error %d", ret);
-<<<<<<< HEAD
-				if (seamless == false)
-					btfmcodec_set_current_state(state, IDLE);
-=======
->>>>>>> origin/bt-kernel.lnx.16.0
 			} else {
 				if (seamless == false)
 					btfmcodec_set_current_state(state, BT_Connected);
@@ -660,15 +632,10 @@ int btfmcodec_hwep_prepare(struct btfmcodec_data *btfmcodec, uint32_t sampling_r
 			ret  = btfmcodec_configure_dma(btfmcodec, (uint8_t)id);
 			if (ret < 0) {
 				BTFMCODEC_ERR("failed to configure Codec DMA %d", ret);
-<<<<<<< HEAD
-				if (seamless == false)
-					btfmcodec_set_current_state(state, IDLE);
-=======
 				if (dai_drv && dai_drv->dai_ops &&
 				     dai_drv->dai_ops->hwep_shutdown) {
 					dai_drv->dai_ops->hwep_shutdown((void *)hwep_info, id);
 				}
->>>>>>> origin/bt-kernel.lnx.16.0
 			} else {
 				if (seamless == false)
 					btfmcodec_set_current_state(state, BT_Connected);

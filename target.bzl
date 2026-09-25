@@ -13,13 +13,8 @@ def define_pineapple():
          ],
          config_options = [
             "CONFIG_MSM_BT_POWER",
-<<<<<<< HEAD
-            #"CONFIG_I2C_RTC6226_QCA",
-            "CONFIG_BTFM_CODEC",
-=======
             "CONFIG_BTFM_SLIM",
             "CONFIG_I2C_RTC6226_QCA",
->>>>>>> origin/bt-kernel.lnx.16.0
             "CONFIG_FMD_ENABLE",
             #"CONFIG_BT_HW_SECURE_DISABLE",
             "CONFIG_BTFM_SWR",
@@ -45,10 +40,12 @@ def define_sun():
              "CONFIG_I2C_RTC6226_QCA",
              "CONFIG_SLIM_BTFM_CODEC",
              "CONFIG_BTFM_CODEC",
-<<<<<<< HEAD
            #  "CONFIG_BT_HW_SECURE_DISABLE",
              "CONFIG_BTFM_SWR",
 	     "CONFIG_FMD_ENABLE",
+            "CONFIG_BTFM_SWR",
+            "CONFIG_SPI_CNSS_PROTO",
+             "CONFIG_THQSPI_PROTO",
         ]
     )
 
@@ -67,43 +64,26 @@ def define_volcano():
              "CONFIG_MSM_BT_POWER",
              #"CONFIG_I2C_RTC6226_QCA",
              "CONFIG_SLIM_BTFM_CODEC",
-	     "CONFIG_BTFM_CODEC",
-=======
->>>>>>> origin/bt-kernel.lnx.16.0
+             "CONFIG_BTFM_CODEC",
            #  "CONFIG_BT_HW_SECURE_DISABLE",
              "CONFIG_BTFM_SWR",
-	     "CONFIG_FMD_ENABLE",
+             "CONFIG_FMD_ENABLE",
             "CONFIG_BTFM_SWR",
-<<<<<<< HEAD
             "CONFIG_BTFM_SLIM",
-	 ]
-	)
-=======
-            "CONFIG_SPI_CNSS_PROTO",
-             "CONFIG_THQSPI_PROTO",
-        ]
+         ]
     )
 
->>>>>>> origin/bt-kernel.lnx.16.0
 def define_parrot():
     define_bt_modules(
         target = "parrot66",
         modules = [
             "btpower",
             "bt_fm_slim",
-<<<<<<< HEAD
-            #"radio-i2c-rtc6226-qca",
-=======
             "radio-i2c-rtc6226-qca",
->>>>>>> origin/bt-kernel.lnx.16.0
         ],
         config_options = [
             "CONFIG_MSM_BT_POWER",
             "CONFIG_BTFM_SLIM",
-<<<<<<< HEAD
-            #"CONFIG_I2C_RTC6226_QCA",
-            #"CONFIG_BT_HW_SECURE_DISABLE",
-=======
             "CONFIG_I2C_RTC6226_QCA",
             #"CONFIG_BT_HW_SECURE_DISABLE",
         ]
@@ -285,6 +265,5 @@ def define_waipio():
         config_options = [
             "CONFIG_MSM_BT_POWER",
             "CONFIG_I2C_RTC6226_QCA",
->>>>>>> origin/bt-kernel.lnx.16.0
         ]
     )
