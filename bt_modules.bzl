@@ -4,6 +4,10 @@ FMRTC_PATH = "rtc6226"
 BTFMCODEC_PATH = "btfmcodec"
 SWR_PATH = "soundwire"
 SPI_CNSS_PATH = "spi"
+<<<<<<< HEAD
+=======
+THQSPI_PATH = "thq-spi"
+>>>>>>> origin/bt-kernel.lnx.16.0
 
 # This dictionary holds all the BT modules included in the bt-kernel
 bt_modules = {}
@@ -60,18 +64,23 @@ register_bt_modules(
     config_deps = {
 		    "CONFIG_BT_HW_SECURE_DISABLE": [ ":smcinvoke_kernel_headers",
             "//vendor/qcom/opensource/securemsm-kernel:%b_smcinvoke_dlkm",
-        ]
+        ],
+        "CONFIG_FMD_ENABLE": ["//vendor/qcom/opensource/wlan/platform:%b_cnss_utils"],
     },
     deps = [
+<<<<<<< HEAD
         "//vendor/qcom/opensource/wlan/platform:all-wlan-platform-headers",
         "//vendor/qcom/opensource/wlan/platform:%b_cnss_utils",
+=======
+      "//vendor/qcom/opensource/wlan/platform:all-wlan-platform-headers",
+>>>>>>> origin/bt-kernel.lnx.16.0
     ],
 )
 
 register_bt_modules(
     name = "bt_fm_slim",
     path = SLIMBUS_PATH,
-    # config_opt = "CONFIG_BTFM_SLIM",
+    config_opt = "CONFIG_BTFM_SLIM",
     srcs = [
         "btfm_slim.c",
         "btfm_slim.h",
@@ -135,8 +144,12 @@ register_bt_modules(
     ],
     deps = [
         ":%b_btpower", ":%b_btfmcodec", ":btfmcodec_headers",
+<<<<<<< HEAD
         "//vendor/qcom/opensource/audio-kernel:%b_audio",
+=======
+>>>>>>> origin/bt-kernel.lnx.16.0
         "//vendor/qcom/opensource/audio-kernel:audio_headers",
+        "//vendor/qcom/opensource/audio-kernel:%b_swr_dlkm",
     ],
 )
 register_bt_modules(
@@ -155,3 +168,24 @@ register_bt_modules(
         ]
     },
 )
+<<<<<<< HEAD
+=======
+register_bt_modules(
+    name = "thqspi_proto",
+    path = THQSPI_PATH,
+    config_opt = "CONFIG_THQSPI_PROTO",
+    srcs = [
+        "thqspi_proto.c",
+        "thqspi_reg.h",
+        "thqspi_mbox_reg.h",
+        "thqspi_proto.h",
+        "thqspi-trace.h",
+    ],
+    deps = [":thqspi_headers"],
+    config_deps = {
+        "CONFIG_THQSPI_LOOPBACK_ENABLED" : [":thqspi_stub_headers",
+        ":%b_thqspi_stub"
+        ]
+    },
+)
+>>>>>>> origin/bt-kernel.lnx.16.0

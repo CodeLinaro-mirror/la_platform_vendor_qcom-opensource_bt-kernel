@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+<<<<<<< HEAD
  * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+=======
+ * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+>>>>>>> origin/bt-kernel.lnx.16.0
  */
 
 
@@ -34,7 +38,9 @@ enum {
 	FMAUDIO_TX = 0,
 	BTAUDIO_TX,
 	BTAUDIO_RX,
-	BTAUDIO_A2DP_SINK_TX,
+	// align definitions to stream id definitions in CP
+	BTAUDIO_RX2,
+	BTAUDIO_TX2,
 	BTFM_NUM_CODEC_DAIS
 };
 

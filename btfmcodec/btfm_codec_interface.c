@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+<<<<<<< HEAD
  * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+=======
+ * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+>>>>>>> origin/bt-kernel.lnx.16.0
  */
 
 #include <linux/kernel.h>
@@ -14,6 +18,7 @@
 static struct snd_soc_dai_driver *btfmcodec_dai_info;
 uint32_t bits_per_second;
 uint8_t num_channels;
+static int btfmcodec_port_state_notify(uint8_t port_state);
 
 static int btfm_codec_get_mixer_control(struct snd_kcontrol *kcontrol,
 					struct snd_ctl_elem_value *ucontrol)
@@ -285,6 +290,7 @@ void btfmcodec_wq_hwep_shutdown(struct work_struct *work)
 	list_for_each_entry_safe(hwep_configs, tmp, head, dai_list) {
 		BTFMCODEC_INFO("shuting down dai id:%d", hwep_configs->stream_id);
 		ret = btfmcodec_hwep_shutdown(btfmcodec, hwep_configs->stream_id, true);
+		hwep_configs->is_port_opened = 0;
 		if (ret < 0) {
 			BTFMCODEC_ERR("failed to shutdown master with id %d", hwep_configs->stream_id);
 			break;
@@ -323,14 +329,36 @@ static void btfmcodec_dai_shutdown(struct snd_pcm_substream *substream,
 	struct btfmcodec_data *btfmcodec = snd_soc_component_get_drvdata(dai->component);
 	struct btfmcodec_state_machine *state = &btfmcodec->states;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
+	BTFMCODEC_DBG("dai->name: %s, dai->id: %d, dai->rate: %d", dai->name,
+		dai->id, dai->symmetric_rate);
+#else
 	BTFMCODEC_DBG("dai->name: %s, dai->id: %d, dai->rate: %d", dai->name,
 		dai->id, dai->rate);
+#endif
 
+<<<<<<< HEAD
+=======
+	if (btfmcodec_get_current_transport(state) == IDLE) {
+		BTFMCODEC_INFO("%s not allowing shutdown as state is IDLE", __func__);
+		return;
+	}
+
+	if ((btfmcodec_get_current_transport(state) == BTADV_AUDIO_Connecting &&
+		btfmcodec_get_prev_transport(state) == BT_Connected) ||
+		((btfmcodec_get_current_transport(state) == BT_Connecting &&
+		btfmcodec_get_prev_transport(state) == BTADV_AUDIO_Connected))) {
+		BTFMCODEC_INFO("%s: Informing port closure to upper layers",  __func__);
+		btfmcodec_port_state_notify(IDLE);
+	}
+
+>>>>>>> origin/bt-kernel.lnx.16.0
 	if (btfmcodec_get_current_transport(state) == BTADV_AUDIO_Connecting &&
 	    btfmcodec_get_prev_transport(state) == BT_Connected) {
 		BTFMCODEC_INFO("%s: closing these ports as graph stopped when CIS is active",
 			__func__);
 		btfmcodec_hwep_shutdown(btfmcodec, dai->id, false);
+<<<<<<< HEAD
 		btfmcodec_delete_configs(btfmcodec, dai->id);
 		if (!btfmcodec_is_valid_cache_avb(btfmcodec))
 			btfmcodec_set_current_state(state, IDLE);
@@ -344,7 +372,22 @@ static void btfmcodec_dai_shutdown(struct snd_pcm_substream *substream,
 		BTFMCODEC_WARN("not allowing shutdown as state is:%s",
 			coverttostring(btfmcodec_get_current_transport(state)));
 		/* Delete stored configs */
+=======
+>>>>>>> origin/bt-kernel.lnx.16.0
 		btfmcodec_delete_configs(btfmcodec, dai->id);
+		if (!btfmcodec_is_valid_cache_avb(btfmcodec))
+			btfmcodec_set_current_state(state, IDLE);
+		return;
+	}
+
+	if ((btfmcodec_get_current_transport(state) != IDLE &&
+	    btfmcodec_get_current_transport(state) != BT_Connected) ||
+	    (btfmcodec_get_current_transport(state) == BTADV_AUDIO_Connecting &&
+	     btfmcodec_get_prev_transport(state) != BT_Connected)) {
+		BTFMCODEC_WARN("Allowing cache retention in current state:%s, prev state: %s",
+			coverttostring(btfmcodec_get_current_transport(state)),
+			coverttostring(btfmcodec_get_prev_transport(state)));
+		return;
 	} else {
 		/* first master shutdown has to done */
 		btfmcodec_hwep_shutdown(btfmcodec, dai->id, false);
@@ -591,21 +634,41 @@ int btfmcodec_hwep_prepare(struct btfmcodec_data *btfmcodec, uint32_t sampling_r
 						      direction, id);
 		BTFMCODEC_ERR("%s: hwep info %ld", __func__, hwep_info->flags);
 		if (ret == 0 && test_bit(BTADV_AUDIO_MASTER_CONFIG, &hwep_info->flags)) {
+			/* Don't send request to cp for fm as it is non cp */
+			if (id == 0) {
+				btfmcodec_set_current_state(state, BT_Connected);
+				return  ret;
+			}
 			ret = btfmcodec_configure_master(btfmcodec, (uint8_t)id);
 			if (ret < 0) {
 				BTFMCODEC_ERR("failed to configure master error %d", ret);
+<<<<<<< HEAD
 				if (seamless == false)
 					btfmcodec_set_current_state(state, IDLE);
+=======
+>>>>>>> origin/bt-kernel.lnx.16.0
 			} else {
 				if (seamless == false)
 					btfmcodec_set_current_state(state, BT_Connected);
 			}
 		} else if (ret == 0 && test_bit(BTADV_CONFIGURE_DMA, &hwep_info->flags)) {
+                        /* Don't send request to cp for fm as it is non cp */
+			if (id == 0) {
+				btfmcodec_set_current_state(state, BT_Connected);
+				return  ret;
+			}
 			ret  = btfmcodec_configure_dma(btfmcodec, (uint8_t)id);
 			if (ret < 0) {
 				BTFMCODEC_ERR("failed to configure Codec DMA %d", ret);
+<<<<<<< HEAD
 				if (seamless == false)
 					btfmcodec_set_current_state(state, IDLE);
+=======
+				if (dai_drv && dai_drv->dai_ops &&
+				     dai_drv->dai_ops->hwep_shutdown) {
+					dai_drv->dai_ops->hwep_shutdown((void *)hwep_info, id);
+				}
+>>>>>>> origin/bt-kernel.lnx.16.0
 			} else {
 				if (seamless == false)
 					btfmcodec_set_current_state(state, BT_Connected);
@@ -669,7 +732,11 @@ static int btfmcodec_dai_prepare(struct snd_pcm_substream *substream,
 	struct hwep_dai_driver *dai_drv = (struct hwep_dai_driver *)
 					      btfmcodec_get_dai_drvdata(hwep_info);
 	uint8_t *codectype = dai_drv->dai_ops->hwep_codectype;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
+	uint32_t sampling_rate = dai->symmetric_rate;
+#else
 	uint32_t sampling_rate = dai->rate;
+#endif
 	uint32_t direction = substream->stream;
 	int id = dai->id;
 	int ret ;
@@ -695,9 +762,15 @@ static int btfmcodec_dai_prepare(struct snd_pcm_substream *substream,
 	return ret;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+int btfmcodec_hwep_set_channel_map(void *hwep_info, unsigned int tx_num,
+				const unsigned int *tx_slot, unsigned int rx_num,
+				const unsigned int *rx_slot)
+#else
 int btfmcodec_hwep_set_channel_map(void *hwep_info, unsigned int tx_num,
 				unsigned int *tx_slot, unsigned int rx_num,
 				unsigned int *rx_slot)
+#endif
 {
 	struct hwep_dai_driver *dai_drv = (struct hwep_dai_driver *)
 					      btfmcodec_get_dai_drvdata(hwep_info);
@@ -712,9 +785,15 @@ int btfmcodec_hwep_set_channel_map(void *hwep_info, unsigned int tx_num,
 
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static int btfmcodec_dai_set_channel_map(struct snd_soc_dai *dai,
+				unsigned int tx_num, const unsigned int *tx_slot,
+				unsigned int rx_num, const unsigned int *rx_slot)
+#else
 static int btfmcodec_dai_set_channel_map(struct snd_soc_dai *dai,
 				unsigned int tx_num, unsigned int *tx_slot,
 				unsigned int rx_num, unsigned int *rx_slot)
+#endif
 {
 	struct btfmcodec_data *btfmcodec = snd_soc_component_get_drvdata(dai->component);
 	struct btfmcodec_state_machine states = btfmcodec->states;
@@ -748,9 +827,15 @@ int btfmcodec_hwep_get_channel_map(void *hwep_info, unsigned int *tx_num,
 	}
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static int btfmcodec_dai_get_channel_map(const struct snd_soc_dai *dai,
+				 unsigned int *tx_num, unsigned int *tx_slot,
+				 unsigned int *rx_num, unsigned int *rx_slot)
+#else
 static int btfmcodec_dai_get_channel_map(struct snd_soc_dai *dai,
 				 unsigned int *tx_num, unsigned int *tx_slot,
 				 unsigned int *rx_num, unsigned int *rx_slot)
+#endif
 {
 	struct btfmcodec_data *btfmcodec = snd_soc_component_get_drvdata(dai->component);
 //	struct btfmcodec_state_machine states = btfmcodec->states;
@@ -796,16 +881,31 @@ void btfmcodec_wq_hwep_configure(struct work_struct *work)
 		if (ret >= 0)
 			ret = btfmcodec_hwep_prepare(btfmcodec, sample_rate, direction, id, true);
 		if (ret < 0) {
+			hwep_configs->is_port_opened = 1;
 			BTFMCODEC_ERR("failed to configure hwep %d", hwep_configs->stream_id);
 			break;
+		} else {
+			hwep_configs->is_port_opened = 1;
 		}
 	}
 
-	if (ret < 0)
+	if (ret < 0) {
+		list_for_each_entry_safe(hwep_configs, tmp, head, dai_list) {
+			if (hwep_configs->is_port_opened) {
+				BTFMCODEC_INFO("shuting down dai id:%d", hwep_configs->stream_id);
+				ret = btfmcodec_hwep_shutdown(btfmcodec, hwep_configs->stream_id,
+								true);
+				hwep_configs->is_port_opened = 0;
+				if (ret < 0) {
+					BTFMCODEC_ERR("failed to shutdown master with id %d",
+							hwep_configs->stream_id);
+				}
+			}
+		}
 		btfmcodec_dev->status[idx] = BTM_FAIL_RESP_RECV;
-	else
+	} else  {
 		btfmcodec_dev->status[idx] = BTM_RSP_RECV;
-
+	}
 	wake_up_interruptible(&btfmcodec_dev->rsp_wait_q[idx]);
 }
 static struct snd_soc_dai_ops btfmcodec_dai_ops = {
@@ -828,9 +928,19 @@ static int btfmcodec_adsp_ssr_notify(struct notifier_block *nb,
 	switch (action) {
 	case QCOM_SSR_BEFORE_SHUTDOWN: {
 		BTFMCODEC_WARN("LPASS SSR triggered");
+		state_ind.opcode = BTM_BTFMCODEC_ADSP_STATE_IND;
+		state_ind.len = BTM_ADSP_STATE_IND_LEN;
+		state_ind.action = (uint32_t)action;
+		btfmcodec_dev_enqueue_pkt(btfmcodec_dev, &state_ind,
+				(state_ind.len + BTM_HEADER_LEN));
 		break;
 	} case QCOM_SSR_AFTER_SHUTDOWN: {
 		BTFMCODEC_WARN("LPASS SSR Completed");
+		state_ind.opcode = BTM_BTFMCODEC_ADSP_STATE_IND;
+		state_ind.len = BTM_ADSP_STATE_IND_LEN;
+		state_ind.action = (uint32_t)action;
+		btfmcodec_dev_enqueue_pkt(btfmcodec_dev, &state_ind,
+				(state_ind.len + BTM_HEADER_LEN));
 		break;
 	} case QCOM_SSR_BEFORE_POWERUP: {
 		BTFMCODEC_WARN("LPASS booted up after SSR");
@@ -850,6 +960,23 @@ static int btfmcodec_adsp_ssr_notify(struct notifier_block *nb,
 	}
 	return 0;
 }
+
+static int btfmcodec_port_state_notify(uint8_t port_state)
+{
+	struct btm_port_state_ind state_ind;
+	struct btfmcodec_data *btfmcodec;
+	struct btfmcodec_char_device *btfmcodec_dev;
+	BTFMCODEC_WARN("%s: port state = %d", __func__, port_state);
+	btfmcodec = btfm_get_btfmcodec();
+	btfmcodec_dev = btfmcodec->btfmcodec_dev;
+	state_ind.opcode = BTM_BTFMCODEC_PORT_STATE_IND;
+	state_ind.len  = BTM_PORT_STATE_IND_LEN;
+	state_ind.port_state = (uint8_t)port_state;
+	btfmcodec_dev_enqueue_pkt(btfmcodec_dev, &state_ind,
+			(state_ind.len + BTM_HEADER_LEN));
+	return 0;
+}
+
 
 int btfm_register_codec(struct hwep_data *hwep_info)
 {

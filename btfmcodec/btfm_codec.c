@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+<<<<<<< HEAD
  * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+=======
+ * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+>>>>>>> origin/bt-kernel.lnx.16.0
  */
 
 #include <linux/slab.h>
@@ -15,6 +19,7 @@
 #include <linux/version.h>
 #include "btfm_codec.h"
 #include "btfm_codec_pkt.h"
+#include "btfm_codec_btadv_interface.h"
 
 #define dev_to_btfmcodec(_dev) container_of(_dev, struct btfmcodec_data, dev)
 
@@ -68,8 +73,6 @@ static int btfmcodec_dev_open(struct inode *inode, struct file *file)
 	struct btfmcodec_data *btfmcodec = (struct btfmcodec_data *)btfmcodec_dev->btfmcodec;
 	unsigned int active_clients = refcount_read(&btfmcodec_dev->active_clients);
 
-	btfmcodec->states.current_state = IDLE; /* Just a temp*/
-	btfmcodec->states.next_state = IDLE;
 	BTFMCODEC_INFO("for %s by %s:%d active_clients[%d]\n",
 		       btfmcodec_dev->dev_name, current->comm,
 		       task_pid_nr(current), refcount_read(&btfmcodec_dev->active_clients));
@@ -81,6 +84,19 @@ static int btfmcodec_dev_open(struct inode *inode, struct file *file)
 	/* for now have btfmcodec and later we can think of having it btfmcodec_dev */
 	file->private_data = btfmcodec;
 	refcount_inc(&btfmcodec_dev->active_clients);
+
+	BTFMCODEC_INFO("current_state %s prev_state %s",
+			coverttostring(btfmcodec->states.current_state),
+			coverttostring(btfmcodec->states.prev_state));
+	/* Reset state if they are BTADV_AUDIO_CONNECTED or BTADV_AUDIO_CONNECTED
+	 * as these states should be moved to IDLE in previous iteration.
+	 */
+	if (btfmcodec->states.current_state == BTADV_AUDIO_Connected ||
+	    btfmcodec->states.current_state == BTADV_AUDIO_Connecting) {
+		btfmcodec->states.current_state = IDLE;
+	}
+
+	btfmcodec->states.prev_state = IDLE;
 	return 0;
 }
 
@@ -128,9 +144,12 @@ static int btfmcodec_dev_release(struct inode *inode, struct file *file)
 	if (btfmcodec_dev->wq_prepare_bearer.func)
 		cancel_work_sync(&btfmcodec_dev->wq_prepare_bearer);
 
+<<<<<<< HEAD
 	btfmcodec->states.current_state = IDLE;
 	btfmcodec->states.next_state = IDLE;
 
+=======
+>>>>>>> origin/bt-kernel.lnx.16.0
 	return 0;
 }
 
@@ -144,10 +163,11 @@ static void btfmcodec_dev_rxwork(struct work_struct *work)
 {
 	struct btfmcodec_char_device *btfmcodec_dev = container_of(work, struct btfmcodec_char_device, rx_work);
 	struct sk_buff *skb;
+	struct btfmcodec_state_machine *state = &btfmcodec->states;
 	uint32_t len;
 	uint8_t status;
 	int idx;
-	uint8_t *bearer_switch_ind;
+	uint8_t *bearer_switch_ind, *dma_rsp;
 
 	BTFMCODEC_DBG("start");
 	while ((skb = skb_dequeue(&btfmcodec_dev->rxq))) {
@@ -165,6 +185,19 @@ static void btfmcodec_dev_rxwork(struct work_struct *work)
 					&btfmcodec_dev->status[BTM_PKT_TYPE_BEARER_SWITCH_IND];
 				*bearer_switch_ind = BTM_WAITING_RSP;
 				btfmcodec_enqueue_transport(btfmcodec_dev, skb->data[0]);
+<<<<<<< HEAD
+=======
+				if (skb->data[0] == NONE &&
+					btfmcodec_get_current_transport(state) == BT_Connecting &&
+					btfmcodec_get_prev_transport(state) ==
+					BTADV_AUDIO_Connected) {
+					BTFMCODEC_INFO("KP might be awaiting for codec dma rsp");
+					idx = BTM_PKT_TYPE_DMA_CONFIG_RSP;
+					dma_rsp = &btfmcodec_dev->status[idx];
+					*dma_rsp = BTM_FAIL_RESP_RECV;
+					wake_up_interruptible(&btfmcodec_dev->rsp_wait_q[idx]);
+				}
+>>>>>>> origin/bt-kernel.lnx.16.0
 				queue_work(btfmcodec_dev->workqueue,
 					&btfmcodec_dev->wq_prepare_bearer);
 			} else {

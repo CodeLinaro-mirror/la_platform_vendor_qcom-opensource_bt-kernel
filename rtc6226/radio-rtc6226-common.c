@@ -112,6 +112,7 @@
 /* kernel includes */
 #include <linux/delay.h>
 #include <linux/i2c.h>
+#include <linux/version.h>
 #include "radio-rtc6226.h"
 /**************************************************************************
  * Module Parameters
@@ -2327,6 +2328,9 @@ static const struct v4l2_file_operations rtc6226_fops = {
  * rtc6226_ioctl_ops - video device ioctl operations
  */
 /* static */
+/* Define ioctl operations based on kernel version */
+/* For kernel versions before 6.15.0 - include all operations */
+#if (KERNEL_VERSION(6, 15, 0) > LINUX_VERSION_CODE)
 const struct v4l2_ioctl_ops rtc6226_ioctl_ops = {
 	.vidioc_querycap            =   rtc6226_vidioc_querycap,
 	.vidioc_g_audio             =   rtc6226_vidioc_g_audio,
@@ -2339,6 +2343,20 @@ const struct v4l2_ioctl_ops rtc6226_ioctl_ops = {
 	.vidioc_s_hw_freq_seek      =   rtc6226_vidioc_s_hw_freq_seek,
 	.vidioc_dqbuf               =   rtc6226_vidioc_dqbuf,
 };
+/* Reduced set of ioctl operations for kernel version 6.15 */
+/* Note: vidioc_g_ctrl and vidioc_s_ctrl operations are removed as they are deprecated in newer kernel */
+#else
+const struct v4l2_ioctl_ops rtc6226_ioctl_ops = {
+	.vidioc_querycap            =   rtc6226_vidioc_querycap,
+	.vidioc_g_audio             =   rtc6226_vidioc_g_audio,
+	.vidioc_g_tuner             =   rtc6226_vidioc_g_tuner,
+	.vidioc_s_tuner             =   rtc6226_vidioc_s_tuner,
+	.vidioc_g_frequency         =   rtc6226_vidioc_g_frequency,
+	.vidioc_s_frequency         =   rtc6226_vidioc_s_frequency,
+	.vidioc_s_hw_freq_seek      =   rtc6226_vidioc_s_hw_freq_seek,
+	.vidioc_dqbuf               =   rtc6226_vidioc_dqbuf,
+};
+#endif
 
 /*
  * rtc6226_viddev_template - video device interface

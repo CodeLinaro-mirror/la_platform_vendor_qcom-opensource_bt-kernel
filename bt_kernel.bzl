@@ -1,4 +1,4 @@
-load("//msm-kernel:target_variants.bzl", "get_all_variants")
+load(":target_variants.bzl", "get_all_variants")
 load("//build/kernel/kleaf:kernel.bzl", "ddk_module")
 load("//build/bazel_common_rules/dist:dist.bzl", "copy_to_dist_dir")
 load(":bt_modules.bzl", "bt_modules")
@@ -20,7 +20,7 @@ def _get_module_srcs(module, options):
     """
     srcs = module.srcs + _get_config_choices(module.config_srcs, options)
     return native.glob(
-        ["{}/{}".format(module.path, src) for src in srcs] + ["include/*.h"]
+        ["{}/{}".format(module.path, src) for src in srcs] + ["include/*.h"],
     )
 
 def _get_module_deps(module, options, formatter):
@@ -55,10 +55,25 @@ def define_target_variant_modules(target, variant, modules, config_options = [])
         config_options: decides which kernel modules to build
     """
     kernel_build = "{}_{}".format(target, variant)
-    kernel_build_label = "//msm-kernel:{}".format(kernel_build)
+    kernel_build_label = select({
+        "//build/kernel/kleaf:socrepo_true": "//soc-repo:{}_base_kernel".format(kernel_build),
+        "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(kernel_build),
+    })
+    deps = select({
+            "//build/kernel/kleaf:socrepo_true": [
+              "//soc-repo:all_headers",
+              "//soc-repo:{}/drivers/remoteproc/rproc_qcom_common".format(kernel_build),
+              "//soc-repo:{}/kernel/trace/qcom_ipc_logging".format(kernel_build),
+              "//soc-repo:{}/drivers/soc/qcom/qcom_aoss".format(kernel_build),
+              "//soc-repo:{}/drivers/slimbus/slimbus".format(kernel_build),
+              "//soc-repo:{}/drivers/pinctrl/qcom/pinctrl-msm".format(kernel_build),
+            ],
+            "//build/kernel/kleaf:socrepo_false": ["//msm-kernel:all_headers"],
+    })
+
     modules = [bt_modules.get(module_name) for module_name in modules]
     options = _get_build_options(modules, config_options)
-    formatter = lambda s : s.replace("%b", kernel_build)
+    formatter = lambda s: s.replace("%b", kernel_build)
 
     all_modules = []
     for module in modules:
@@ -70,7 +85,7 @@ def define_target_variant_modules(target, variant, modules, config_options = [])
             kernel_build = kernel_build_label,
             srcs = module_srcs,
             out = "{}.ko".format(module.name),
-            deps = ["//msm-kernel:all_headers"] + _get_module_deps(module, options, formatter),
+            deps = deps + _get_module_deps(module, options, formatter),
             includes = ["include"],
             local_defines = options.keys(),
             visibility = ["//visibility:public"],
