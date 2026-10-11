@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 
@@ -38,6 +38,13 @@ enum {
 	QCA_EVROS_SOC_ID_0200 = 0x40200200,
 };
 
+enum {
+	QCA_ORNE_SOC_ID_0100 = 0x40262100,
+};
+
+enum {
+	QCA_COLOGNE_SOC_ID_0100 = 0x40292100,
+};
 
 enum {
 	EVROS_EA = 0x0108170220ULL,

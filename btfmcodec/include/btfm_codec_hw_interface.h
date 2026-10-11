@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef __LINUX_BTFM_CODEC_HW_INTERFACE_H
 #define __LINUX_BTFM_CODEC_HW_INTERFACE_H
-
+#include <linux/version.h>
 #include <linux/kernel.h>
 #include <linux/bitops.h>
 #include <sound/pcm.h>
@@ -29,6 +29,7 @@ struct hwep_configurations {
 	uint8_t codectype;
 	uint32_t direction;
 	uint8_t num_channels;
+	uint8_t is_port_opened;
 	struct list_head dai_list;
 };
 
@@ -67,10 +68,17 @@ struct hwep_dai_ops {
 	void (*hwep_shutdown)(void *, int);
 	int (*hwep_hw_params)(void *, uint32_t, uint32_t, uint8_t);
 	int (*hwep_prepare)(void *, uint32_t, uint32_t, int);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+	int (*hwep_set_channel_map)(void *, unsigned int, const unsigned int *,
+				unsigned int, const unsigned int *);
+	int (*hwep_get_channel_map)(const void *, unsigned int *, unsigned int *,
+				unsigned int *, unsigned int *, int);
+#else
 	int (*hwep_set_channel_map)(void *, unsigned int, unsigned int *,
 				unsigned int, unsigned int *);
 	int (*hwep_get_channel_map)(void *, unsigned int *, unsigned int *,
 				unsigned int *, unsigned int *, int);
+#endif
 	int (*hwep_get_configs)(void *a, void *b, uint8_t c);
 	uint8_t *hwep_codectype;
 };

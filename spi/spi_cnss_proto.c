@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 /*
@@ -184,6 +184,9 @@ static void spi_cnss_parse_and_enqueue(struct spi_cnss_priv *spi_drv,
 		ret++;
 		if (is_peri_cmd(cp.proto_ind)) {
 			cp.end_point = rx_buf[index+1];
+			if (cp.end_point != UWB) {
+				cp.end_point = UWB;
+			}
 			ret++;
 		} else {
 			cp.end_point = get_usr(cp.proto_ind);
@@ -934,8 +937,11 @@ loop_back:
 				usr = get_usr(rx_buf[index]);
 			}
 			if (usr < 0 ||  usr >= MAX_DEV || !spi_drv->user[usr].is_active) {
-				SPI_CNSS_ERR(spi_drv,"%s: Invalid or inactive user:%d. ignore the message\n", __func__, usr);
-				return -EINVAL;
+				SPI_CNSS_ERR(spi_drv,"%s: Invalid or inactive user:%d. change host id to uwb\n", __func__, usr);
+				usr = UWB;
+				spi_cnss_prepare_data_log(spi_drv,"read msg", (char *)&rx_buf[FREAD_TX_SIZE],
+						spi_drv->client.CBUF_LEN, 0, spi_drv->client.CBUF_LEN);
+//				return -EINVAL;
 			}
 			SPI_CNSS_INFO(spi_drv,"%s: data valid, usr = %d\n", __func__, usr);
 			if ((0 <= usr) && (usr < MAX_DEV) && spi_drv->user[usr].fifo_full) {
@@ -1350,7 +1356,12 @@ static int spi_cnss_read_context_info(struct spi_cnss_priv *spi_drv, bool is_irq
 #ifdef CONFIG_AGGRESSIVE_SLEEP
 void spi_cnss_sleep_timeout_handler(struct timer_list *t)
 {
-	struct spi_cnss_priv *spi_drv = from_timer(spi_drv, t, client_sleep_timer);
+#if (KERNEL_VERSION(6, 16, 0) > LINUX_VERSION_CODE)
+        struct spi_cnss_priv *spi_drv = from_timer(spi_drv, t, client_sleep_timer);
+#else
+        struct spi_cnss_priv *spi_drv = timer_container_of(spi_drv, t, client_sleep_timer);
+#endif
+
 	SPI_CNSS_DBG(spi_drv, "%s\n",__func__);
 	if (spi_drv->context_read_pending || spi_drv->read_pending || gpio_get_value(spi_drv->gpio) ||
 		spi_drv->client_state == ASLEEP || spi_drv->write_pending ||
@@ -1664,6 +1675,13 @@ static int spi_cnss_controller_init(struct spi_cnss_priv *spi_drv)
 	spi_stub_driver_reg_cb(notification_to_schedule_wq);
 #else
 	enable_irq(spi_drv->irq);
+
+	if (gpio_get_value(spi_drv->gpio)) {
+		SPI_CNSS_ERR(spi_drv, "%s: irq gpio is high which should not suppose to be high",
+			__func__);
+		pr_err("%s: irq gpio is high which should not suppose to be high\n",__func__);
+	}
+
 	ret = spi_cnss_wakeup_client(spi_drv, NUM_OF_TRIALS_DURING_OPEN);
 
 	if (ret < 0 && gpio_get_value(spi_drv->gpio)) {
@@ -1795,6 +1813,7 @@ static int spi_cnss_open(struct inode *inode, struct file *filp)
 	}
 	if (!spi_drv->client_init) {
 		spi_drv->client_state = ASLEEP;
+		atomic_set(&spi_drv->check_resume_wait, FALSE);
 		ret = spi_cnss_controller_init(spi_drv);
 		if (ret < 0) {
 			SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError spi_cnss_controller_init failed\n", __func__);
@@ -1827,6 +1846,7 @@ static ssize_t spi_cnss_write(struct file *filp, const char __user *buf, size_t 
 	void *data_buf = NULL;
 	int ret,rc;
 	int err_code = 0;
+	int length_check = 0;
 
 	if (!filp || !buf || !len | !filp->private_data) {
 		pr_err("%s: Null pointer\n", __func__);
@@ -1859,7 +1879,8 @@ static ssize_t spi_cnss_write(struct file *filp, const char __user *buf, size_t 
 		spi_drv->ipc_log_enable = false;
 		return -EFAULT;
 	}
-	if (user_req->data_len > (spi_drv->client.HBUF_SIZE - 2)) {//2 bytes for proto byte and host id
+	length_check = is_peri_cmd(user_req->proto_ind)?2:1;//2 bytes  for peri and 1 for uci
+	if (user_req->data_len > (spi_drv->client.HBUF_SIZE - length_check)) {
 		SPI_CNSS_ERR(spi_drv, "%s:SpiCnssError invalid payload length: %d\n",__func__, user_req->data_len);
 		return -EINVAL;
 	}
@@ -2166,7 +2187,11 @@ static int spi_cnss_create_chrdev(struct spi_cnss_priv *spi_drv)
 		return ret;
 	}
 	spi_cnss_cdev_major = MAJOR(spi_drv->chrdev.spidev);
-	spi_drv->chrdev.spi_cnss_class = class_create(THIS_MODULE,"spicnssdev");
+#if (KERNEL_VERSION(6, 4, 0) > LINUX_VERSION_CODE)
+	spi_drv->chrdev.spi_cnss_class = class_create(THIS_MODULE, "spicnssdev");
+#else
+	spi_drv->chrdev.spi_cnss_class = class_create("spicnssdev");
+#endif
 	if (IS_ERR(spi_drv->chrdev.spi_cnss_class)) {
 		SPI_CNSS_ERR(spi_drv, "%s err: %ld\n", __func__, PTR_ERR(spi_drv->chrdev.spi_cnss_class));
 		ret = PTR_ERR(spi_drv->chrdev.spi_cnss_class);
@@ -2456,7 +2481,7 @@ static int spi_cnss_suspend(struct device *dev)
 		if (ret != 0)
 			SPI_CNSS_ERR(spi_drv, "%s runtime suspend failed\n", __func__);
 	}
-	if (ret == 0) {
+	if (ret == 0 && spi_drv->usr_cnt > 0) {
 		atomic_set(&spi_drv->check_resume_wait, TRUE);
 		reinit_completion(&spi_drv->resume_wait);
 	}
@@ -2477,7 +2502,7 @@ static int spi_cnss_resume(struct device *dev)
 	}
 	SPI_CNSS_ERR(spi_drv, "%s \n", __func__);
 	if (spi_drv->usr_cnt == 0) {
-		pr_err("%s: no active clients\n",__func__);
+		SPI_CNSS_INFO(spi_drv, "%s: no active clients\n",__func__);
 		return 0;
 	}
 	complete(&spi_drv->resume_wait);
