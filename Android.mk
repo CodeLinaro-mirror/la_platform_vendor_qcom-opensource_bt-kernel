@@ -7,18 +7,28 @@ ifeq ($(TARGET_KERNEL_DLKM_DISABLE), true)
         endif
 endif
 
+ifeq ($(call is-board-platform-in-list, chora malabar), true)
+	BT_DLKM_ENABLE := true
+endif
+
 ifeq ($(BT_DLKM_ENABLE),  true)
 
 LOCAL_PATH := $(call my-dir)
 
 # Build/Package only in case of supported target
-ifeq ($(call is-board-platform-in-list, taro kalama pineapple blair sun parrot canoe lahaina shikra), true)
+ifeq ($(call is-board-platform-in-list, taro kalama pineapple blair bengal lahaina sun parrot canoe chora malabar hamoa seraph hamoa_la shikra), true)
 
 BT_SELECT := CONFIG_MSM_BT_POWER=m
+ifneq ($(call is-board-platform-in-list, seraph), true)
 BT_SELECT += CONFIG_I2C_RTC6226_QCA=m
+endif
 
-ifneq ($(call is-board-platform-in-list, parrot canoe), true)
+ifneq ($(call is-board-platform-in-list, parrot canoe chora hamoa hamoa_la), true)
 BT_SELECT += CONFIG_FMD_ENABLE=y
+endif
+
+ifeq ($(call is-board-platform-in-list, chora), true)
+BT_SELECT += CONFIG_EXT_BUCK=y
 endif
 
 ifeq ($(TARGET_KERNEL_DLKM_SECUREMSM_QTEE_OVERRIDE), true)
@@ -30,15 +40,24 @@ endif
 LOCAL_PATH := $(call my-dir)
 LOCAL_MODULE_DDK_BUILD := true
 LOCAL_MODULE_KO_DIRS := pwr/btpower.ko
+ifneq ($(call is-board-platform-in-list, seraph), true)
 LOCAL_MODULE_KO_DIRS += rtc6226/radio-i2c-rtc6226-qca.ko
+endif
 
 ifeq ($(TARGET_USES_QMAA_OVERRIDE_BLUETOOTH_AUDIO), true)
-ifeq ($(call is-board-platform-in-list, sun canoe), true)
+ifeq ($(call is-board-platform-in-list, sun canoe chora malabar), true)
 BT_SELECT += CONFIG_BTFM_CODEC=m
-BT_SELECT += CONFIG_BTFM_SWR=m
 BT_SELECT += CONFIG_SLIM_BTFM_CODEC=m
 LOCAL_MODULE_KO_DIRS += btfmcodec/btfmcodec.ko
 LOCAL_MODULE_KO_DIRS += slimbus/btfm_slim_codec.ko
+ifneq ($(call is-board-platform-in-list, malabar), true)
+BT_SELECT += CONFIG_BTFM_SWR=m
+LOCAL_MODULE_KO_DIRS += soundwire/bt_fm_swr.ko
+endif
+else ifeq ($(call is-board-platform-in-list,seraph), true)
+BT_SELECT += CONFIG_BTFM_CODEC=m
+BT_SELECT += CONFIG_BTFM_SWR=m
+LOCAL_MODULE_KO_DIRS += btfmcodec/btfmcodec.ko
 LOCAL_MODULE_KO_DIRS += soundwire/bt_fm_swr.ko
 else
 BT_SELECT += CONFIG_BTFM_SLIM=m
@@ -49,6 +68,10 @@ endif
 ifeq ($(TARGET_USES_QTI_UWB), true)
 BT_SELECT += CONFIG_SPI_CNSS_PROTO=m
 LOCAL_MODULE_KO_DIRS += spi/spi_cnss_proto.ko
+endif
+ifeq ($(BOARD_HAVE_STANDALONE_THREAD), true)
+BT_SELECT += CONFIG_THQSPI_PROTO=m
+LOCAL_MODULE_KO_DIRS += thq-spi/thqspi_proto.ko
 endif
 # This makefile is only for DLKM
 ifneq ($(findstring vendor,$(LOCAL_PATH)),)
@@ -106,7 +129,7 @@ LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 
 ifeq ($(TARGET_USES_QMAA_OVERRIDE_BLUETOOTH_AUDIO), true)
-ifeq ($(call is-board-platform-in-list, sun canoe), true)
+ifeq ($(call is-board-platform-in-list, sun canoe chora malabar), true)
 ################################ BTFM CODEC Driver #########################
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(BT_SRC_FILES)
@@ -121,6 +144,32 @@ include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(BT_SRC_FILES)
 LOCAL_MODULE              := btfm_slim_codec.ko
 LOCAL_MODULE_KBUILD_NAME  := slimbus/btfm_slim_codec.ko
+LOCAL_MODULE_TAGS         := optional
+LOCAL_MODULE_DEBUG_ENABLE := true
+LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
+include $(DLKM_DIR)/Build_external_kernelmodule.mk
+################################ soundwire ################################
+ifneq ($(call is-board-platform-in-list, malabar), true)
+include $(CLEAR_VARS)
+LOCAL_SRC_FILES           := $(BT_SRC_FILES)
+LOCAL_MODULE              := bt_fm_swr.ko
+LOCAL_MODULE_KBUILD_NAME  := soundwire/bt_fm_swr.ko
+LOCAL_MODULE_TAGS         := optional
+LOCAL_MODULE_DEBUG_ENABLE := true
+KBUILD_REQUIRED_KOS += swr_dlkm.ko
+#KBUILD_OPTIONS += KBUILD_EXTRA_SYMBOLS+=$(call intermediates-dir-for,DLKM,swr_dlkm)/Module.symvers
+#LOCAL_REQUIRED_MODULES    := swr_dlkm
+#LOCAL_ADDITIONAL_DEPENDENCIES += $(call intermediates-dir-for,DLKM,swr_dlkm)/Module.symvers
+LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
+include $(DLKM_DIR)/Build_external_kernelmodule.mk
+endif
+else ifeq ($(call is-board-platform-in-list, seraph), true)
+################################ BTFM CODEC Driver #########################
+$(warning Compiling btfmcodec.ko for seraph...)
+include $(CLEAR_VARS)
+LOCAL_SRC_FILES           := $(BT_SRC_FILES)
+LOCAL_MODULE              := btfmcodec.ko
+LOCAL_MODULE_KBUILD_NAME  := btfmcodec/btfmcodec.ko
 LOCAL_MODULE_TAGS         := optional
 LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
@@ -169,6 +218,17 @@ LOCAL_MODULE_TAGS         := optional
 LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
+################################  thqspi driver################################
+ifeq ($(BOARD_HAVE_STANDALONE_THREAD), true)
+include $(CLEAR_VARS)
+LOCAL_SRC_FILES           := $(BT_SRC_FILES)
+LOCAL_MODULE              := thqspi_proto.ko
+LOCAL_MODULE_KBUILD_NAME  := thq-spi/thqspi_proto.ko
+LOCAL_MODULE_TAGS         := optional
+LOCAL_MODULE_DEBUG_ENABLE := true
+LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
+include $(DLKM_DIR)/Build_external_kernelmodule.mk
+endif
 ###########################################################
 
 endif # DLKM check

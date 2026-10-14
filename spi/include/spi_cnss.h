@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef __LINUX_SPI_CNSS_H
@@ -12,6 +12,8 @@
 
 #define SPI_SOFT_RESET_BIT  BIT(0)
 #define SPI_SLEEP_CMD_BIT  BIT(1)
+#define SPI_CNSS_IPC_LOG_BIT  BIT(2)
+
 /*
 * Protocol Indicator
 */

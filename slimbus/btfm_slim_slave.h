@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef BTFM_SLIM_SLAVE_H
@@ -85,6 +85,7 @@ enum {
 	QCA_CHEROKEE_SOC_ID_0310  = 0x40010310,
 	QCA_CHEROKEE_SOC_ID_0320  = 0x40010320,
 	QCA_CHEROKEE_SOC_ID_0320_UMC  = 0x40014320,
+	QCA_CHEROKEE_SOC_ID_0330  = 0x40010330,
 };
 
 enum {
