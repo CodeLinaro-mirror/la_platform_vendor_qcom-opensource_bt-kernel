@@ -231,9 +231,11 @@ def define_waipio():
         modules = [
             "btpower",
             "radio-i2c-rtc6226-qca",
+            "bt_fm_slim",
         ],
         config_options = [
             "CONFIG_MSM_BT_POWER",
             "CONFIG_I2C_RTC6226_QCA",
+            "CONFIG_BTFM_SLIM",
         ]
     )
