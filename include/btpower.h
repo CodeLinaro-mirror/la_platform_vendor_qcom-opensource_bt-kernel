@@ -387,6 +387,7 @@ struct platform_pwr_data {
 	enum ssr_states sub_state;
 	enum ssr_states wrkq_signal_state;
 	struct workqueue_struct *workq;
+	struct workqueue_struct *pwr_vote_wq; /* dedicated WQ for power voting */
 	struct device_node *bt_of_node;
 	struct device_node *uwb_of_node;
 	struct work_struct bt_wq;
